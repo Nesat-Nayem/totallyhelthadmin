@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import FileUpload from '@/components/FileUpload'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
+import { apiMultipart } from '@/utils/api'
+import { useSession } from 'next-auth/react'
 
 /** FORM TYPES **/
 type FormData = {
@@ -17,17 +19,23 @@ type FormData = {
   delPrice: number
 }
 
+
 type SingleValue = { value: string }
 type WeekOffer = { week: string; offer: string }
 
 const AddMealPlan = () => {
-  const { register, handleSubmit } = useForm<FormData>()
+  const { register, handleSubmit, reset } = useForm<FormData>()
+  const { data: session } = useSession()
 
   const [kcalList, setKcalList] = useState<SingleValue[]>([{ value: '' }])
   const [deliveredList, setDeliveredList] = useState<SingleValue[]>([{ value: '' }])
   const [suitableList, setSuitableList] = useState<SingleValue[]>([{ value: '' }])
   const [daysPerWeekList, setDaysPerWeekList] = useState<WeekOffer[]>([{ week: '', offer: '' }])
   const [weeksOfferList, setWeeksOfferList] = useState<WeekOffer[]>([{ week: '', offer: '' }])
+  const [category, setCategory] = useState<string>('')
+  const [brand, setBrand] = useState<string>('')
+  const [files, setFiles] = useState<File[]>([])
+  const [submitting, setSubmitting] = useState(false)
 
   const handleChange = <T,>(list: T[], setList: React.Dispatch<React.SetStateAction<T[]>>, index: number, key: keyof T, val: string) => {
     const updated = [...list]
@@ -45,21 +53,54 @@ const AddMealPlan = () => {
     setList(updated)
   }
 
-  const onSubmit: SubmitHandler<FormData> = (data) => {
-    console.log('Form Submitted:', {
-      ...data,
-      kcalList,
-      deliveredList,
-      suitableList,
-      daysPerWeekList,
-      weeksOfferList,
-    })
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    try {
+      setSubmitting(true)
+      const form = new FormData()
+      form.append('title', data.title)
+      form.append('description', data.description)
+      if (data.discount) form.append('discount', data.discount)
+      if (data.badge) form.append('badge', data.badge)
+      if (data.price !== undefined && data.price !== null) form.append('price', String(data.price))
+      if (data.delPrice !== undefined && data.delPrice !== null) form.append('delPrice', String(data.delPrice))
+      if (category) form.append('category', category)
+      if (brand) form.append('brand', brand)
+
+      // Arrays
+      const arr = (xs: SingleValue[]) => xs.map((x) => x.value).filter((v) => v)
+      form.append('kcalList', JSON.stringify(arr(kcalList)))
+      form.append('deliveredList', JSON.stringify(arr(deliveredList)))
+      form.append('suitableList', JSON.stringify(arr(suitableList)))
+      form.append('daysPerWeek', JSON.stringify(daysPerWeekList.map((x) => x.week).filter((v) => v)))
+      form.append('weeksOffers', JSON.stringify(weeksOfferList.filter((w) => w.week && w.offer)))
+
+      // Files: first as thumbnail, all as images
+      files.forEach((file, idx) => {
+        form.append('images', file)
+        if (idx === 0) form.append('thumbnail', file)
+      })
+
+      const token = (session as any)?.user?.token as string | undefined
+      await apiMultipart('/meal-plans', form, token)
+      reset()
+      setKcalList([{ value: '' }])
+      setDeliveredList([{ value: '' }])
+      setSuitableList([{ value: '' }])
+      setDaysPerWeekList([{ week: '', offer: '' }])
+      setWeeksOfferList([{ week: '', offer: '' }])
+      setFiles([])
+      alert('Meal plan created')
+    } catch (e: any) {
+      alert(e?.message || 'Failed to create')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <Col xl={12}>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <FileUpload title="Meal Plan Photos" />
+        <FileUpload title="Meal Plan Photos" onFilesChange={(fs) => setFiles(fs)} />
 
         {/* General Info */}
         <Card>
@@ -81,11 +122,12 @@ const AddMealPlan = () => {
                   <label htmlFor="menuCategory" className="form-label">
                     Select Menu Category
                   </label>
-                  <select id="menuCategory" className="form-control form-select">
-                    <option value="">Breakfast</option>
-                    <option value="">Lunch</option>
-                    <option value="">Dinner</option>
-                    <option value="">Snacks</option>
+                  <select id="menuCategory" className="form-control form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <option value="">Select Category</option>
+                    <option value="Breakfast">Breakfast</option>
+                    <option value="Lunch">Lunch</option>
+                    <option value="Dinner">Dinner</option>
+                    <option value="Snacks">Snacks</option>
                   </select>
                 </div>
               </Col>
@@ -94,11 +136,12 @@ const AddMealPlan = () => {
                   <label htmlFor="brands" className="form-label">
                     Select Brands
                   </label>
-                  <select id="brands" className="form-control form-select">
-                    <option value="">Totally Health</option>
-                    <option value="">Subway</option>
-                    <option value="">Pizza Hut</option>
-                    <option value="">Burger King</option>
+                  <select id="brands" className="form-control form-select" value={brand} onChange={(e) => setBrand(e.target.value)}>
+                    <option value="">Select Brand</option>
+                    <option value="Totally Health">Totally Health</option>
+                    <option value="Subway">Subway</option>
+                    <option value="Pizza Hut">Pizza Hut</option>
+                    <option value="Burger King">Burger King</option>
                   </select>
                 </div>
               </Col>
@@ -296,8 +339,8 @@ const AddMealPlan = () => {
         <div className="p-3 bg-light mb-3 rounded">
           <Row className="justify-content-end g-2">
             <Col lg={2}>
-              <button type="submit" className="btn btn-outline-secondary w-100">
-                Create Product
+              <button type="submit" disabled={submitting} className="btn btn-outline-secondary w-100">
+                {submitting ? 'Creating...' : 'Create Meal Plan'}
               </button>
             </Col>
             <Col lg={2}>

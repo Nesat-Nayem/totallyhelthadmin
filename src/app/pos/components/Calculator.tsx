@@ -16,6 +16,7 @@ const Calculator = () => {
     setResult('')
   }
 
+  
   const handleInput = (value: string) => {
     setExpression((prev) => prev + value)
   }

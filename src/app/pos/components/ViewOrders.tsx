@@ -15,6 +15,7 @@ const orderData = [
     note: 'Customer need to recheck the product once',
     status: 'onhold',
   },
+  
   {
     id: '#002',
     cashier: 'admin',

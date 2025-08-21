@@ -1,27 +1,46 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Modal, Button, ListGroup } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import LogoBox from '@/components/LogoBox'
 import barcode from '@/assets/images/barcode.webp'
 
-const PrintOrder = () => {
+type OrderItem = { id: string; title: string; price: number; qty: number }
+type Order = {
+  id: string
+  invoiceNo: string
+  date: string
+  customer?: { id: string; name: string }
+  items: OrderItem[]
+  subTotal: number
+  total: number
+}
+
+const PrintOrder = ({ order }: { order?: Order }) => {
   const [showModal, setShowModal] = useState(false)
 
   const handleShow = () => setShowModal(true)
   const handleClose = () => setShowModal(false)
 
+  const hasItems = !!order && order.items && order.items.length > 0
+  const displayDate = useMemo(() => {
+    if (!order?.date) return ''
+    try {
+      return new Date(order.date).toLocaleString()
+    } catch {
+      return order.date
+    }
+  }, [order?.date])
+
   return (
     <>
-      {/* Trigger Button */}
-      <Button variant="info" size="sm" onClick={handleShow}>
+      <Button variant="info" size="sm" onClick={handleShow} disabled={!hasItems} title={!hasItems ? 'No items to print' : 'Print Order'}>
         <IconifyIcon icon="mdi:printer" className="me-1" />
         Print Order
       </Button>
 
-      {/* Modal */}
       <Modal show={showModal} onHide={handleClose} centered>
         <Modal.Header closeButton>
           <Modal.Title>Tax Invoice</Modal.Title>
@@ -40,18 +59,18 @@ const PrintOrder = () => {
           <div className="mb-3">
             <div className="d-flex justify-content-between">
               <div>
-                <strong>Name:</strong> Suraj Jamdade
+                <strong>Name:</strong> {order?.customer?.name || 'Guest'}
               </div>
               <div>
-                <strong>Customer Id:</strong> #0001
+                <strong>Customer Id:</strong> {order?.customer?.id || '-'}
               </div>
             </div>
             <div className="d-flex justify-content-between">
               <div>
-                <strong>Invoice No:</strong> S001
+                <strong>Invoice No:</strong> {order?.invoiceNo || '-'}
               </div>
               <div>
-                <strong>Date:</strong> 02 Aug 2025
+                <strong>Date:</strong> {displayDate}
               </div>
             </div>
           </div>
@@ -67,47 +86,31 @@ const PrintOrder = () => {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>1</td>
-                <td>International Meal Plan</td>
-                <td>AED 100</td>
-                <td>3</td>
-                <td>AED 320</td>
-              </tr>
+              {order?.items?.map((it, idx) => (
+                <tr key={it.id}>
+                  <td>{idx + 1}</td>
+                  <td>{it.title}</td>
+                  <td>AED {it.price}</td>
+                  <td>{it.qty}</td>
+                  <td>AED {it.price * it.qty}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 
           <ListGroup variant="flush" className="small text-end">
             <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Receive Amount:</strong> <span>AED 320.00</span>
+              <strong>Sub Total:</strong> <span className="text-danger">AED {order?.subTotal ?? 0}</span>
             </ListGroup.Item>
             <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Change Amount:</strong> <span>AED 0.00</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Sub Total:</strong> <span className="text-danger">AED 320.00</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>GST (18%):</strong> <span>AED 320.00</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Discount:</strong> <span> AED 0.00</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Shipping Charge:</strong> <span> AED 0.00</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Total Bill:</strong> <span>AED 655.00</span>
-            </ListGroup.Item>
-            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
-              <strong>Rounding :</strong> <span>AED 0.00</span>
+              <strong>Total Bill:</strong> <span>AED {order?.total ?? 0}</span>
             </ListGroup.Item>
           </ListGroup>
 
           <hr className="my-2" />
 
           <h6 className="text-end text-primary">
-            Total Payable: <strong>AED 655.00</strong>
+            Total Payable: <strong>AED {order?.total ?? 0}</strong>
           </h6>
 
           <p className="text-center mt-3 small text-muted">
@@ -116,7 +119,7 @@ const PrintOrder = () => {
 
           <div className="text-center my-3">
             <Image src={barcode} alt="barcode" width={150} height={40} />
-            <div className="fw-bold mt-2">Sale S001</div>
+            <div className="fw-bold mt-2">Sale {order?.invoiceNo}</div>
             <div className="small">Thank You For Shopping With Us. Please Come Again</div>
           </div>
         </Modal.Body>
@@ -124,7 +127,7 @@ const PrintOrder = () => {
           <Button variant="secondary" onClick={handleClose}>
             Close
           </Button>
-          <Button variant="dark" onClick={() => window.print()}>
+          <Button variant="dark" onClick={() => window.print()} disabled={!hasItems}>
             Print Receipt
           </Button>
         </Modal.Footer>
