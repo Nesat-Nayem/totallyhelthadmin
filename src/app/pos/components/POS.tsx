@@ -228,9 +228,9 @@ const POS = () => {
               <IconifyIcon icon="mdi:cash-register" /> Sales List
             </Link>
             <Calculator />
-            <Link href="/dashboard" className="btn btn-sm btn-dark">
+            {/* <Link href="/dashboard" className="btn btn-sm btn-dark">
               <IconifyIcon icon="mdi:view-dashboard-outline" /> Dashboard
-            </Link>
+            </Link> */}
           </CardHeader>
 
           <CardBody>
@@ -315,6 +315,12 @@ const POS = () => {
                   <Form.Label>Change Amount</Form.Label>
                   <Form.Control type="number" defaultValue="0" min={1} />
                 </Form.Group>
+
+                     <Form.Group className="mb-2">
+                  <Form.Label>Due Amount </Form.Label>
+                  <Form.Control type="number" defaultValue="0" min={1} />
+                </Form.Group>
+
                 <Form.Group className="mb-2">
                   <Form.Label>Payment Mode</Form.Label>
                   <Form.Select>
@@ -381,14 +387,7 @@ const POS = () => {
             <Button variant="warning" size="sm" onClick={() => setSelected({})}>
               <IconifyIcon icon="mdi:restart" /> Reset
             </Button>
-            <PrintOrder order={{ id: 'tmp', invoiceNo, date: new Date().toISOString(), customer: customers.find((c) => c.id === customerId), items: Object.values(selected).map((i) => ({ id: i.id, title: i.title, price: i.price, qty: i.qty })), subTotal, total: totalAmount }} />
-            {/* <ViewOrder /> */}
-            <Link href="/reports/all-income" className="btn btn-sm btn-dark">
-              <IconifyIcon icon="mdi:document" /> Reports
-            </Link>
-            <Link href="/reports/transactions" className="btn btn-sm btn-light">
-              <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
-            </Link>
+      
             <Button variant="primary" size="sm" onClick={saveOrder}>
               <IconifyIcon icon="mdi:content-save-outline" /> Save
             </Button>
