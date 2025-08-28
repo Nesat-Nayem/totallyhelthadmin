@@ -25,6 +25,89 @@ const SalesList = () => {
   const { data: session } = useSession()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
+  const [fromDate, setFromDate] = useState<string>('')
+  const [toDate, setToDate] = useState<string>('')
+  const [format, setFormat] = useState<'pdf' | 'excel' | 'csv' | 'all'>('all')
+
+  const filtered = React.useMemo(() => {
+    if (!fromDate && !toDate) return orders
+    const from = fromDate ? new Date(fromDate + 'T00:00:00') : null
+    const to = toDate ? new Date(toDate + 'T23:59:59') : null
+    return orders.filter((o) => {
+      const d = new Date(o.date)
+      if (isNaN(d.getTime())) return false
+      if (from && d < from) return false
+      if (to && d > to) return false
+      return true
+    })
+  }, [orders, fromDate, toDate])
+
+  const download = () => {
+    const rows = filtered.map((o) => {
+      const mode = (o.paymentMode || '').toLowerCase()
+      const cash = mode === 'cash' ? o.total : 0
+      const card = mode === 'card' ? o.total : 0
+      const online = mode === 'online' ? o.total : 0
+      const tawseel = mode === 'tawseel' ? o.total : 0
+      return {
+        Date: fmt(o.date),
+        'Cash Amt': cash,
+        'Cr.Card Amt': card,
+        'Online Amt': online,
+        'Tawseel Amt': tawseel,
+        'Total Amt': o.total,
+      }
+    })
+
+    const toCSV = (data: any[]) => {
+      if (!data.length) return ''
+      const headers = Object.keys(data[0])
+      const esc = (v: any) => {
+        const s = String(v ?? '')
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+          return '"' + s.replace(/"/g, '""') + '"'
+        }
+        return s
+      }
+      const lines = [headers.join(',')]
+      for (const row of data) {
+        lines.push(headers.map((h) => esc((row as any)[h])).join(','))
+      }
+      return lines.join('\n')
+    }
+
+    if (format === 'pdf') {
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Sales Report</title>
+        <style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:left}</style></head>
+        <body><h3>Pay Type Wise Sales Summary</h3>
+        <table><thead><tr><th>Date</th><th>Cash Amt</th><th>Cr.Card Amt</th><th>Online Amt</th><th>Tawseel Amt</th><th>Total Amt</th></tr></thead><tbody>
+        ${rows
+          .map(
+            (r) => `<tr><td>${r['Date']}</td><td>${r['Cash Amt']}</td><td>${r['Cr.Card Amt']}</td><td>${r['Online Amt']}</td><td>${r['Tawseel Amt']}</td><td>${r['Total Amt']}</td></tr>`
+          )
+          .join('')}
+        </tbody></table>
+        <script>window.onload=()=>{window.print();}</script>
+        </body></html>`
+      const win = window.open('', '_blank')
+      if (win) {
+        win.document.write(html)
+        win.document.close()
+      }
+      return
+    }
+
+    const csv = toCSV(rows)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sales-report-${fromDate || 'all'}-to-${toDate || 'all'}.${format === 'excel' ? 'xlsx' : 'csv'}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   const loadOrders = async () => {
     try {
@@ -86,23 +169,20 @@ const SalesList = () => {
                 Pay Type Wise Sales Summary-Report
               </CardTitle>
               <div className="mb-3">
-                <label htmlFor="fromDate" className="form-label">
-                  From
-                </label>
-                <input id="fromDate" type="date" className="form-control" />
+                <label htmlFor="fromDate" className="form-label">From</label>
+                <input id="fromDate" type="date" className="form-control" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
               </div>
               <div className="mb-3">
-                <label htmlFor="toDate" className="form-label">
-                  To
-                </label>
-                <input id="toDate" type="date" className="form-control" />
+                <label htmlFor="toDate" className="form-label">To</label>
+                <input id="toDate" type="date" className="form-control" value={toDate} onChange={(e) => setToDate(e.target.value)} />
               </div>
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
+              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1" value={format} onChange={(e) => setFormat(e.target.value as any)}>
                 <option value="all">Select download</option>
                 <option value="pdf">PDF</option>
                 <option value="excel">Excel</option>
                 <option value="csv">CSV</option>
               </select>
+              <button className="btn btn-primary btn-sm ms-2" onClick={download} disabled={format==='all'}>Download</button>
             </CardHeader>
 
             <div>
@@ -126,14 +206,14 @@ const SalesList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length === 0 ? (
+                    {filtered.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="text-center text-muted">
-                          {loading ? 'Loading orders...' : 'No orders yet. Create one in POS.'}
+                          {loading ? 'Loading orders...' : 'No matching orders.'}
                         </td>
                       </tr>
                     ) : (
-                      orders.map((o) => {
+                      filtered.map((o) => {
                         const mode = (o.paymentMode || '').toLowerCase()
                         const cash = mode === 'cash' ? o.total : 0
                         const card = mode === 'card' ? o.total : 0
