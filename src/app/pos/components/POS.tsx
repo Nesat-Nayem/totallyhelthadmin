@@ -45,6 +45,14 @@ const POS = () => {
   const [endDate, setEndDate] = useState('')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerId, setCustomerId] = useState('')
+  const [vatPercent, setVatPercent] = useState<number>(0)
+  const [discountType, setDiscountType] = useState<'flat' | 'percent'>('flat')
+  const [discountValue, setDiscountValue] = useState<number>(0)
+  const [shippingCharge, setShippingCharge] = useState<number>(0)
+  const [rounding, setRounding] = useState<number>(0)
+  const [receiveAmount, setReceiveAmount] = useState<number>(0)
+  const [paymentMode, setPaymentMode] = useState<string>('Cash')
+  const [note, setNote] = useState<string>('')
 
   const load = async () => {
     try {
@@ -119,7 +127,18 @@ const POS = () => {
   }
 
   const subTotal = Object.values(selected).reduce((sum, p) => sum + p.price * p.qty, 0)
-  const totalAmount = subTotal
+  const vatAmount = Number(((subTotal * (Number(vatPercent) || 0)) / 100).toFixed(2))
+  const discountAmount = Number(
+    (
+      (discountType === 'percent'
+        ? subTotal * ((Number(discountValue) || 0) / 100)
+        : Number(discountValue) || 0) || 0
+    ).toFixed(2)
+  )
+  const totalAmount = Math.max(0, Number((subTotal + vatAmount + (Number(shippingCharge) || 0) + (Number(rounding) || 0) - discountAmount).toFixed(2)))
+  const payableAmount = totalAmount
+  const changeAmount = Math.max(0, Number(((Number(receiveAmount) || 0) - payableAmount).toFixed(2)))
+  const dueAmount = Math.max(0, Number((payableAmount - (Number(receiveAmount) || 0)).toFixed(2)))
 
   const onCustomerCreated = (c: Customer) => {
     setCustomers((prev) => [...prev, c])
@@ -141,11 +160,31 @@ const POS = () => {
         total: totalAmount,
         startDate,
         endDate,
-        status: 'paid',
+        status: dueAmount > 0 ? 'unpaid' : 'paid',
+        paymentMode,
+        vatPercent: Number(vatPercent) || 0,
+        vatAmount,
+        discountType,
+        discountAmount,
+        shippingCharge: Number(shippingCharge) || 0,
+        rounding: Number(rounding) || 0,
+        payableAmount,
+        receiveAmount: Number(receiveAmount) || 0,
+        changeAmount,
+        dueAmount,
+        note: note?.trim() || undefined,
       }
       await apiFetch(`/orders`, { method: 'POST', body: JSON.stringify(payload) }, token)
       alert('Order saved')
       setSelected({})
+      setVatPercent(0)
+      setDiscountType('flat')
+      setDiscountValue(0)
+      setShippingCharge(0)
+      setRounding(0)
+      setReceiveAmount(0)
+      setPaymentMode('Cash')
+      setNote('')
       // regenerate invoice number for next order
       const inv = `S-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`
       setInvoiceNo(inv)
@@ -309,21 +348,21 @@ const POS = () => {
               <Col md={6}>
                 <Form.Group className="mb-2">
                   <Form.Label>Receive Amount</Form.Label>
-                  <Form.Control type="number" defaultValue="0" />
+                  <Form.Control type="number" value={receiveAmount} onChange={(e) => setReceiveAmount(Number(e.target.value) || 0)} />
                 </Form.Group>
                 <Form.Group className="mb-2">
                   <Form.Label>Change Amount</Form.Label>
-                  <Form.Control type="number" defaultValue="0" min={1} />
+                  <Form.Control type="number" value={changeAmount} readOnly />
                 </Form.Group>
 
-                     <Form.Group className="mb-2">
+                <Form.Group className="mb-2">
                   <Form.Label>Due Amount </Form.Label>
-                  <Form.Control type="number" defaultValue="0" min={1} />
+                  <Form.Control type="number" value={dueAmount} readOnly />
                 </Form.Group>
 
                 <Form.Group className="mb-2">
                   <Form.Label>Payment Mode</Form.Label>
-                  <Form.Select>
+                  <Form.Select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
                     {paymentModes.map((mode, idx) => (
                       <option key={idx} value={mode}>
                         {mode}
@@ -332,7 +371,7 @@ const POS = () => {
                   </Form.Select>
                 </Form.Group>
 
-                <Form.Control as="textarea" placeholder="Type note..." />
+                <Form.Control as="textarea" placeholder="Type note..." value={note} onChange={(e) => setNote(e.target.value)} />
               </Col>
 
               <Col md={6}>
@@ -341,31 +380,33 @@ const POS = () => {
                   <Form.Control type="text" value={`AED ${subTotal}`} disabled />
                 </Form.Group>
                 <Form.Group className="mb-2">
-                  <Form.Label>VAT</Form.Label>
+                  <Form.Label>VAT (%)</Form.Label>
                   <InputGroup>
-                    <Form.Select>
-                      <option>Select</option>
-                      <option>GST (18%)</option>
-                      <option>IGST (9%)</option>
-                      <option>CGST (9%)</option>
-                      <option>TVA (15%)</option>
+                    <Form.Select value={vatPercent} onChange={(e) => setVatPercent(Number(e.target.value) || 0)}>
+                      <option value={0}>Select</option>
+                      <option value={5}>5%</option>
+                      <option value={9}>9%</option>
+                      <option value={15}>15%</option>
+                      <option value={18}>18%</option>
                     </Form.Select>
-                    <FormControl type="number" placeholder="0.00" />
+                    <FormControl type="number" placeholder="Custom %" value={vatPercent} onChange={(e) => setVatPercent(Number(e.target.value) || 0)} />
                   </InputGroup>
+                  <div className="small text-muted">VAT Amount: AED {vatAmount}</div>
                 </Form.Group>
                 <Form.Group className="mb-2">
                   <Form.Label>Discount</Form.Label>
                   <InputGroup>
-                    <Form.Select>
-                      <option>Flat (AED)</option>
-                      <option>Percent (%)</option>
+                    <Form.Select value={discountType} onChange={(e) => setDiscountType(e.target.value as any)}>
+                      <option value="flat">Flat (AED)</option>
+                      <option value="percent">Percent (%)</option>
                     </Form.Select>
-                    <FormControl type="number" placeholder="0" />
+                    <FormControl type="number" placeholder="0" value={discountValue} onChange={(e) => setDiscountValue(Number(e.target.value) || 0)} />
                   </InputGroup>
+                  <div className="small text-muted">Discount Amount: AED {discountAmount}</div>
                 </Form.Group>
                 <Form.Group className="mb-2">
                   <Form.Label>Shipping Charge</Form.Label>
-                  <Form.Control type="number" defaultValue="0" min={1} />
+                  <Form.Control type="number" value={shippingCharge} onChange={(e) => setShippingCharge(Number(e.target.value) || 0)} />
                 </Form.Group>
                 <Form.Group className="mb-2">
                   <Form.Label>Total Amount</Form.Label>
@@ -373,13 +414,13 @@ const POS = () => {
                 </Form.Group>
                 <Form.Group className="mb-2">
                   <Form.Label>Rounding(+/-)</Form.Label>
-                  <Form.Control type="number" defaultValue="0" min={1} />
+                  <Form.Control type="number" value={rounding} onChange={(e) => setRounding(Number(e.target.value) || 0)} />
                 </Form.Group>
               </Col>
             </Row>
             <div className="d-flex justify-content-between bg-light p-3 border">
               <h5>Payable Amount:</h5>
-              <h5 className="text-primary fw-bold">AED {totalAmount}</h5>
+              <h5 className="text-primary fw-bold">AED {payableAmount}</h5>
             </div>
           </CardBody>
 

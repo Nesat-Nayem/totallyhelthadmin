@@ -171,7 +171,7 @@ const SalesList = () => {
                           <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || 'Cash'}</td>
                           <td>
                             <div className="d-flex gap-2">
-                              <Link href="/sales/invoice" className="btn btn-light btn-sm" title="Invoice">
+                              <Link href={`/sales/invoice/${o.id}`} className="btn btn-light btn-sm" title="Invoice">
                                 <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-18" />
                               </Link>
                               <Link href="/pos" className="btn btn-soft-primary btn-sm" title="Open POS">

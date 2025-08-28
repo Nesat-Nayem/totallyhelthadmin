@@ -12,10 +12,22 @@ type Order = {
   id: string
   invoiceNo: string
   date: string
-  customer?: { id: string; name: string }
+  customer?: { id?: string; name: string }
   items: OrderItem[]
   subTotal: number
   total: number
+  // extended
+  vatPercent?: number
+  vatAmount?: number
+  discountType?: 'flat' | 'percent'
+  discountAmount?: number
+  shippingCharge?: number
+  rounding?: number
+  payableAmount?: number
+  receiveAmount?: number
+  changeAmount?: number
+  dueAmount?: number
+  paymentMode?: string
 }
 
 const PrintOrder = ({ order }: { order?: Order }) => {
@@ -103,14 +115,41 @@ const PrintOrder = ({ order }: { order?: Order }) => {
               <strong>Sub Total:</strong> <span className="text-danger">AED {order?.subTotal ?? 0}</span>
             </ListGroup.Item>
             <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>VAT ({order?.vatPercent ?? 0}%):</strong> <span>AED {order?.vatAmount ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Discount ({order?.discountType === 'percent' ? '%' : 'AED'}):</strong> <span>AED {order?.discountAmount ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Shipping Charge:</strong> <span>AED {order?.shippingCharge ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
               <strong>Total Bill:</strong> <span>AED {order?.total ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Rounding(+/-):</strong> <span>AED {order?.rounding ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Payable Amount:</strong> <span>AED {order?.payableAmount ?? order?.total ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Receive Amount:</strong> <span>AED {order?.receiveAmount ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Change Amount:</strong> <span>AED {order?.changeAmount ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Due Amount:</strong> <span>AED {order?.dueAmount ?? 0}</span>
+            </ListGroup.Item>
+            <ListGroup.Item className="d-flex justify-content-between border-0 px-0 py-1">
+              <strong>Paid by:</strong> <span>{order?.paymentMode || 'Cash'}</span>
             </ListGroup.Item>
           </ListGroup>
 
           <hr className="my-2" />
 
           <h6 className="text-end text-primary">
-            Total Payable: <strong>AED {order?.total ?? 0}</strong>
+            Total Payable: <strong>AED {order?.payableAmount ?? order?.total ?? 0}</strong>
           </h6>
 
           <p className="text-center mt-3 small text-muted">
