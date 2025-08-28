@@ -119,6 +119,7 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
+
   {
     key: 'invoices',
     icon: 'solar:clipboard-list-bold-duotone',
@@ -130,50 +131,64 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Reports',
     icon: 'solar:bill-list-bold-duotone',
     children: [
-      {
-        key: 'all-income',
-        label: 'Collection Report',
-        url: '/reports/all-income',
-        parentKey: 'reports',
-      },
 
-      {
-        key: 'vat-report',
-        label: 'VAT Report',
-        url: '/reports/vat-report',
+       {
+        key: 'membership-report',
+        label: 'Membership Report',
+        url: '/reports/membership-report',
         parentKey: 'reports',
       },
       {
-        key: 'discount-report',
-        label: 'Discount Report',
-        url: '/reports/discount-report',
+        key: 'sales-report',
+        label: 'Sales Report',
+        url: '/reports/sales-report',
         parentKey: 'reports',
       },
+      
+      // {
+      //   key: 'all-income',
+      //   label: 'Collection Report',
+      //   url: '/reports/all-income',
+      //   parentKey: 'reports',
+      // },
 
       // {
-      //   key: 'staff-report',
-      //   label: 'Staff  Report',
+      //   key: 'vat-report',
+      //   label: 'VAT Report',
+      //   url: '/reports/vat-report',
+      //   parentKey: 'reports',
+      // },
+      // {
+      //   key: 'discount-report',
+      //   label: 'Discount Report',
       //   url: '/reports/discount-report',
       //   parentKey: 'reports',
       // },
-      {
-        key: 'unpaid-report',
-        label: 'Unpaid Delivery  Report',
-        url: '/reports/unpaid-report',
-        parentKey: 'reports',
-      },
-      {
-        key: 'category-wise-report',
-        label: 'Category Wise Report',
-        url: '/reports/category-wise-report',
-        parentKey: 'reports',
-      },
-      {
-        key: 'order-wise-report',
-        label: 'Order Type Wise Report',
-        url: '/reports/order-wise-report',
-        parentKey: 'reports',
-      },
+
+      // // {
+      // //   key: 'staff-report',
+      // //   label: 'Staff  Report',
+      // //   url: '/reports/discount-report',
+      // //   parentKey: 'reports',
+      // // },
+      // {
+      //   key: 'unpaid-report',
+      //   label: 'Unpaid Delivery  Report',
+      //   url: '/reports/unpaid-report',
+      //   parentKey: 'reports',
+      // },
+      // {
+      //   key: 'category-wise-report',
+      //   label: 'Category Wise Report',
+      //   url: '/reports/category-wise-report',
+      //   parentKey: 'reports',
+      // },
+      // {
+      //   key: 'order-wise-report',
+      //   label: 'Order Type Wise Report',
+      //   url: '/reports/order-wise-report',
+      //   parentKey: 'reports',
+      // },
     ],
   },
   {
