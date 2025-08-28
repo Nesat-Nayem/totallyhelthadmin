@@ -21,6 +21,7 @@ type Order = {
   paymentMode?: string
 }
 
+
 const SalesList = () => {
   const { data: session } = useSession()
   const [orders, setOrders] = useState<Order[]>([])
