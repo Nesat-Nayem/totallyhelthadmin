@@ -7,7 +7,7 @@ import PasswordFormInput from '@/components/form/PasswordFormInput'
 import { Controller } from 'react-hook-form'
 
 const LoginFrom = () => {
-  const { loading, login, control } = useSignIn()
+  const { loading, login, control, branches, branchesLoading } = useSignIn()
   return (
     <form className="authentication-form" onSubmit={login}>
       <TextFormInput control={control} name="email" containerClassName="mb-3" label="Email" id="email-id" placeholder="Enter your email" />
@@ -27,14 +27,20 @@ const LoginFrom = () => {
         }
       />
       <label className="form-label">Select Branch</label>
-      <select name="approved" id="" className="form-control form-select mb-3">
-        <option selected>Branch</option>
-        <option value="dubai">Dubai</option>
-        <option value="sharjah">Sharjah</option>
-        <option value="abudhabi">Abudhabi</option>
-        <option value="alain">Alain</option>
-        <option value="abudhabi">Abu Dhabi</option>
-      </select>
+      <Controller
+        name="branchId"
+        control={control}
+        render={({ field }) => (
+          <select {...field} className="form-control form-select mb-3" disabled={branchesLoading}>
+            <option value="">{branchesLoading ? 'Loading branches...' : 'Select Branch'}</option>
+            {branches.map((b: any) => (
+              <option key={b._id} value={b._id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        )}
+      />
       <div className="mb-3">
         <FormCheck label="Remember me" id="sign-in" />
       </div>
@@ -48,3 +54,4 @@ const LoginFrom = () => {
 }
 
 export default LoginFrom
+

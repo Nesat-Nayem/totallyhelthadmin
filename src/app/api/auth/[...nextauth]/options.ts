@@ -2,21 +2,15 @@ import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { randomBytes } from 'crypto'
 
-import type { UserType } from '@/types/auth'
+import { API_BASE_URL } from '@/utils/env'
 
-export const fakeUsers: UserType[] = [
-  {
-    id: '1',
-    email: 'user@demo.com',
-    username: 'demo_user',
-    password: '123456',
-    firstName: 'Demo',
-    lastName: 'User',
-    role: 'Admin',
-    token:
-      'eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ0ZWNoemFhIiwiYXVkIjoiaHR0cHM6Ly90ZWNoemFhLmdldGFwcHVpLmNvbS8iLCJzdWIiOiJzdXBwb3J0QGNvZGVydGhlbWVzLmNvbSIsImxhc3ROYW1lIjoiVGVjaHphYSIsIkVtYWlsIjoidGVjaHphYXN0dWRpb0BnbWFpbC5jb20iLCJSb2xlIjoiQWRtaW4iLCJmaXJzdE5hbWUiOiJUZXN0VG9rZW4ifQ.ud4LnFZ-mqhHEYiPf2wCLM7KvLGoAxhXTBSymRIZEFLleFkO119AXd8p3OfPCpdUWSyeZl8-pZyElANc_KHj5w',
-  },
-]
+type BackendLoginResponse = {
+  success: boolean
+  statusCode: number
+  message: string
+  token: string
+  data: any
+}
 
 export const options: NextAuthOptions = {
   providers: [
@@ -32,16 +26,35 @@ export const options: NextAuthOptions = {
           label: 'Password',
           type: 'password',
         },
+        branchId: {
+          label: 'Branch',
+          type: 'text',
+        },
       },
       async authorize(credentials, req) {
-        const filteredUser = fakeUsers.find((user) => {
-          return user.email === credentials?.email && user.password === credentials?.password
+        const res = await fetch(`${API_BASE_URL}/auth/signin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: credentials?.email,
+            password: credentials?.password,
+            branchId: credentials?.branchId,
+          }),
         })
-        if (filteredUser) {
-          return filteredUser
-        } else {
-          throw new Error('Email or Password is not valid')
+
+        const data = (await res.json()) as BackendLoginResponse
+        if (res.ok && data?.success && data?.token) {
+          // Return a user-like object for NextAuth
+          return {
+            id: data.data?._id ?? data.data?.id ?? 'user',
+            email: data.data?.email,
+            name: data.data?.name,
+            role: data.data?.role,
+            branchId: data.data?.branchId,
+            token: data.token,
+          } as any
         }
+        throw new Error(data?.message || 'Invalid credentials')
       },
     }),
   ],
@@ -50,14 +63,27 @@ export const options: NextAuthOptions = {
     signIn: '/auth/sign-in',
   },
   callbacks: {
-    async signIn({ user, account, profile, email, credentials }) {
+    async signIn({ user }) {
       return true
     },
-    session: ({ session, token }) => {
-      session.user = {
-        email: 'user@demo.com',
-        name: 'Test User',
+    async jwt({ token, user }) {
+      if (user) {
+        token.accessToken = (user as any).token
+        token.user = {
+          email: (user as any).email,
+          name: (user as any).name,
+          role: (user as any).role,
+          branchId: (user as any).branchId,
+        }
       }
+      return token
+    },
+    session: ({ session, token }) => {
+      ;(session as any).accessToken = (token as any).accessToken
+      session.user = {
+        email: (token as any).user?.email,
+        name: (token as any).user?.name,
+      } as any
       return Promise.resolve(session)
     },
   },

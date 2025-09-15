@@ -8,6 +8,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 
 import { useNotificationContext } from '@/context/useNotificationContext'
 import useQueryParams from '@/hooks/useQueryParams'
+import { useGetBranchesQuery } from '@/services/branchApi'
 
 const useSignIn = () => {
   const [loading, setLoading] = useState(false)
@@ -19,6 +20,7 @@ const useSignIn = () => {
   const loginFormSchema = yup.object({
     email: yup.string().email('Please enter a valid email').required('Please enter your email'),
     password: yup.string().required('Please enter your password'),
+    branchId: yup.string().required('Please select a branch'),
   })
 
   const { control, handleSubmit } = useForm({
@@ -26,10 +28,14 @@ const useSignIn = () => {
     defaultValues: {
       email: 'user@demo.com',
       password: '123456',
+      branchId: '',
     },
   })
 
   type LoginFormFields = yup.InferType<typeof loginFormSchema>
+
+  // Fetch branches for selection
+  const { data: branches = [], isLoading: branchesLoading } = useGetBranchesQuery()
 
   const login = handleSubmit(async (values: LoginFormFields) => {
     setLoading(true)
@@ -37,6 +43,7 @@ const useSignIn = () => {
       redirect: false,
       email: values?.email,
       password: values?.password,
+      branchId: values?.branchId,
     }).then((res) => {
       if (res?.ok) {
         push(queryParams['redirectTo'] ?? '/dashboard')
@@ -48,7 +55,7 @@ const useSignIn = () => {
     setLoading(false)
   })
 
-  return { loading, login, control }
+  return { loading, login, control, branches, branchesLoading }
 }
 
 export default useSignIn

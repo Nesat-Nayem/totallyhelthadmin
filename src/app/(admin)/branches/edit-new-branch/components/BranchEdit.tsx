@@ -1,6 +1,4 @@
 'use client'
-import ChoicesFormInput from '@/components/form/ChoicesFormInput'
-import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
 import React from 'react'
@@ -8,11 +6,16 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useGetBranchByIdQuery, useUpdateBranchMutation } from '@/services/branchApi'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 /** FORM DATA TYPE **/
 type FormData = {
-  title: string
-  status: string
+  name: string
+  location?: string
+  brand?: string
+  logo?: string
+  status: 'active' | 'inactive'
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
@@ -22,8 +25,11 @@ type ControlType = {
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  title: yup.string().required('Please enter title'),
-  status: yup.string().required('Please select a status'),
+  name: yup.string().required('Please enter branch name'),
+  location: yup.string().optional(),
+  brand: yup.string().optional(),
+  logo: yup.string().url('Please provide a valid URL').optional(),
+  status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
 
 /** GENERAL INFORMATION CARD **/
@@ -37,20 +43,35 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Branch Name" />
+              <TextFormInput control={control} type="text" name="name" label="Branch Name" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="title" label="Branch Logo" />
+              <TextFormInput control={control} type="text" name="logo" label="Branch Logo URL" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Branch Location" />
+              <TextFormInput control={control} type="text" name="location" label="Branch Location" />
             </div>
           </Col>
-
+          <Col lg={6}>
+            <label htmlFor="">Brand</label>
+            <div className="mb-3">
+              <Controller
+                control={control}
+                name="brand"
+                render={({ field }) => (
+                  <select {...field} className="form-control form-select">
+                    <option value="">Select Brand</option>
+                    <option value="Totally Health">Totally Health</option>
+                    <option value="Healthy Living">Healthy Living</option>
+                  </select>
+                )}
+              />
+            </div>
+          </Col>
           {/* STATUS FIELD */}
           <Col lg={6}>
             <label className="form-label">Status</label>
@@ -105,10 +126,28 @@ const BranchEdit: React.FC = () => {
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active' },
   })
+  const params = useSearchParams()
+  const id = params.get('id') as string
+  const { data } = useGetBranchByIdQuery(id!, { skip: !id })
+  const [updateBranch, { isLoading }] = useUpdateBranchMutation()
+  const { push } = useRouter()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  React.useEffect(() => {
+    if (data) {
+      reset({
+        name: (data as any).name,
+        location: (data as any).location,
+        brand: (data as any).brand,
+        logo: (data as any).logo,
+        status: (data as any).status || 'active',
+      })
+    }
+  }, [data, reset])
+
+  const onSubmit = async (form: FormData) => {
+    if (!id) return
+    await updateBranch({ id, data: form }).unwrap()
+    push('/branches/list-of-branches')
   }
 
   return (
@@ -117,7 +156,7 @@ const BranchEdit: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
               Save
             </Button>
           </Col>
@@ -133,3 +172,4 @@ const BranchEdit: React.FC = () => {
 }
 
 export default BranchEdit
+

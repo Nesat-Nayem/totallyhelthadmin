@@ -1,6 +1,4 @@
 'use client'
-import ChoicesFormInput from '@/components/form/ChoicesFormInput'
-import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
 import React from 'react'
@@ -8,11 +6,16 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useCreateBranchMutation } from '@/services/branchApi'
+import { useRouter } from 'next/navigation'
 
 /** FORM DATA TYPE **/
 type FormData = {
-  title: string
-  status: string
+  name: string
+  location?: string
+  brand?: string
+  logo?: string
+  status: 'active' | 'inactive'
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
@@ -22,8 +25,11 @@ type ControlType = {
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  title: yup.string().required('Please enter title'),
-  status: yup.string().required('Please select a status'),
+  name: yup.string().required('Please enter branch name'),
+  location: yup.string().optional(),
+  brand: yup.string().optional(),
+  logo: yup.string().url('Please provide a valid URL').optional(),
+  status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
 
 /** GENERAL INFORMATION CARD **/
@@ -37,27 +43,33 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Branch Name" />
+              <TextFormInput control={control} type="text" name="name" label="Branch Name" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="title" label="Branch Logo" />
+              <TextFormInput control={control} type="text" name="logo" label="Branch Logo URL" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Branch Location" />
+              <TextFormInput control={control} type="text" name="location" label="Branch Location" />
             </div>
           </Col>
           <Col lg={6}>
-            <label htmlFor="">Select Brand</label>
+            <label htmlFor="">Brand</label>
             <div className="mb-3">
-              <select name="title" id="" className="form-control form-select">
-                <option value="0">Select Brand</option>
-                <option value="1">Totally Health</option>
-                <option value="2">Healthy Living</option>
-              </select>
+              <Controller
+                control={control}
+                name="brand"
+                render={({ field }) => (
+                  <select {...field} className="form-control form-select">
+                    <option value="">Select Brand</option>
+                    <option value="Totally Health">Totally Health</option>
+                    <option value="Healthy Living">Healthy Living</option>
+                  </select>
+                )}
+              />
             </div>
           </Col>
 
@@ -115,10 +127,13 @@ const BranchAdd: React.FC = () => {
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active' },
   })
+  const [createBranch, { isLoading }] = useCreateBranchMutation()
+  const { push } = useRouter()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
+  const onSubmit = async (data: FormData) => {
+    await createBranch(data).unwrap()
     reset()
+    push('/branches/list-of-branches')
   }
 
   return (
@@ -127,7 +142,7 @@ const BranchAdd: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
               Save
             </Button>
           </Col>
@@ -143,3 +158,4 @@ const BranchAdd: React.FC = () => {
 }
 
 export default BranchAdd
+
