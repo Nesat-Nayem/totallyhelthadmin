@@ -1,5 +1,6 @@
+'use client'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { Suspense } from 'react'
+import { Suspense, use } from 'react'
 import { Button } from 'react-bootstrap'
 import Link from 'next/link'
 import LeftSideBarToggle from './LeftSideBarToggle'
@@ -8,8 +9,10 @@ import ThemeModeToggle from './ThemeModeToggle'
 import Notifications from './Notifications'
 import ThemeCustomizerToggle from './ThemeCustomizerToggle'
 import ProfileDropdown from './ProfileDropdown'
+import { useRouter } from 'next/navigation'
 
 const TopBarNav = () => {
+  const router = useRouter()
   return (
     <header className="topbar p-0">
       <div className="container-fluid">
@@ -21,10 +24,10 @@ const TopBarNav = () => {
 
           {/* Right: Buttons & Toggles */}
           <div className="d-flex align-items-center flex-wrap gap-2 justify-content-end w-100 w-md-auto">
-            <Link href="/sales/pos" className="btn btn-sm btn-info d-flex align-items-center gap-1">
+            <Button onClick={() => router.push('pos')} className="btn btn-sm btn-info d-flex align-items-center gap-1">
               <IconifyIcon icon="mdi:cart-outline" />
               <span className="d-none d-sm-inline">POS</span>
-            </Link>
+            </Button>
 
             <Link href="/dashboard" className="btn btn-sm btn-dark d-flex align-items-center gap-1">
               <IconifyIcon icon="mdi:view-dashboard-outline" />

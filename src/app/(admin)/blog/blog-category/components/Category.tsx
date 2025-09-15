@@ -21,7 +21,7 @@ const Category = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Blog Category
             </CardTitle>
-            <Link href="/blog/blog-category-add" className="btn btn-sm btn-primary">
+            <Link href="/blog/blog-category-add" className="btn btn-lg btn-primary">
               Add Category
             </Link>
           </CardHeader>

@@ -58,14 +58,14 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
       <CardBody>
         <Row>
           <Col lg={4}>
-            <TextFormInput control={control} name="expenseId" label="Expense ID" />
+            <TextFormInput control={control} name="expenseId" label="Invoice ID" />
           </Col>
           <Col lg={4}>
-            <TextFormInput control={control} type="date" name="expenseDate" label="Expense Date" />
+            <TextFormInput control={control} type="date" name="expenseDate" label="Invoice Date" />
           </Col>
           <Col lg={4}>
             <div className="mb-3">
-              <label className="form-label">Category</label>
+              <label className="form-label">Expense Type</label>
               <Controller
                 control={control}
                 name="category"
@@ -88,22 +88,18 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
           </Col>
 
           <Col lg={6}>
-            <label className="form-label">Staff Name</label>
+            <label className="form-label">Supplier Name</label>
             <Controller
               control={control}
               name="paidBy"
               render={({ field }) => (
-                <ChoicesFormInput {...field} className="form-control" data-choices data-placeholder="Select Staff">
-                  <option value="">Select Staff</option>
+                <select {...field} className="form-control form-select mb-3" data-choices data-placeholder="Select Staff">
+                  <option value="">Select Supplier</option>
                   <option value="John Doe">John Doe</option>
                   <option value="Suraj Jamdade">Suraj Jamdade</option>
-                </ChoicesFormInput>
+                </select>
               )}
             />
-          </Col>
-
-          <Col lg={6}>
-            <TextFormInput control={control} name="invoiceNumber" label="Invoice / Bill Number" className="mb-3" />
           </Col>
 
           <Col lg={6}>
@@ -116,10 +112,7 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
                   <select {...field} className="form-control form-select">
                     <option value="">Select Payment Method</option>
                     <option value="Cash">Cash</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="Card">Card</option>
-                    <option value="UPI">UPI</option>
-                    <option value="Cheque">Cheque</option>
+                    <option value="Credit">Credit</option>
                   </select>
                 )}
               />
@@ -135,60 +128,22 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
           </Col>
 
           <Col lg={6}>
-            <TextFormInput control={control} name="approvedBy" label="Approved By" className="mb-3" />
-          </Col>
-
-          <Col lg={6}>
-            <div className="mb-3">
-              <label className="form-label">Upload Receipt</label>
-              <input type="file" className="form-control" />
-            </div>
+            <label className="form-label">Approved By</label>
+            <Controller
+              control={control}
+              name="approvedBy"
+              render={({ field }) => (
+                <select {...field} className="form-control form-select">
+                  <option value="">Select Approved By</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Supervisor">Supervisor</option>
+                </select>
+              )}
+            />
           </Col>
 
           <Col lg={6}>
             <TextFormInput control={control} name="notes" label="Notes / Remarks" className="mb-3" />
-          </Col>
-
-          {/* STATUS */}
-          <Col lg={6}>
-            <label className="form-label">Status</label>
-            <Controller
-              control={control}
-              name="status"
-              render={({ field, fieldState }) => (
-                <>
-                  <div className="d-flex gap-3 align-items-center">
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        value="active"
-                        checked={field.value === 'active'}
-                        onChange={field.onChange}
-                        id="statusActive"
-                      />
-                      <label className="form-check-label" htmlFor="statusActive">
-                        Active
-                      </label>
-                    </div>
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        value="inactive"
-                        checked={field.value === 'inactive'}
-                        onChange={field.onChange}
-                        id="statusInactive"
-                      />
-                      <label className="form-check-label" htmlFor="statusInactive">
-                        Inactive
-                      </label>
-                    </div>
-                  </div>
-                  {fieldState.error && <small className="text-danger">{fieldState.error.message}</small>}
-                </>
-              )}
-            />
           </Col>
         </Row>
       </CardBody>

@@ -2,6 +2,22 @@ import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { randomBytes } from 'crypto'
 
+import type { UserType } from '@/types/auth'
+
+export const fakeUsers: UserType[] = [
+  {
+    id: '1',
+    email: 'user@demo.com',
+    username: 'demo_user',
+    password: '123456',
+    firstName: 'Demo',
+    lastName: 'User',
+    role: 'Admin',
+    token:
+      'eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ0ZWNoemFhIiwiYXVkIjoiaHR0cHM6Ly90ZWNoemFhLmdldGFwcHVpLmNvbS8iLCJzdWIiOiJzdXBwb3J0QGNvZGVydGhlbWVzLmNvbSIsImxhc3ROYW1lIjoiVGVjaHphYSIsIkVtYWlsIjoidGVjaHphYXN0dWRpb0BnbWFpbC5jb20iLCJSb2xlIjoiQWRtaW4iLCJmaXJzdE5hbWUiOiJUZXN0VG9rZW4ifQ.ud4LnFZ-mqhHEYiPf2wCLM7KvLGoAxhXTBSymRIZEFLleFkO119AXd8p3OfPCpdUWSyeZl8-pZyElANc_KHj5w',
+  },
+]
+
 export const options: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -17,28 +33,14 @@ export const options: NextAuthOptions = {
           type: 'password',
         },
       },
-      async authorize(credentials) {
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080/v1/api'
-        try {
-          const res = await fetch(`${apiBase}/auth/signin`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: credentials?.email, password: credentials?.password }),
-          })
-          const data = await res.json().catch(() => ({}))
-          if (!res.ok || data?.success === false) {
-            throw new Error(data?.message || 'Invalid credentials')
-          }
-          const userData = data?.data || {}
-          return {
-            id: userData?._id || userData?.id || 'unknown',
-            name: userData?.name,
-            email: userData?.email,
-            role: userData?.role,
-            token: data?.token,
-          } as any
-        } catch (e: any) {
-          throw new Error(e?.message || 'Login failed')
+      async authorize(credentials, req) {
+        const filteredUser = fakeUsers.find((user) => {
+          return user.email === credentials?.email && user.password === credentials?.password
+        })
+        if (filteredUser) {
+          return filteredUser
+        } else {
+          throw new Error('Email or Password is not valid')
         }
       },
     }),
@@ -48,23 +50,15 @@ export const options: NextAuthOptions = {
     signIn: '/auth/sign-in',
   },
   callbacks: {
-    async signIn() {
+    async signIn({ user, account, profile, email, credentials }) {
       return true
     },
-    async jwt({ token, user }) {
-      if (user) {
-        ;(token as any).user = user
-        ;(token as any).accessToken = (user as any).token
-      }
-      return token
-    },
-    async session({ session, token }) {
-      const t = token as any
+    session: ({ session, token }) => {
       session.user = {
-        ...(t?.user || {}),
-        token: t?.accessToken,
-      } as any
-      return session
+        email: 'user@demo.com',
+        name: 'Test User',
+      }
+      return Promise.resolve(session)
     },
   },
   session: {

@@ -12,37 +12,37 @@ export const stateData: StatType[] = [
 
   {
     icon: 'solar:cart-5-bold-duotone',
-    name: 'Total Products',
+    name: 'Branch wise sales',
     amount: '976',
     variant: 'danger',
     url: '/products/products-list',
   },
 
   {
-    icon: 'solar:users-group-rounded-bold-duotone',
-    name: 'Total Customer',
-    amount: '123.6',
+    icon: 'solar:gift-bold-duotone',
+    name: 'Brand wise sales',
+    amount: '123',
     variant: 'success',
     url: '/customer/customer-list',
   },
   {
     icon: 'solar:user-rounded-bold-duotone',
-    name: 'Total Enquiries',
+    name: 'Total member Registered today',
     amount: '2000',
     variant: 'success',
     url: '/contact-us',
   },
   {
     icon: 'solar:chat-square-bold-duotone',
-    name: 'Total Meal Plan Order',
-    amount: '123.6k',
+    name: 'Total aggregators sales today',
+    amount: '123k',
     variant: 'warning',
     url: '/menu-plan-order-history',
   },
 
   {
-    icon: 'solar:cup-hot-broken',
-    name: 'Total Restautants',
+    icon: 'solar:dollar-bold',
+    name: 'Total expense today',
     amount: '123',
     variant: 'warning',
     url: '/pages/restaurants',

@@ -82,3 +82,36 @@
 .react-datepicker-wrapper {
   width: 100% !important;
 }
+
+.form-label {
+  margin-bottom: 0.4rem;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--bs-body-color);
+}
+
+.form-control,
+.form-select {
+  padding: 15px 15px !important;
+}
+
+.table-centered td,
+.table-centered th {
+  font-size: 20px !important;
+}
+
+.wrapper .main-nav .navbar-nav .nav-item .nav-link {
+  font-size: 20px !important;
+}
+
+.wrapper .main-nav .navbar-nav .nav-item .nav-link.active {
+  font-size: 20px !important;
+}
+
+.wrapper .main-nav .navbar-nav .sub-navbar-nav .sub-nav-item .sub-nav-link {
+  font-size: 20px !important;
+}
+
+.css-13cymwt-control {
+  padding: 9px !important;
+}

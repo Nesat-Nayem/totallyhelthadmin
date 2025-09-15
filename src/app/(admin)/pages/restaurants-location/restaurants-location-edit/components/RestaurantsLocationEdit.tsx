@@ -42,12 +42,17 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="location" label="Location" />
+              <TextFormInput control={control} type="text" name="location" label="Restaurants name" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="file" label="Banner" />
+              <TextFormInput control={control} type="text" name="location" label=" Restaurants Location" />
+            </div>
+          </Col>
+          <Col lg={6}>
+            <div className="mb-3">
+              <TextFormInput control={control} type="file" name="file" label="Restaurants Img" />
             </div>
           </Col>
 

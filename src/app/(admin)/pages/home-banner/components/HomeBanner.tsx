@@ -43,7 +43,7 @@ const HomeBanner = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Home Banners
             </CardTitle>
-            <Link href="/pages/home-banner/home-banner-add" className="btn btn-sm btn-primary">
+            <Link href="/pages/home-banner/home-banner-add" className="btn btn-lg btn-primary">
               Add Banners
             </Link>
           </CardHeader>

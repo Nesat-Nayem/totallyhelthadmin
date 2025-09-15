@@ -40,8 +40,8 @@ const InventoryList = async () => {
             </InputGroup>
 
             {/* Month Filter Dropdown */}
-            <Link href="/inventory/add-inventory" className="btn btn-sm btn-primary">
-              Add Inventory
+            <Link href="/inventory/add-inventory" className="btn btn-lg btn-primary">
+              + Add Inventory
             </Link>
           </CardHeader>
           <div>

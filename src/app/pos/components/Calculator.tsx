@@ -16,7 +16,6 @@ const Calculator = () => {
     setResult('')
   }
 
-  
   const handleInput = (value: string) => {
     setExpression((prev) => prev + value)
   }
@@ -45,7 +44,7 @@ const Calculator = () => {
   return (
     <>
       {/* Trigger Button */}
-      <Button variant="info" size="sm" onClick={handleShowModal}>
+      <Button variant="info" size="lg" onClick={handleShowModal}>
         <IconifyIcon icon="mdi:calculator-variant-outline" className="me-1" />
         Calculator
       </Button>

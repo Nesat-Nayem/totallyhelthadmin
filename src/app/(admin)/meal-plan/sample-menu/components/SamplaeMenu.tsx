@@ -52,8 +52,8 @@ const SamplaeMenu = async () => {
             <CardTitle as="h4" className="flex-grow-1">
               Sample Menu List
             </CardTitle>
-            <Link href="/meal-plan/sample-menu/sample-menu-add" className="btn btn-sm btn-primary">
-              Add Sample Menu
+            <Link href="/meal-plan/sample-menu/sample-menu-add" className="btn btn-lg btn-primary">
+              + Add Sample Menu
             </Link>
           </CardHeader>
 

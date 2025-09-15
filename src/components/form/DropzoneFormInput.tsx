@@ -64,7 +64,7 @@ const DropzoneFormInput = ({
                           <Col className="text-end">
                             <Link href="" className="btn btn-link btn-lg text-muted shadow-none">
                               <div className="flex-shrink-0 ms-3">
-                                <button data-dz-remove className="btn btn-sm btn-primary" onClick={() => removeFile(file)}>
+                                <button data-dz-remove className="btn btn-lg btn-primary" onClick={() => removeFile(file)}>
                                   Delete
                                 </button>
                               </div>

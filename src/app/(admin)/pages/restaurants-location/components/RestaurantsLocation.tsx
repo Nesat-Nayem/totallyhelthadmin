@@ -11,18 +11,21 @@ const data = [
   {
     id: 1,
     banner: banner1,
+    name: 'Totally Health',
     title: 'Dubai',
     status: 'Active',
   },
   {
     id: 2,
     banner: banner2,
+    name: 'Totally Health',
     title: 'Dubai',
     status: 'Active',
   },
   {
     id: 3,
     banner: banner3,
+    name: 'Totally Health',
     title: 'Dubai',
     status: 'Active',
   },
@@ -37,8 +40,8 @@ const RestaurantsLocation = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Restaurants Locations
             </CardTitle>
-            <Link href="/pages/restaurants-location/restaurants-location-add" className="btn btn-sm btn-primary">
-              Add Restaurants
+            <Link href="/pages/restaurants-location/restaurants-location-add" className="btn btn-lg btn-primary">
+              + Add Restaurants
             </Link>
           </CardHeader>
           <div>
@@ -52,7 +55,8 @@ const RestaurantsLocation = async () => {
                         <label className="form-check-label" htmlFor="customCheck1" />
                       </div>
                     </th>
-                    <th>Banner</th>
+                    <th>Restaurants Img</th>
+                    <th>Restaurants Name</th>
                     <th>Location</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -74,6 +78,7 @@ const RestaurantsLocation = async () => {
                           </div>
                         </div>
                       </td>
+                      <td>{item.name}</td>
                       <td>{item.title}</td>
                       <td>
                         <span className="badge bg-success">{item.status}</span>

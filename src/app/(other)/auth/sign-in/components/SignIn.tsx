@@ -30,22 +30,7 @@ const SignIn = () => {
                   <p className="text-muted mt-1 mb-4">Enter your email address and password to access admin panel.</p>
                   <div className="mb-5">
                     <LoginFrom />
-                    <p className="mt-3 fw-semibold no-span">OR sign with</p>
-                    <div className="d-grid gap-2">
-                      <Link href="" className="btn btn-soft-dark">
-                        <IconifyIcon icon="bxl:google" className="fs-20 me-1" /> Sign in with Google
-                      </Link>
-                      <Link href="" className="btn btn-soft-primary">
-                        <IconifyIcon icon="bxl:facebook" className="fs-20 me-1" /> Sign in with Facebook
-                      </Link>
-                    </div>
                   </div>
-                  <p className="text-danger text-center">
-                    Don&apos;t have an account?{' '}
-                    <Link href="/auth/sign-up" className="text-dark fw-bold ms-1">
-                      Sign Up
-                    </Link>
-                  </p>
                 </div>
               </Col>
             </Row>

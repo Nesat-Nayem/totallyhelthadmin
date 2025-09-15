@@ -22,7 +22,7 @@ const Brands = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Brands List
             </CardTitle>
-            <Link href="/pages/brands/brands-add" className="btn btn-sm btn-primary">
+            <Link href="/pages/brands/brands-add" className="btn btn-lg btn-primary">
               Add Brands
             </Link>
           </CardHeader>

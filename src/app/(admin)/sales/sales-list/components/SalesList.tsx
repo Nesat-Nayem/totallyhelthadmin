@@ -1,89 +1,36 @@
 'use client'
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
+import { getAllOrders } from '@/helpers/data'
+import Image from 'next/image'
 import Link from 'next/link'
-import React, { useEffect, useState } from 'react'
-import { Card, CardFooter, CardTitle, Col, Row } from 'react-bootstrap'
-import { apiFetch } from '@/utils/api'
-import { useSession } from 'next-auth/react'
-
-type OrderItem = { productId?: string; title: string; price: number; qty: number }
-type Order = {
-  id: string
-  invoiceNo: string
-  date: string
-  customer?: { id?: string; name: string }
-  items: OrderItem[]
-  subTotal: number
-  total: number
-  startDate?: string
-  endDate?: string
-  status?: string
-  paymentMode?: string
-}
-
+import React, { useState } from 'react'
+import {
+  Card,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Col,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  FormControl,
+  InputGroup,
+  Row,
+} from 'react-bootstrap'
 
 const SalesList = () => {
-  const { data: session } = useSession()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(false)
+  const [punchedIn, setPunchedIn] = useState(false)
 
-  const loadOrders = async () => {
-    try {
-      setLoading(true)
-      const token = (session as any)?.user?.token || (session as any)?.accessToken || (session as any)?.user?.accessToken
-      const res = await apiFetch<{ data: any[] }>(`/orders?limit=200`, {}, token)
-      const list: Order[] = (res.data || []).map((o: any) => ({
-        id: o._id || o.id,
-        invoiceNo: o.invoiceNo,
-        date: o.date,
-        customer: o.customer,
-        items: o.items,
-        subTotal: o.subTotal,
-        total: o.total,
-        startDate: o.startDate,
-        endDate: o.endDate,
-        status: o.status,
-        paymentMode: o.paymentMode,
-      }))
-      setOrders(list)
-    } catch {
-      setOrders([])
-    } finally {
-      setLoading(false)
-    }
+  const handleToggle = () => {
+    setPunchedIn(!punchedIn)
   }
-
-  useEffect(() => {
-    loadOrders()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session])
-
-  const removeOrder = async (id: string) => {
-    if (!confirm('Delete this order?')) return
-    try {
-      const token = (session as any)?.user?.token || (session as any)?.accessToken || (session as any)?.user?.accessToken
-      await apiFetch(`/orders/${id}`, { method: 'DELETE' }, token)
-      setOrders((prev) => prev.filter((o) => o.id !== id))
-    } catch (e: any) {
-      alert(e?.message || 'Failed to delete order')
-    }
-  }
-
-  const totalSales = orders.reduce((sum, o) => sum + (o.total || 0), 0)
-  const fmt = (d: string) => {
-    try {
-      return new Date(d).toLocaleString()
-    } catch {
-      return d
-    }
-  }
-
   return (
     <>
       <Row>
         <Col lg={4}>
           <Card>
-            
             <div className="p-3 text-center d-flex align-items-center gap-3">
               <div>
                 <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-24" />
@@ -91,7 +38,7 @@ const SalesList = () => {
               <div>
                 <h5>Total Sales</h5>
                 <h5>
-                  <span className="text-success">AED {totalSales}</span>
+                  <span className="text-success">AED 2000</span>
                 </h5>
               </div>
             </div>
@@ -104,9 +51,24 @@ const SalesList = () => {
                 <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-24" />
               </div>
               <div>
-                <h5>This Month Sales</h5>
+                <h5>Paid Sales</h5>
                 <h5>
-                  <span className="text-success">AED {totalSales}</span>
+                  <span className="text-success">AED 1980</span>
+                </h5>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col lg={4}>
+          <Card>
+            <div className="p-3 text-center d-flex align-items-center gap-3">
+              <div>
+                <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-24" />
+              </div>
+              <div>
+                <h5>UnPaid Sales</h5>
+                <h5>
+                  <span className="text-success">AED 20</span>
                 </h5>
               </div>
             </div>
@@ -117,11 +79,33 @@ const SalesList = () => {
       <Row>
         <Col xl={12}>
           <Card>
-            <div className="d-flex card-header justify-content-between align-items-center">
-              <div>
-                <CardTitle as={'h4'}>Sales List </CardTitle>
-              </div>
-            </div>
+            <CardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <CardTitle as="h4" className="mb-0 flex-grow-1">
+                All Sales List
+              </CardTitle>
+
+              {/* Search Input */}
+              <InputGroup style={{ maxWidth: '250px' }}>
+                <FormControl placeholder="Search invoice No..." />
+              </InputGroup>
+
+              {/* Month Filter Dropdown */}
+              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
+                <option value="all">Select Month</option>
+                <option value="january">January</option>
+                <option value="february">February</option>
+                <option value="march">March</option>
+                <option value="april">April</option>
+                <option value="may">May</option>
+                <option value="june">June</option>
+                <option value="july">July</option>
+                <option value="august">August</option>
+                <option value="september">September</option>
+                <option value="october">October</option>
+                <option value="november">November</option>
+                <option value="december">December</option>
+              </select>
+            </CardHeader>
             <div>
               <div className="table-responsive">
                 <table className="table align-middle mb-0 table-hover table-centered table-bordered">
@@ -145,47 +129,87 @@ const SalesList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.length === 0 ? (
-                      <tr>
-                        <td colSpan={10} className="text-center text-muted">
-                          {loading ? 'Loading orders...' : 'No orders yet. Create one in POS.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      orders.map((o, idx) => (
-                        <tr key={o.id}>
-                          <td>
-                            <div className="form-check">
-                              <input type="checkbox" className="form-check-input" id={`check-${o.id}`} />
-                              <label className="form-check-label" htmlFor={`check-${o.id}`} />
-                            </div>
-                          </td>
-                          <td style={{ textWrap: 'nowrap' }}>{idx + 1}</td>
-                          <td style={{ textWrap: 'nowrap' }}>{fmt(o.date)}</td>
-                          <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo}</td>
-                          <td style={{ textWrap: 'nowrap' }}>{o.customer?.name || 'Guest'}</td>
-                          <td style={{ textWrap: 'nowrap' }}>AED {o.total}</td>
-                          <td style={{ textWrap: 'nowrap' }}>AED 0</td>
-                          <td style={{ textWrap: 'nowrap' }}>
-                            <span className="badge bg-success">Paid</span>
-                          </td>
-                          <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || 'Cash'}</td>
-                          <td>
-                            <div className="d-flex gap-2">
-                              <Link href={`/sales/invoice/${o.id}`} className="btn btn-light btn-sm" title="Invoice">
-                                <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-18" />
-                              </Link>
-                              <Link href="/pos" className="btn btn-soft-primary btn-sm" title="Open POS">
-                                <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                              </Link>
-                              <button className="btn btn-soft-danger btn-sm" onClick={() => removeOrder(o.id)} title="Delete">
-                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    <tr>
+                      <td>
+                        <div className="form-check">
+                          <input type="checkbox" className="form-check-input" id="customCheck2" />
+                          <label className="form-check-label" htmlFor="customCheck2">
+                            &nbsp;
+                          </label>
+                        </div>
+                      </td>
+                      <td style={{ textWrap: 'nowrap' }}>1</td>
+                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
+                      <td style={{ textWrap: 'nowrap' }}>S001</td>
+                      <td style={{ textWrap: 'nowrap' }}>Suraj Jamdade</td>
+                      <td style={{ textWrap: 'nowrap' }}>AED 200</td>
+                      <td style={{ textWrap: 'nowrap' }}>AED 20</td>
+                      <td style={{ textWrap: 'nowrap' }}>
+                        <span className="badge bg-success">Paid</span>
+                      </td>
+                      <td style={{ textWrap: 'nowrap' }}>UPI</td>
+
+                      <td>
+                        <div className="d-flex gap-2">
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${punchedIn ? 'bg-success text-white' : 'bg-danger text-white'}`}
+                            onClick={handleToggle}>
+                            <IconifyIcon icon={punchedIn ? 'solar:logout-2-broken' : 'solar:login-2-broken'} />
+                          </button>
+                          <Link href="/sales/invoice" className="btn btn-light btn-sm">
+                            <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="/sales/pos" className="btn btn-soft-primary btn-sm">
+                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="" className="btn btn-soft-danger btn-sm">
+                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td>
+                        <div className="form-check">
+                          <input type="checkbox" className="form-check-input" id="customCheck2" />
+                          <label className="form-check-label" htmlFor="customCheck2">
+                            &nbsp;
+                          </label>
+                        </div>
+                      </td>
+                      <td style={{ textWrap: 'nowrap' }}>2</td>
+                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
+                      <td style={{ textWrap: 'nowrap' }}>S001</td>
+                      <td style={{ textWrap: 'nowrap' }}>Suraj Jamdade</td>
+                      <td style={{ textWrap: 'nowrap' }}>AED 200</td>
+                      <td style={{ textWrap: 'nowrap' }}>AED 20</td>
+                      <td style={{ textWrap: 'nowrap' }}>
+                        <span className="badge bg-danger">UnPaid</span>
+                      </td>
+                      <td style={{ textWrap: 'nowrap' }}>UPI</td>
+
+                      <td>
+                        <div className="d-flex gap-2">
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${punchedIn ? 'bg-success text-white' : 'bg-danger text-white'}`}
+                            onClick={handleToggle}>
+                            <IconifyIcon icon={punchedIn ? 'solar:logout-2-broken' : 'solar:login-2-broken'} />
+                          </button>
+                          <Link href="/sales/invoice" className="btn btn-light btn-sm">
+                            <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="/sales/pos" className="btn btn-soft-primary btn-sm">
+                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="" className="btn btn-soft-danger btn-sm">
+                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

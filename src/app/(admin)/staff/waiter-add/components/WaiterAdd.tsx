@@ -139,7 +139,17 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
           </Col>
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} name="branch" label="Branch" />
+              <label htmlFor="" className="form-label">
+                Select Branch
+              </label>
+              <div className="mb-3">
+                <select name="sift" id="" className="form-control form-select">
+                  <option value="">Select Branch</option>
+                  <option value="Dubai">Dubai</option>
+                  <option value="Sharjah">Sharjah</option>
+                  <option value="Abu Dhabi">Abu Dhabi</option>
+                </select>
+              </div>
             </div>
           </Col>
 

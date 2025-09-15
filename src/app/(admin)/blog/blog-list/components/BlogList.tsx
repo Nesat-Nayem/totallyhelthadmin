@@ -13,7 +13,7 @@ const BlogList = () => {
         <CardTitle as={'h4'} className="flex-grow-1">
           All Blog List
         </CardTitle>
-        <Link href="/blog/add-blog" className="btn btn-sm btn-primary">
+        <Link href="/blog/add-blog" className="btn btn-lg btn-primary">
           Add Blog
         </Link>
       </CardHeader>

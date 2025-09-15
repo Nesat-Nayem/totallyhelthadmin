@@ -16,7 +16,7 @@ const CategoryList = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               All Categories List
             </CardTitle>
-            <Link href="/products/product-add" className="btn btn-sm btn-primary">
+            <Link href="/products/product-add" className="btn btn-lg btn-primary">
               Add Product
             </Link>
             <Dropdown>

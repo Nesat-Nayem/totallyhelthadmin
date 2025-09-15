@@ -24,13 +24,6 @@ const StatsCard = ({ amount, icon, name, variant, url }: StatType) => {
             </Col>
           </Row>
         </CardBody>
-        <CardFooter className="py-2 bg-light bg-opacity-50">
-          <div className="d-flex align-items-center justify-content-between">
-            <Link href={url} className="text-reset fw-semibold fs-12">
-              View More
-            </Link>
-          </div>
-        </CardFooter>
       </Card>
     </Col>
   )
@@ -163,14 +156,14 @@ const Stats = () => {
 
   return (
     <>
-      <Col xxl={5}>
+      <Col xxl={12}>
         <Row>
           {stateData.map((item, idx) => (
             <StatsCard key={idx} {...item} />
           ))}
         </Row>
       </Col>
-      <Col xxl={7}>
+      <Col xxl={12}>
         <Card>
           <CardBody>
             <div className="d-flex justify-content-between align-items-center">

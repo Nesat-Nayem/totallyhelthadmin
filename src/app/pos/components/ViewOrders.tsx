@@ -15,7 +15,6 @@ const orderData = [
     note: 'Customer need to recheck the product once',
     status: 'onhold',
   },
-  
   {
     id: '#002',
     cashier: 'admin',
@@ -84,12 +83,12 @@ const ViewOrder = () => {
   return (
     <>
       {/* Trigger Button */}
-      <Button variant="dark" size="sm" onClick={handleShow}>
+      <Button variant="dark" size="lg" onClick={handleShow}>
         <IconifyIcon icon="mdi:eye-outline" className="me-1" /> View Orders
       </Button>
 
       {/* Orders Modal */}
-      <Modal show={showModal} onHide={handleClose} centered size="lg">
+      <Modal show={showModal} onHide={handleClose} centered size="xl">
         <Modal.Header closeButton>
           <Modal.Title>Orders</Modal.Title>
         </Modal.Header>
@@ -97,16 +96,21 @@ const ViewOrder = () => {
         <Modal.Body>
           {/* Tabs */}
           <div className="d-flex gap-2 mb-3">
-            {['onhold', 'unpaid', 'paid'].map((tab) => (
-              <Button
-                key={tab}
-                variant={activeTab === tab ? 'warning' : 'light'}
-                size="sm"
-                className="text-capitalize"
-                onClick={() => setActiveTab(tab as any)}>
-                {tab}
-              </Button>
-            ))}
+            {['onhold', 'unpaid', 'paid'].map((tab) => {
+              let variant: string = 'light'
+
+              if (activeTab === tab) {
+                if (tab === 'onhold') variant = 'secondary'
+                else if (tab === 'unpaid') variant = 'danger'
+                else if (tab === 'paid') variant = 'success'
+              }
+
+              return (
+                <Button key={tab} variant={variant} size="sm" className="text-capitalize" onClick={() => setActiveTab(tab as any)}>
+                  {tab}
+                </Button>
+              )
+            })}
           </div>
 
           {/* Search */}

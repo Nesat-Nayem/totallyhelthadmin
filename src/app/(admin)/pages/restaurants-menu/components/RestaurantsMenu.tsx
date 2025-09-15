@@ -2,7 +2,21 @@ import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import { Card, CardFooter, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
+import {
+  Button,
+  Card,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Col,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  FormControl,
+  InputGroup,
+  Row,
+} from 'react-bootstrap'
 import banner1 from '../../../../../assets/images/banner/1.jpg'
 import banner2 from '../../../../../assets/images/banner/2.jpg'
 import banner3 from '../../../../../assets/images/banner/3.jpg'
@@ -11,25 +25,12 @@ const data = [
   {
     id: 1,
     banner: banner1,
-    title: 'The tastiest and easiest way to lose weight fast.',
+    title: 'Biryani',
+    brands: 'totally health',
+    branch: 'Dubai',
+    priceCategory: 'DineIn',
     price: 'AED 40',
-    category: 'Breakfast',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    banner: banner2,
-    title: 'The tastiest and easiest way to lose weight fast.',
-    price: 'AED 50',
-    category: 'Breakfast',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    banner: banner3,
-    title: 'The tastiest and easiest way to lose weight fast.',
-    price: 'AED 20',
-    category: 'Breakfast',
+    category: 'Dinner',
     status: 'Active',
   },
 ]
@@ -43,13 +44,18 @@ const RestaurantsMenu = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Restaurants Menu
             </CardTitle>
-            <Link href="/pages/restaurants-menu/restaurants-menu-add" className="btn btn-sm btn-primary">
-              Add Menu
+            {/* Search Input */}
+            <InputGroup style={{ maxWidth: '250px' }}>
+              <FormControl placeholder="Search..." />
+            </InputGroup>
+
+            <Link href="/pages/restaurants-menu/restaurants-menu-add" className="btn btn-lg btn-primary">
+              + Add Menu
             </Link>
           </CardHeader>
           <div>
             <div className="table-responsive">
-              <table className="table align-middle mb-0 table-hover table-centered">
+              <table className="table align-middle mb-0 table-hover table-centered table-bordered">
                 <thead className="bg-light-subtle">
                   <tr>
                     <th style={{ width: 20 }}>
@@ -58,12 +64,15 @@ const RestaurantsMenu = async () => {
                         <label className="form-check-label" htmlFor="customCheck1" />
                       </div>
                     </th>
-                    <th>Banner</th>
-                    <th>Title</th>
-                    <th>Price</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th style={{ textWrap: 'nowrap' }}>Category</th>
+                    <th style={{ textWrap: 'nowrap' }}>Menu Image</th>
+                    <th style={{ textWrap: 'nowrap' }}>Menu Name</th>
+                    <th style={{ textWrap: 'nowrap' }}>Brands</th>
+                    <th style={{ textWrap: 'nowrap' }}>Restaurents Branch</th>
+                    <th style={{ textWrap: 'nowrap' }}>Price Category</th>
+                    <th style={{ textWrap: 'nowrap' }}>Price</th>
+                    <th style={{ textWrap: 'nowrap' }}>Status</th>
+                    <th style={{ textWrap: 'nowrap' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -75,6 +84,7 @@ const RestaurantsMenu = async () => {
                           <label className="form-check-label" htmlFor="customCheck2" />
                         </div>
                       </td>
+                      <td>{item.category}</td>
                       <td>
                         <div className="d-flex align-items-center gap-2">
                           <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
@@ -83,8 +93,14 @@ const RestaurantsMenu = async () => {
                         </div>
                       </td>
                       <td>{item.title}</td>
-                      <td>{item.price}</td>
-                      <td>{item.category}</td>
+
+                      <td>{item.brands}</td>
+                      <td>{item.branch}</td>
+                      <td>
+                        <span className="badge bg-success">{item.priceCategory}</span>
+                      </td>
+                      <td style={{ textWrap: 'nowrap' }}>{item.price}</td>
+
                       <td>
                         <span className="badge bg-success">{item.status}</span>
                       </td>

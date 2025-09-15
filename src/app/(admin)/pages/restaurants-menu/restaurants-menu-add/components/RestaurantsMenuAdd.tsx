@@ -14,31 +14,56 @@ type FormData = {
   title: string
   status: string
   description: string
-  price: string
   file: FileList
   NutritionFacts: string
+
+  // ✅ changed from single string to multiple selections
+  orderTypes: string[]
+  dineinPrice?: string
+  takeawayPrice?: string
+  aggregatorPrice?: string
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
 type ControlType = {
   control: Control<FormData>
+  register: ReturnType<typeof useForm<FormData>>['register']
 }
 
-/** VALIDATION SCHEMA WITH STRONG TYPES **/
-const messageSchema: yup.ObjectSchema<FormData> = yup.object({
+/** VALIDATION SCHEMA **/
+const messageSchema: yup.ObjectSchema<any> = yup.object({
   title: yup.string().required('Please enter title'),
   status: yup.string().required('Please select a status'),
   description: yup.string().required('Please enter description'),
-  price: yup.string().required('Please enter price'),
   NutritionFacts: yup.string().required('Please enter Nutrition Facts'),
   file: yup
     .mixed<FileList>()
     .test('required', 'Please upload a banner image', (value) => value && value.length > 0)
     .required(),
+
+  // ✅ at least one order type must be selected
+  orderTypes: yup.array().of(yup.string()).min(1, 'Please select at least one order type'),
+
+  // ✅ require price only if type is selected
+  dineinPrice: yup.string().when('orderTypes', {
+    is: (val: string[]) => val?.includes('dinein'),
+    then: (schema) => schema.required('Please enter DineIn price'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+  takeawayPrice: yup.string().when('orderTypes', {
+    is: (val: string[]) => val?.includes('takeaway'),
+    then: (schema) => schema.required('Please enter Takeaway price'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+  aggregatorPrice: yup.string().when('orderTypes', {
+    is: (val: string[]) => val?.includes('aggregator'),
+    then: (schema) => schema.required('Please enter Aggregator price'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
+const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) => {
   return (
     <Card>
       <CardHeader>
@@ -46,12 +71,11 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
       </CardHeader>
       <CardBody>
         <Row>
+          {/* Category */}
           <Col lg={6}>
-            <label htmlFor="" className="form-label">
-              category
-            </label>
+            <label className="form-label">Category</label>
             <div className="mb-3">
-              <select name="" id="" className="form-control  form-select">
+              <select className="form-control form-select">
                 <option value="0">Select Restaurants</option>
                 <option value="1">Breakfast</option>
                 <option value="2">Soups & Bite</option>
@@ -59,36 +83,135 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
               </select>
             </div>
           </Col>
+
+          {/* Brands */}
           <Col lg={6}>
+            <label className="form-label">Brands</label>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Title" />
+              <select className="form-control form-select">
+                <option value="0">Select Brands</option>
+                <option value="1">Totally Health</option>
+                <option value="2">KFC</option>
+                <option value="3">Pizza Hut</option>
+              </select>
             </div>
           </Col>
-          <Col lg={6}>
+
+          {/* Branch */}
+          <Col lg={4}>
+            <label className="form-label">Restaurant Branch</label>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="price" label="Price" />
+              <select className="form-control form-select">
+                <option value="0">Select Branch</option>
+                <option value="1">Dubai</option>
+                <option value="2">Abu Dhabi</option>
+                <option value="3">Sharjah</option>
+              </select>
             </div>
           </Col>
-          <Col lg={6}>
+
+          <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="file" label="Banner" />
+              <TextFormInput control={control} type="text" name="title" label="Menu Name" />
             </div>
           </Col>
+
+          <Col lg={4}>
+            <div className="mb-3">
+              <TextFormInput control={control} type="file" name="file" label="Menu Banner" />
+            </div>
+          </Col>
+
+          {/* ✅ Price with checkboxes */}
+          <Col lg={6}>
+            <label className="form-label">Price</label>
+            <Controller
+              control={control}
+              name="orderTypes"
+              render={({ field, fieldState }) => {
+                const handleChange = (value: string) => {
+                  let newValue = [...(field.value || [])]
+                  if (newValue.includes(value)) {
+                    newValue = newValue.filter((v) => v !== value)
+                  } else {
+                    newValue.push(value)
+                  }
+                  field.onChange(newValue)
+                }
+
+                return (
+                  <>
+                    <div className="d-flex gap-4 align-items-center mb-3">
+                      {/* DineIn */}
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="dineIn"
+                          checked={field.value?.includes('dinein')}
+                          onChange={() => handleChange('dinein')}
+                        />
+                        <label className="form-check-label" htmlFor="dineIn">
+                          DineIn
+                        </label>
+                      </div>
+
+                      {/* Takeaway */}
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="takeaway"
+                          checked={field.value?.includes('takeaway')}
+                          onChange={() => handleChange('takeaway')}
+                        />
+                        <label className="form-check-label" htmlFor="takeaway">
+                          Takeaway
+                        </label>
+                      </div>
+
+                      {/* Aggregators */}
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="aggregator"
+                          checked={field.value?.includes('aggregator')}
+                          onChange={() => handleChange('aggregator')}
+                        />
+                        <label className="form-check-label" htmlFor="aggregator">
+                          Aggregators
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Conditional price inputs */}
+                    {field.value?.includes('dinein') && (
+                      <div className="mb-3">
+                        <input type="number" className="form-control" placeholder="Enter DineIn price" {...register('dineinPrice')} />
+                      </div>
+                    )}
+                    {field.value?.includes('takeaway') && (
+                      <div className="mb-3">
+                        <input type="number" className="form-control" placeholder="Enter Takeaway price" {...register('takeawayPrice')} />
+                      </div>
+                    )}
+                    {field.value?.includes('aggregator') && (
+                      <div className="mb-3">
+                        <input type="number" className="form-control" placeholder="Enter Aggregator price" {...register('aggregatorPrice')} />
+                      </div>
+                    )}
+
+                    {fieldState.error && <small className="text-danger">{fieldState.error.message}</small>}
+                  </>
+                )
+              }}
+            />
+          </Col>
+
           <Col lg={12}>
             <div className="mb-3">
               <TextAreaFormInput rows={4} control={control} type="text" name="description" label="Description" placeholder="Type description" />
-            </div>
-          </Col>
-          <Col lg={12}>
-            <div className="mb-3">
-              <TextAreaFormInput
-                rows={4}
-                control={control}
-                type="text"
-                name="NutritionFacts"
-                label="Nutrition Facts"
-                placeholder="Type description"
-              />
             </div>
           </Col>
 
@@ -142,19 +265,19 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 
 /** MAIN COMPONENT **/
 const RestaurantsMenuAdd: React.FC = () => {
-  const { reset, handleSubmit, control } = useForm<FormData>({
+  const { reset, handleSubmit, control, register } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active' },
+    defaultValues: { status: 'active', orderTypes: [] },
   })
 
   const onSubmit = (data: FormData) => {
     console.log('Form Submitted:', data)
-    reset()
+    reset({ status: 'active', orderTypes: [] })
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GeneralInformationCard control={control} />
+      <GeneralInformationCard control={control} register={register} />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>

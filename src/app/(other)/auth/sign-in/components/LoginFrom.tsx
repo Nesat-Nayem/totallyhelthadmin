@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button, FormCheck } from 'react-bootstrap'
 import useSignIn from './useSignIn'
 import PasswordFormInput from '@/components/form/PasswordFormInput'
+import { Controller } from 'react-hook-form'
 
 const LoginFrom = () => {
   const { loading, login, control } = useSignIn()
@@ -19,15 +20,21 @@ const LoginFrom = () => {
         id="password-id"
         label={
           <>
-            <Link href="/auth/reset-pass" className="float-end text-muted text-unline-dashed ms-1">
-              Reset password
-            </Link>
             <label className="form-label" htmlFor="example-password">
               Password
             </label>
           </>
         }
       />
+      <label className="form-label">Select Branch</label>
+      <select name="approved" id="" className="form-control form-select mb-3">
+        <option selected>Branch</option>
+        <option value="dubai">Dubai</option>
+        <option value="sharjah">Sharjah</option>
+        <option value="abudhabi">Abudhabi</option>
+        <option value="alain">Alain</option>
+        <option value="abudhabi">Abu Dhabi</option>
+      </select>
       <div className="mb-3">
         <FormCheck label="Remember me" id="sign-in" />
       </div>

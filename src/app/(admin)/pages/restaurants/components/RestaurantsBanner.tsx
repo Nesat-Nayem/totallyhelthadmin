@@ -34,7 +34,7 @@ const RestaurantsBanner = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Restaurants Banners
             </CardTitle>
-            <Link href="/pages/restaurants/restaurants-banner-add" className="btn btn-sm btn-primary">
+            <Link href="/pages/restaurants/restaurants-banner-add" className="btn btn-lg btn-primary">
               Add Banners
             </Link>
           </CardHeader>

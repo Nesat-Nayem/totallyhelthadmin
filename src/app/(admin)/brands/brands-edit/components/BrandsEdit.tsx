@@ -40,6 +40,11 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
               <TextFormInput control={control} type="text" name="title" label="Brand Name" />
             </div>
           </Col>
+          <Col lg={6}>
+            <div className="mb-3">
+              <TextFormInput control={control} type="file" name="title" label="Brand Logo" />
+            </div>
+          </Col>
 
           {/* STATUS FIELD */}
           <Col lg={6}>

@@ -29,13 +29,13 @@ const GeneralInformationCard = ({ control }: controlType) => {
           {/* Category */}
           <Col lg={6}>
             <label className="form-label">Category</label>
-            <ChoicesFormInput className="form-control" data-choices data-placeholder="Select Category">
+            <select name="category" id="" className="form-control form-select">
               <option value="">Select Category</option>
               <option value="Vegetables">Vegetables</option>
               <option value="Meat">Meat</option>
               <option value="Beverages">Beverages</option>
               <option value="Dairy">Dairy</option>
-            </ChoicesFormInput>
+            </select>
           </Col>
 
           {/* SKU / Tag ID */}
@@ -55,12 +55,13 @@ const GeneralInformationCard = ({ control }: controlType) => {
           {/* Unit of Measure */}
           <Col lg={6}>
             <label className="form-label">Unit of Measure</label>
-            <ChoicesFormInput className="form-control" data-choices>
+
+            <select name="category" id="" className="form-control form-select">
               <option value="">Select Unit</option>
               <option value="kg">Kilogram (kg)</option>
               <option value="ltr">Litre (ltr)</option>
               <option value="pcs">Pieces (pcs)</option>
-            </ChoicesFormInput>
+            </select>
           </Col>
 
           {/* Reorder Level */}
@@ -87,7 +88,13 @@ const GeneralInformationCard = ({ control }: controlType) => {
           {/* Supplier Name */}
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="supplier" label="Supplier Name" placeholder="Enter Supplier Name" />
+              <label className="form-label">Select Supplier</label>
+              <select name="category" id="" className="form-control form-select">
+                <option value="">Select Supplier</option>
+                <option value="Supplier 1">Supplier 1</option>
+                <option value="Supplier 2">Supplier 2</option>
+                <option value="Supplier 3">Supplier 3</option>
+              </select>
             </div>
           </Col>
 

@@ -32,7 +32,7 @@ const FaqsPage = () => {
           <CardTitle as={'h4'} className="flex-grow-1">
             All Faq List
           </CardTitle>
-          <Link href="/support/faqs/faq-add" className="btn btn-sm btn-primary">
+          <Link href="/support/faqs/faq-add" className="btn btn-lg btn-primary">
             Add FAQ
           </Link>
         </CardHeader>

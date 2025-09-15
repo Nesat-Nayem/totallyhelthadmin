@@ -1,0 +1,161 @@
+import IconifyIcon from '@/components/wrappers/IconifyIcon'
+import Image from 'next/image'
+import Link from 'next/link'
+import React from 'react'
+import {
+  Button,
+  Card,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Col,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  FormControl,
+  InputGroup,
+  Row,
+} from 'react-bootstrap'
+import banner1 from '../../../../../assets/images/sample-menu/biryani.jpg'
+
+const data = [
+  {
+    id: 1,
+    banner: banner1,
+    title: 'Biryani',
+    category: 'Lunch',
+    price: 'AED 5.99',
+    priceCategory: 'Restaurant',
+    brands: 'Totally Health',
+    branch: 'dubai',
+    desc: 'Cooking up made-to-order meal plans to help you look and feel fantastic! Choose from thousands of meal combinations and get healthy, nutritious and delicious meals delivered straight to your door.',
+    status: 'Active',
+  },
+]
+
+const RestaurentsMenu = async () => {
+  return (
+    <Row>
+      <Col xl={12}>
+        <Card>
+          <CardHeader className="d-flex justify-content-between align-items-center gap-1">
+            <CardTitle as={'h4'} className="flex-grow-1">
+              Menu Items List
+            </CardTitle>
+            {/* Search Input */}
+            <InputGroup style={{ maxWidth: '250px' }}>
+              <FormControl placeholder="Search menu..." type="search" />
+            </InputGroup>
+
+            <Link href="/menu-master/menu-add" className="btn btn-lg btn-primary">
+              + Add Menu
+            </Link>
+          </CardHeader>
+          <div>
+            <div className="table-responsive">
+              <table className="table align-middle mb-0 table-hover table-centered table-bordered">
+                <thead className="bg-light-subtle">
+                  <tr>
+                    <th style={{ width: 20 }}>
+                      <div className="form-check">
+                        <input type="checkbox" className="form-check-input" id="customCheck1" />
+                        <label className="form-check-label" htmlFor="customCheck1" />
+                      </div>
+                    </th>
+                    <th style={{ textWrap: 'nowrap' }}>Menu Banner</th>
+                    <th style={{ textWrap: 'nowrap' }}>Title</th>
+                    <th style={{ textWrap: 'nowrap' }}> Category</th>
+                    <th style={{ textWrap: 'nowrap' }}>Price </th>
+                    <th style={{ textWrap: 'nowrap' }}>Price Category</th>
+                    <th style={{ textWrap: 'nowrap' }}>Brands</th>
+                    <th style={{ textWrap: 'nowrap' }}>Branch</th>
+                    <th style={{ textWrap: 'nowrap' }}>Description</th>
+                    <th style={{ textWrap: 'nowrap' }}>Status</th>
+                    <th style={{ textWrap: 'nowrap' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <div className="form-check">
+                          <input type="checkbox" className="form-check-input" id="customCheck2" />
+                          <label className="form-check-label" htmlFor="customCheck2" />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
+                            <Image src={item.banner} alt="product" className="avatar-md" />
+                          </div>
+                        </div>
+                      </td>
+                      <td>{item.title}</td>
+                      <td>{item.category}</td>
+                      <td>{item.price}</td>
+                      <td>
+                        <span className="badge bg-success">{item.priceCategory}</span>
+                      </td>
+                      <td>{item.brands}</td>
+                      <td>{item.branch}</td>
+
+                      <td>{item.desc.slice(0, 20)}</td>
+
+                      <td>
+                        <span className="badge bg-success">{item.status} </span>
+                      </td>
+                      <td>
+                        <div className="d-flex gap-2">
+                          <Link href="/menu-master/menu-edit" className="btn btn-soft-primary btn-sm">
+                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="" className="btn btn-soft-danger btn-sm">
+                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <CardFooter className="border-top">
+            <nav aria-label="Page navigation example">
+              <ul className="pagination justify-content-end mb-0">
+                <li className="page-item">
+                  <Link className="page-link" href="">
+                    Previous
+                  </Link>
+                </li>
+                <li className="page-item active">
+                  <Link className="page-link" href="">
+                    1
+                  </Link>
+                </li>
+                <li className="page-item">
+                  <Link className="page-link" href="">
+                    2
+                  </Link>
+                </li>
+                <li className="page-item">
+                  <Link className="page-link" href="">
+                    3
+                  </Link>
+                </li>
+                <li className="page-item">
+                  <Link className="page-link" href="">
+                    Next
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          </CardFooter>
+        </Card>
+      </Col>
+    </Row>
+  )
+}
+
+export default RestaurentsMenu

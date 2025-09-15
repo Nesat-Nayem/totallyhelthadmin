@@ -1,14 +1,11 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import Link from 'next/link'
 import { Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import FileUpload from '@/components/FileUpload'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { apiFetch, apiMultipartPut } from '@/utils/api'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 
 /** FORM TYPES **/
 type FormData = {
@@ -24,31 +21,13 @@ type SingleValue = { value: string }
 type WeekOffer = { week: string; offer: string }
 
 const EditMealPlan = () => {
-  const { register, handleSubmit, reset } = useForm<FormData>()
-  const params = useSearchParams()
-  const id = params.get('id') || ''
-  const router = useRouter()
-  const { data: session } = useSession()
+  const { register, handleSubmit } = useForm<FormData>()
 
   const [kcalList, setKcalList] = useState<SingleValue[]>([{ value: '' }])
   const [deliveredList, setDeliveredList] = useState<SingleValue[]>([{ value: '' }])
   const [suitableList, setSuitableList] = useState<SingleValue[]>([{ value: '' }])
   const [daysPerWeekList, setDaysPerWeekList] = useState<WeekOffer[]>([{ week: '', offer: '' }])
   const [weeksOfferList, setWeeksOfferList] = useState<WeekOffer[]>([{ week: '', offer: '' }])
-  const [category, setCategory] = useState<string>('')
-  const [brand, setBrand] = useState<string>('')
-  const [files, setFiles] = useState<File[]>([])
-  const [existingImages, setExistingImages] = useState<{ _id?: string; url?: string }[]>([])
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | undefined>(undefined)
-  const [removedImageIds, setRemovedImageIds] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-
-  const getImgUrl = (u?: any): string | undefined => {
-    if (!u) return undefined
-    if (typeof u === 'string') return u
-    return u.url || u.secure_url
-  }
 
   const handleChange = <T,>(list: T[], setList: React.Dispatch<React.SetStateAction<T[]>>, index: number, key: keyof T, val: string) => {
     const updated = [...list]
@@ -66,128 +45,21 @@ const EditMealPlan = () => {
     setList(updated)
   }
 
-  useEffect(() => {
-    const load = async () => {
-      if (!id) return
-      try {
-        setLoading(true)
-        const res = await apiFetch<any>(`/meal-plans/${id}`)
-        const item = res?.data || res
-        reset({
-          title: item.title,
-          description: item.description,
-          discount: item.discount,
-          badge: item.badge,
-          price: item.price,
-          delPrice: item.delPrice,
-        })
-        setCategory(item.category || '')
-        setBrand(item.brand || '')
-        setKcalList((item.kcalList || ['']).map((v: string) => ({ value: v })))
-        setDeliveredList((item.deliveredList || ['']).map((v: string) => ({ value: v })))
-        setSuitableList((item.suitableList || ['']).map((v: string) => ({ value: v })))
-        setDaysPerWeekList((item.daysPerWeek || ['']).map((v: string) => ({ week: v, offer: '' })))
-        setWeeksOfferList((item.weeksOffers || [{ week: '', offer: '' }]).map((w: any) => ({ week: w.week, offer: w.offer })))
-        setExistingImages((item.images || []).map((img: any) => ({ _id: img?._id, url: getImgUrl(img) })))
-        setThumbnailUrl(getImgUrl(item.thumbnail))
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
-
-  const onRemoveExistingImage = (imgId?: string) => {
-    if (!imgId) return
-    setRemovedImageIds((prev) => [...prev, imgId])
-    setExistingImages((prev) => prev.filter((x) => x._id !== imgId))
-  }
-
-  const onSubmit: SubmitHandler<FormData> = async (data) => {
-    try {
-      setSubmitting(true)
-      const form = new FormData()
-      form.append('title', data.title)
-      form.append('description', data.description)
-      if (data.discount) form.append('discount', data.discount)
-      if (data.badge) form.append('badge', data.badge)
-      if (data.price !== undefined && data.price !== null) form.append('price', String(data.price))
-      if (data.delPrice !== undefined && data.delPrice !== null) form.append('delPrice', String(data.delPrice))
-      if (category) form.append('category', category)
-      if (brand) form.append('brand', brand)
-
-      // Arrays
-      const arr = (xs: SingleValue[]) => xs.map((x) => x.value).filter((v) => v)
-      form.append('kcalList', JSON.stringify(arr(kcalList)))
-      form.append('deliveredList', JSON.stringify(arr(deliveredList)))
-      form.append('suitableList', JSON.stringify(arr(suitableList)))
-      form.append('daysPerWeek', JSON.stringify(daysPerWeekList.map((x) => x.week).filter((v) => v)))
-      form.append('weeksOffers', JSON.stringify(weeksOfferList.filter((w) => w.week && w.offer)))
-
-      // Image removals
-      if (removedImageIds.length) form.append('removeImageIds', JSON.stringify(removedImageIds))
-
-      // New files: first file as new thumbnail (if present), all appended as images
-      files.forEach((file, idx) => {
-        form.append('images', file)
-        if (idx === 0) form.append('thumbnail', file)
-      })
-
-      const token = (session as any)?.user?.token as string | undefined
-      await apiMultipartPut(`/meal-plans/${id}`, form, token)
-      alert('Meal plan updated')
-      router.push('/meal-plan/meal-plan-list')
-    } catch (e: any) {
-      alert(e?.message || 'Failed to update')
-    } finally {
-      setSubmitting(false)
-    }
+  const onSubmit: SubmitHandler<FormData> = (data) => {
+    console.log('Form Submitted:', {
+      ...data,
+      kcalList,
+      deliveredList,
+      suitableList,
+      daysPerWeekList,
+      weeksOfferList,
+    })
   }
 
   return (
     <Col xl={12}>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <FileUpload title="Meal Plan Photos" onFilesChange={(fs) => setFiles(fs)} />
-
-        {/* Existing Images */}
-        {!loading && (thumbnailUrl || existingImages.length > 0) && (
-          <Card>
-            <CardHeader>
-              <CardTitle as="h4">Current Images</CardTitle>
-            </CardHeader>
-            <CardBody>
-              {thumbnailUrl && (
-                <div className="mb-3">
-                  <label className="form-label">Thumbnail</label>
-                  <div>
-                    <img src={thumbnailUrl} alt="thumbnail" style={{ maxHeight: 120, borderRadius: 8 }} />
-                  </div>
-                  <small className="text-muted d-block mt-1">Upload a new first image to replace the thumbnail.</small>
-                </div>
-              )}
-              {existingImages.length > 0 && (
-                <div>
-                  <label className="form-label">Gallery</label>
-                  <Row>
-                    {existingImages.map((img) => (
-                      <Col key={img._id || img.url} lg={3} className="mb-3">
-                        <div className="border p-2 rounded d-flex flex-column align-items-center">
-                          <img src={img.url} alt="meal" style={{ maxHeight: 140, borderRadius: 6, objectFit: 'cover', width: '100%' }} />
-                          {img._id && (
-                            <button type="button" className="btn btn-sm btn-outline-danger mt-2" onClick={() => onRemoveExistingImage(img._id)}>
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </Col>
-                    ))}
-                  </Row>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        )}
+        <FileUpload title="Meal Plan Photos" />
 
         {/* General Info */}
         <Card>
@@ -195,77 +67,72 @@ const EditMealPlan = () => {
             <CardTitle as="h4">Edit Meal Plan</CardTitle>
           </CardHeader>
           <CardBody>
-            {loading && <p>Loading...</p>}
-            {!loading && (
-              <Row>
-                <Col lg={6}>
-                  <div className="mb-3">
-                    <label htmlFor="title" className="form-label">
-                      Title
-                    </label>
-                    <input {...register('title')} type="text" id="title" className="form-control" />
-                  </div>
-                </Col>
-                <Col lg={6}>
-                  <div className="mb-3">
-                    <label htmlFor="menuCategory" className="form-label">
-                      Select Menu Category
-                    </label>
-                    <select id="menuCategory" className="form-control form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-                      <option value="">Select Category</option>
-                      <option value="Breakfast">Breakfast</option>
-                      <option value="Lunch">Lunch</option>
-                      <option value="Dinner">Dinner</option>
-                      <option value="Snacks">Snacks</option>
-                    </select>
-                  </div>
-                </Col>
-                <Col lg={4}>
-                  <div className="mb-3">
-                    <label htmlFor="brands" className="form-label">
-                      Select Brands
-                    </label>
-                    <select id="brands" className="form-control form-select" value={brand} onChange={(e) => setBrand(e.target.value)}>
-                      <option value="">Select Brand</option>
-                      <option value="Totally Health">Totally Health</option>
-                      <option value="Subway">Subway</option>
-                      <option value="Pizza Hut">Pizza Hut</option>
-                      <option value="Burger King">Burger King</option>
-                    </select>
-                  </div>
-                </Col>
-                <Col lg={4}>
-                  <div className="mb-3">
-                    <label htmlFor="discount" className="form-label">
-                      % Off
-                    </label>
-                    <input {...register('discount')} type="text" id="discount" className="form-control" />
-                  </div>
-                </Col>
-                <Col lg={4}>
-                  <div className="mb-3">
-                    <label htmlFor="badge" className="form-label">
-                      Badge Title
-                    </label>
-                    <input {...register('badge')} type="text" id="badge" className="form-control" />
-                  </div>
-                </Col>
-                <Col lg={12}>
-                  <div className="mb-3">
-                    <label htmlFor="description" className="form-label">
-                      Description
-                    </label>
-                    <textarea
-                      {...register('description')}
-                      className="form-control bg-light-subtle"
-                      id="description"
-                      rows={5}
-                      placeholder="Short description about the product"
-                    />
-                  </div>
-                </Col>
-              </Row>
-            )}
+            <Row>
+              <Col lg={6}>
+                <div className="mb-3">
+                  <label htmlFor="title" className="form-label">
+                    Title
+                  </label>
+                  <input {...register('title')} type="text" id="title" className="form-control" />
+                </div>
+              </Col>
+              <Col lg={6}>
+                <div className="mb-3">
+                  <label htmlFor="menuCategory" className="form-label">
+                    Select Menu Category
+                  </label>
+                  <select id="menuCategory" className="form-control form-select">
+                    <option value="">Breakfast</option>
+                    <option value="">Lunch</option>
+                    <option value="">Dinner</option>
+                    <option value="">Snacks</option>
+                  </select>
+                </div>
+              </Col>
+              <Col lg={4}>
+                <div className="mb-3">
+                  <label htmlFor="brands" className="form-label">
+                    Select Brands
+                  </label>
+                  <select id="brands" className="form-control form-select">
+                    <option value="">Totally Health</option>
+                    <option value="">Subway</option>
+                    <option value="">Pizza Hut</option>
+                    <option value="">Burger King</option>
+                  </select>
+                </div>
+              </Col>
+              <Col lg={4}>
+                <div className="mb-3">
+                  <label htmlFor="discount" className="form-label">
+                    % Off
+                  </label>
+                  <input {...register('discount')} type="text" id="discount" className="form-control" />
+                </div>
+              </Col>
+              <Col lg={4}>
+                <div className="mb-3">
+                  <label htmlFor="badge" className="form-label">
+                    Badge Title
+                  </label>
+                  <input {...register('badge')} type="text" id="badge" className="form-control" />
+                </div>
+              </Col>
+              <Col lg={12}>
+                <div className="mb-3">
+                  <label htmlFor="description" className="form-label">
+                    Description
+                  </label>
+                  <textarea
+                    {...register('description')}
+                    className="form-control bg-light-subtle"
+                    id="description"
+                    rows={5}
+                    placeholder="Short description about the product"
+                  />
+                </div>
+              </Col>
+            </Row>
           </CardBody>
         </Card>
 
@@ -429,8 +296,8 @@ const EditMealPlan = () => {
         <div className="p-3 bg-light mb-3 rounded">
           <Row className="justify-content-end g-2">
             <Col lg={2}>
-              <button type="submit" disabled={submitting} className="btn btn-outline-secondary w-100">
-                {submitting ? 'Updating...' : 'Update Meal Plan'}
+              <button type="submit" className="btn btn-outline-secondary w-100">
+                Create Product
               </button>
             </Col>
             <Col lg={2}>

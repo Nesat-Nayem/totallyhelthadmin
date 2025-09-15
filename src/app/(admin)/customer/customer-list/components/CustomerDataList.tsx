@@ -18,6 +18,7 @@ import {
   InputGroup,
   Row,
 } from 'react-bootstrap'
+import PunchModal from './PunchModal'
 
 const CustomerDataList = async () => {
   const customerData = await getAllOrders()
@@ -41,8 +42,8 @@ const CustomerDataList = async () => {
               </InputGroup>
 
               {/* Month Filter Dropdown */}
-              <Link href="/customer/customer-add" className="btn btn-sm btn-primary">
-                Add Customers
+              <Link href="/customer/customer-add" className="btn btn-lg btn-primary">
+                + Add Customers
               </Link>
             </CardHeader>
 
@@ -62,6 +63,7 @@ const CustomerDataList = async () => {
                       <th style={{ textWrap: 'nowrap' }}>Phone</th>
                       <th style={{ textWrap: 'nowrap' }}>Meal Plan Start Date</th>
                       <th style={{ textWrap: 'nowrap' }}>Meal Plan End Date</th>
+                      <th style={{ textWrap: 'nowrap' }}>Pending Total Meals</th>
                       <th style={{ textWrap: 'nowrap' }}>Status</th>
                       <th style={{ textWrap: 'nowrap' }}>Action</th>
                     </tr>
@@ -79,11 +81,13 @@ const CustomerDataList = async () => {
                       <td style={{ textWrap: 'nowrap' }}>+91 9876543210</td>
                       <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
                       <td style={{ textWrap: 'nowrap' }}>01 Dec 2025</td>
+                      <td style={{ textWrap: 'nowrap' }}>8</td>
                       <td style={{ textWrap: 'nowrap' }}>
                         <span className="badge bg-success">Active</span>
                       </td>
                       <td style={{ textWrap: 'nowrap' }}>
                         <div className="d-flex gap-2">
+                          <PunchModal />
                           <Link href="/customer/customer-edit" className="btn btn-soft-primary btn-sm">
                             <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
                           </Link>

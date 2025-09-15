@@ -1,62 +1,40 @@
-"use client"
-
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
+import Image from 'next/image'
 import Link from 'next/link'
-import React, { useEffect, useState } from 'react'
-import { Button, Card, CardFooter, CardHeader, CardTitle, Col, FormControl, InputGroup, Row } from 'react-bootstrap'
-import { apiFetch } from '@/utils/api'
-import { useSession } from 'next-auth/react'
+import React from 'react'
+import {
+  Button,
+  Card,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Col,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownToggle,
+  FormControl,
+  InputGroup,
+  Row,
+} from 'react-bootstrap'
+import banner1 from '../../../../../assets/images/banner/1.jpg'
+import banner2 from '../../../../../assets/images/banner/2.jpg'
+import banner3 from '../../../../../assets/images/banner/3.jpg'
 
-type MealPlanItem = {
-  _id: string
-  title: string
-  category?: string
-  brand?: string
-  price?: number
-  status?: string
-  thumbnail?: { url?: string; secure_url?: string } | string
-  images?: ({ url?: string; secure_url?: string } | string)[]
-}
+const data = [
+  {
+    id: 1,
+    title: 'international meal Plan',
+    banner: banner1,
+    MealPlanCategory: 'Breakfast',
+    Brands: 'Totally Health',
+    Price: 'AED 100',
 
-const MealPlan = () => {
-  const { data: session } = useSession()
-  const [items, setItems] = useState<MealPlanItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [q, setQ] = useState('')
+    status: 'Active',
+  },
+]
 
-  const load = async () => {
-    try {
-      setLoading(true)
-      const res = await apiFetch<{ data: MealPlanItem[] }>(`/meal-plans?limit=50${q ? `&search=${encodeURIComponent(q)}` : ''}`)
-      setItems(res.data || [])
-    } catch (e) {
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const onDelete = async (id: string) => {
-    if (!confirm('Delete this meal plan?')) return
-    try {
-      const token = (session as any)?.user?.token as string | undefined
-      await apiFetch(`/meal-plans/${id}`, { method: 'DELETE' }, token)
-      setItems((prev) => prev.filter((x) => x._id !== id))
-    } catch (e: any) {
-      alert(e?.message || 'Failed to delete')
-    }
-  }
-  const getImgUrl = (u?: any): string | undefined => {
-    if (!u) return undefined
-    if (typeof u === 'string') return u
-    return u.url || u.secure_url
-  }
-
+const MealPlan = async () => {
   return (
     <Row>
       <Col xl={12}>
@@ -68,15 +46,15 @@ const MealPlan = () => {
 
             {/* Search Input */}
             <InputGroup style={{ maxWidth: '250px' }}>
-              <FormControl placeholder="Search..." value={q} onChange={(e) => setQ(e.target.value)} />
-              <Button variant="outline-secondary" onClick={load}>
+              <FormControl placeholder="Search..." />
+              <Button variant="outline-secondary">
                 <IconifyIcon icon="mdi:magnify" />
               </Button>
             </InputGroup>
 
             {/* Month Filter Dropdown */}
-            <Link href="/meal-plan/add-meal-plan" className="btn btn-sm btn-primary">
-              Add Meal
+            <Link href="/meal-plan/add-meal-plan" className="btn btn-lg btn-primary">
+              + Add Meal
             </Link>
           </CardHeader>
 
@@ -102,63 +80,44 @@ const MealPlan = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8}>Loading...</td>
-                    </tr>
-                  ) : items.length === 0 ? (
-                    <tr>
-                      <td colSpan={8}>No meal plans found</td>
-                    </tr>
-                  ) : (
-                    items.map((item) => (
-                      <tr key={item._id}>
-                        <td>
-                          <div className="form-check">
-                            <input type="checkbox" className="form-check-input" id="customCheck2" />
-                            <label className="form-check-label" htmlFor="customCheck2" />
+                  {data.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <div className="form-check">
+                          <input type="checkbox" className="form-check-input" id="customCheck2" />
+                          <label className="form-check-label" htmlFor="customCheck2" />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
+                            <Image src={item.banner} alt="product" className="avatar-md" />
                           </div>
-                        </td>
-                        <td>
-                          <div className="d-flex align-items-center gap-2">
-                            <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={
-                                  getImgUrl(item.thumbnail) ||
-                                  (item.images && item.images.length ? getImgUrl(item.images[0]) : undefined) ||
-                                  '/placeholder.svg'
-                                }
-                                alt="thumb"
-                                className="avatar-md rounded"
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td>{item.title}</td>
-                        <td>{item.category || '-'}</td>
-                        <td>{item.brand || '-'}</td>
-                        <td>{item.price ?? '-'}</td>
+                        </div>
+                      </td>
+                      <td>{item.title}</td>
+                      <td>{item.MealPlanCategory}</td>
+                      <td>{item.Brands}</td>
+                      <td>{item.Price}</td>
 
-                        <td>
-                          <span className="badge bg-success">{item.status || 'active'}</span>
-                        </td>
-                        <td>
-                          <div className="d-flex gap-2">
-                            <Link href={`/meal-plan/meal-plan-view?id=${item._id}`} className="btn btn-light btn-sm">
-                              <IconifyIcon icon="solar:eye-broken" className="align-middle fs-18" />
-                            </Link>
-                            <Link href={`/meal-plan/meal-plan-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
-                              <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                            </Link>
-                            <button onClick={() => onDelete(item._id)} className="btn btn-soft-danger btn-sm">
-                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                      <td>
+                        <span className="badge bg-success">{item.status}</span>
+                      </td>
+                      <td>
+                        <div className="d-flex gap-2">
+                          <Link href="/meal-plan/meal-plan-view" className="btn btn-light btn-sm">
+                            <IconifyIcon icon="solar:eye-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="/meal-plan/meal-plan-edit" className="btn btn-soft-primary btn-sm">
+                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                          </Link>
+                          <Link href="" className="btn btn-soft-danger btn-sm">
+                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

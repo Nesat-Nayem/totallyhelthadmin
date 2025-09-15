@@ -1,3 +1,4 @@
+import { use } from 'react'
 import { MenuItemType } from '@/types/menu'
 
 export const MENU_ITEMS: MenuItemType[] = [
@@ -17,32 +18,118 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Sales',
     icon: 'solar:cart-5-bold-duotone',
     children: [
-      // {
-      //   key: 'pos-child',
-      //   label: 'POS',
-      //   url: '/sales/pos',
-      //   parentKey: 'sales',
-      // },
       {
         key: 'sales-list',
-        label: 'Sales List',
+        label: 'Pay Type Sales ',
         url: '/sales/sales-list',
+        parentKey: 'sales',
+      },
+      {
+        key: 'membership-sales-list',
+        label: 'Membership Sales ',
+        url: '/sales/membership-sales-list',
         parentKey: 'sales',
       },
     ],
   },
+
   {
-    key: 'restaurant-menu-category',
-    icon: 'solar:clipboard-list-bold-duotone',
-    label: 'Menu Category',
-    url: '/pages/restaurants-menu-category',
+    key: 'menu-master',
+    label: 'Menu Master',
+    icon: 'solar:cup-hot-broken',
+    children: [
+      {
+        key: 'Restaurant-menu',
+        label: 'Restaurant Menu',
+        url: '/menu-master/restaurant-menu',
+        parentKey: 'menu-master',
+      },
+      {
+        key: 'online-menu',
+        label: 'Online Menu',
+        url: '/menu-master/online-menu',
+        parentKey: 'menu-master',
+      },
+      {
+        key: 'membership-menu',
+        label: 'Membership Menu',
+        url: '/menu-master/membership-menu',
+        parentKey: 'menu-master',
+      },
+      {
+        key: 'add-new-menu',
+        label: 'Add New Menu Item',
+        url: '/menu-master/menu-add',
+        parentKey: 'menu-master',
+      },
+      {
+        key: 'menu-category',
+        label: 'Menu Category',
+        url: '/menu-master/menu-category',
+        parentKey: 'menu-master',
+      },
+    ],
+  },
+
+  {
+    key: 'paymeny-method',
+    label: 'Payment Method',
+    icon: 'solar:dollar-bold',
+    children: [
+      {
+        key: 'list-of-payment-method',
+        label: 'Payment Method',
+        url: '/payment-method/list-of-payment-method',
+        parentKey: 'payment-method',
+      },
+      {
+        key: 'add-new-payment-method',
+        label: 'Add  Payment Method',
+        url: '/payment-method/add-new-payment-method',
+        parentKey: 'payment-method',
+      },
+    ],
+  },
+
+  {
+    key: 'branches',
+    label: 'Branches',
+    icon: 'solar:box-bold-duotone',
+    children: [
+      {
+        key: 'list-of-branches',
+        label: 'List of branches',
+        url: '/branches/list-of-branches',
+        parentKey: 'branches',
+      },
+      {
+        key: 'add-new-branch',
+        label: 'Add new branch',
+        url: '/branches/add-new-branch',
+        parentKey: 'branches',
+      },
+    ],
   },
   {
-    key: 'brand-master',
-    icon: 'solar:gift-bold-duotone',
+    key: 'brands',
     label: 'Brands',
-    url: '/brands',
+    icon: 'solar:gift-bold-duotone',
+    children: [
+      {
+        key: 'list-of-brands',
+        label: 'List of brands',
+        url: '/brands/list-of-brands',
+        parentKey: 'brands',
+      },
+      {
+        key: 'brand-menu',
+        label: 'Brand Menu',
+        url: '/brands/brand-menu',
+        parentKey: 'brands',
+      },
+    ],
   },
+
   {
     key: 'meal-plan',
     label: 'Meal Plan',
@@ -50,7 +137,7 @@ export const MENU_ITEMS: MenuItemType[] = [
     children: [
       {
         key: 'add-meal-plan',
-        label: 'Add Meal Plan',
+        label: 'Add new meal Plan',
         url: '/meal-plan/add-meal-plan',
         parentKey: 'meal-plan',
       },
@@ -60,8 +147,41 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/meal-plan/meal-plan-list',
         parentKey: 'meal-plan',
       },
+      {
+        key: 'meal-plan-menu',
+        label: 'Meal Plan Menu',
+        url: '/meal-plan/sample-menu',
+        parentKey: 'meal-plan',
+      },
     ],
   },
+
+  {
+    key: 'aggregators',
+    label: 'Aggregators',
+    icon: 'solar:gift-bold-duotone',
+    children: [
+      {
+        key: 'add-aggregators',
+        label: 'Add new aggregator',
+        url: '/aggregators/add-aggregators',
+        parentKey: 'aggregators',
+      },
+      {
+        key: 'aggregators-list',
+        label: 'List of Aggregators',
+        url: '/aggregators/aggregators-list',
+        parentKey: 'aggregators',
+      },
+      // {
+      //   key: 'aggregators-menu-linking',
+      //   label: 'Menu linking for aggregator',
+      //   url: '/aggregators/aggregators-menu-linking',
+      //   parentKey: 'aggregators',
+      // },
+    ],
+  },
+
   {
     key: 'inventory',
     label: 'Inventory',
@@ -79,118 +199,15 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/inventory/inventory-list',
         parentKey: 'inventory',
       },
-    ],
-  },
-  {
-    key: 'customer',
-    label: 'Customers',
-    icon: 'solar:users-group-two-rounded-bold-duotone',
-    children: [
       {
-        key: 'customer-add',
-        label: 'Add Customer',
-        url: '/customer/customer-add',
-        parentKey: 'customer',
-      },
-      {
-        key: 'customer-list',
-        label: 'Customer List',
-        url: '/customer/customer-list',
-        parentKey: 'customer',
-      },
-    ],
-  },
-  {
-    key: 'staff',
-    label: 'Staff',
-    icon: 'solar:users-group-two-rounded-bold-duotone',
-    children: [
-      {
-        key: 'waiter-list',
-        label: 'Waiter Master',
-        url: '/staff/waiter-list',
-        parentKey: 'staff',
-      },
-      {
-        key: 'delivery-boy-master',
-        label: 'Delivery Boy Master',
-        url: '/staff/delivery-boy-master',
-        parentKey: 'staff',
+        key: 'supplier-master',
+        label: 'Supplier List',
+        url: '/staff/supplier-list',
+        parentKey: 'inventory',
       },
     ],
   },
 
-  {
-    key: 'invoices',
-    icon: 'solar:clipboard-list-bold-duotone',
-    label: 'Invoices',
-    url: '/invoices',
-  },
-  {
-    key: 'reports',
-    label: 'Reports',
-    icon: 'solar:bill-list-bold-duotone',
-    children: [
-
-       {
-        key: 'membership-report',
-        label: 'Membership Report',
-        url: '/reports/membership-report',
-        parentKey: 'reports',
-      },
-      {
-        key: 'sales-report',
-        label: 'Sales Report',
-        url: '/reports/sales-report',
-        parentKey: 'reports',
-      },
-      
-      // {
-      //   key: 'all-income',
-      //   label: 'Collection Report',
-      //   url: '/reports/all-income',
-      //   parentKey: 'reports',
-      // },
-
-      // {
-      //   key: 'vat-report',
-      //   label: 'VAT Report',
-      //   url: '/reports/vat-report',
-      //   parentKey: 'reports',
-      // },
-      // {
-      //   key: 'discount-report',
-      //   label: 'Discount Report',
-      //   url: '/reports/discount-report',
-      //   parentKey: 'reports',
-      // },
-
-      // // {
-      // //   key: 'staff-report',
-      // //   label: 'Staff  Report',
-      // //   url: '/reports/discount-report',
-      // //   parentKey: 'reports',
-      // // },
-      // {
-      //   key: 'unpaid-report',
-      //   label: 'Unpaid Delivery  Report',
-      //   url: '/reports/unpaid-report',
-      //   parentKey: 'reports',
-      // },
-      // {
-      //   key: 'category-wise-report',
-      //   label: 'Category Wise Report',
-      //   url: '/reports/category-wise-report',
-      //   parentKey: 'reports',
-      // },
-      // {
-      //   key: 'order-wise-report',
-      //   label: 'Order Type Wise Report',
-      //   url: '/reports/order-wise-report',
-      //   parentKey: 'reports',
-      // },
-    ],
-  },
   {
     key: 'expenses',
     label: 'Expenses',
@@ -203,13 +220,159 @@ export const MENU_ITEMS: MenuItemType[] = [
         parentKey: 'expenses',
       },
       {
-        key: 'expense-list',
-        label: 'Expense List',
-        url: '/expenses/expense-list',
+        key: 'cash-expense',
+        label: 'Cash Expense',
+        url: '/expenses/cash-expense',
+        parentKey: 'expenses',
+      },
+      {
+        key: 'credit-expense',
+        label: 'Credit Expense',
+        url: '/expenses/credit-expense',
         parentKey: 'expenses',
       },
     ],
   },
+
+  {
+    key: 'customer',
+    label: 'Customers Master',
+    icon: 'solar:users-group-two-rounded-bold-duotone',
+    children: [
+      {
+        key: 'customer-add',
+        label: 'Add new Customer',
+        url: '/customer/customer-add',
+        parentKey: 'customer',
+      },
+      {
+        key: 'customer-list',
+        label: 'Customer List',
+        url: '/customer/customer-list',
+        parentKey: 'customer',
+      },
+      {
+        key: 'customer-membership-history-list',
+        label: 'Customer Membership History',
+        url: '/customer/customer-membership-history-list',
+        parentKey: 'customer',
+      },
+    ],
+  },
+
+  {
+    key: 'staff',
+    label: 'Staff Master',
+    icon: 'solar:users-group-two-rounded-bold-duotone',
+    children: [
+      {
+        key: 'waiter-list',
+        label: 'Waiter List',
+        url: '/staff/waiter-list',
+        parentKey: 'staff',
+      },
+      {
+        key: 'cashier-list',
+        label: 'Cashier List',
+        url: '/staff/cashier-list',
+        parentKey: 'staff',
+      },
+      {
+        key: 'add-new-waiter',
+        label: 'Add new waiter',
+        url: '/staff/waiter-add',
+        parentKey: 'staff',
+      },
+      {
+        key: 'add-new-cashier',
+        label: 'Add new cashier',
+        url: '/staff/add-new-cashier',
+        parentKey: 'staff',
+      },
+    ],
+  },
+
+  {
+    key: 'Shift-master',
+    icon: 'solar:calendar-bold-duotone',
+    label: 'Shift Close',
+    url: '/shift-close',
+  },
+  {
+    key: 'reports',
+    label: 'Reports',
+    icon: 'solar:bill-list-bold-duotone',
+    children: [
+      {
+        key: 'membership-report',
+        label: 'Membership Report',
+        url: '/reports/membership-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'sales-report',
+        label: 'Paytype wise Report',
+        url: '/reports/paytype-wise-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'aggregator-sales-report',
+        label: 'Aggregator Wise Report',
+        url: '/reports/aggregator-wise-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'branch-sales-report',
+        label: 'Branch Wise Sales Report',
+        url: '/reports/branch-sales-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'pay-out-sales-report',
+        label: 'Pay-out Report',
+        url: '/reports/pay-out-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'supplier-wise-report',
+        label: 'Supplier wise report',
+        url: '/reports/supplier-wise-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'cancelled-bills-report',
+        label: 'Cancelled Bills Reports',
+        url: '/reports/cancel-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'discount-report',
+        label: 'Discount Report',
+        url: '/reports/discount-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'vat-report',
+        label: 'Vat Report',
+        url: '/reports/vat-report',
+        parentKey: 'reports',
+      },
+      {
+        key: 'day-closing',
+        label: 'Day closing',
+        url: '/reports/day-close-report',
+        parentKey: 'reports',
+      },
+    ],
+  },
+
+  {
+    key: 'more-options',
+    icon: 'solar:cup-hot-broken',
+    label: 'More Options',
+    url: '/more-options',
+  },
+
   {
     key: 'enquiry',
     label: 'Enquiries',
@@ -342,12 +505,7 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-  {
-    key: 'sample-menu',
-    label: 'Sample Menu',
-    icon: 'solar:document-bold-duotone',
-    url: '/meal-plan/sample-menu',
-  },
+
   {
     key: 'support',
     label: 'SUPPORT',
@@ -375,6 +533,12 @@ export const MENU_ITEMS: MenuItemType[] = [
     key: 'custom',
     label: 'CUSTOM',
     isTitle: true,
+  },
+  {
+    key: 'role-management',
+    label: 'Role Management',
+    icon: 'solar:users-group-two-rounded-bold-duotone',
+    url: '/role-management',
   },
   {
     key: 'settings',

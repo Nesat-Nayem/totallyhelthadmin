@@ -1,9 +1,7 @@
 import { Card, CardBody, CardHeader, CardTitle } from 'react-bootstrap'
 import DropzoneFormInput from './form/DropzoneFormInput'
 
-type Props = { title: string; onFilesChange?: (files: File[]) => void }
-
-const FileUpload = ({ title, onFilesChange }: Props) => {
+const FileUpload = ({ title }: { title: string }) => {
   return (
     <Card>
       <CardHeader>
@@ -16,7 +14,6 @@ const FileUpload = ({ title, onFilesChange }: Props) => {
           text="Drop your images here, or click to browse"
           helpText={<span className="text-muted fs-13 ">(1600 x 1200 (4:3) recommended. PNG, JPG and GIF files are allowed )</span>}
           showPreview
-          onFileUpload={(files) => onFilesChange?.(files as unknown as File[])}
         />
       </CardBody>
     </Card>

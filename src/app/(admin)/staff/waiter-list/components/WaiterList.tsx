@@ -42,8 +42,8 @@ const WaiterList = async () => {
               </InputGroup>
 
               {/* Month Filter Dropdown */}
-              <Link href="/staff/waiter-add" className="btn btn-sm btn-primary">
-                Add Waiter
+              <Link href="/staff/waiter-add" className="btn btn-lg btn-primary">
+                + Add Waiter
               </Link>
             </CardHeader>
 

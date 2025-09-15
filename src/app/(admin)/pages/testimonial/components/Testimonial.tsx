@@ -22,7 +22,7 @@ const Testimonial = async () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Testimonials
             </CardTitle>
-            <Link href="/pages/testimonial/testimonial-add" className="btn btn-sm btn-primary">
+            <Link href="/pages/testimonial/testimonial-add" className="btn btn-lg btn-primary">
               Add testimonial
             </Link>
           </CardHeader>
