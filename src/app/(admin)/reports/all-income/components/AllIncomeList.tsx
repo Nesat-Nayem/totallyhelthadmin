@@ -1,6 +1,5 @@
+'use client'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import {
@@ -10,17 +9,91 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { useGetOrdersQuery } from '@/services/orderApi'
+
+function formatDate(d: string | Date) {
+  const date = typeof d === 'string' ? new Date(d) : d
+  return date.toLocaleDateString()
+}
+
+function firstDayOfMonthISO() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+}
+
+function todayISO() {
+  return new Date().toISOString()
+}
+
+function toCSV(rows: any[]) {
+  const headers = [
+    'Invoice No',
+    'Date',
+    'Customer',
+    'Payment Mode',
+    'Subtotal',
+    'VAT',
+    'Shipping',
+    'Total',
+    'Status',
+  ]
+  const lines = rows.map((o: any) => [
+    o.invoiceNo,
+    o.date,
+    o.customer?.name || '',
+    o.paymentMode || '',
+    o.subTotal,
+    o.vatAmount || 0,
+    o.shippingCharge || 0,
+    o.total,
+    o.status,
+  ])
+  const csv = [headers, ...lines].map((r) => r.map((v) => `"${String(v ?? '')}"`).join(',')).join('\n')
+  return new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+}
 
 const AllIncomeList = () => {
+  const [q, setQ] = React.useState('')
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
+  const [page, setPage] = React.useState(1)
+  const limit = 20
+
+  const { data: ordersResp } = useGetOrdersQuery({ q: q || undefined, page, limit, startDate: startDate || undefined, endDate: endDate || undefined })
+  const orders = ordersResp?.data ?? []
+  const meta = ordersResp?.meta
+  const summary = ordersResp?.summary
+
+  // this month
+  const { data: monthResp } = useGetOrdersQuery({ startDate: firstDayOfMonthISO(), endDate: todayISO(), page: 1, limit: 1 })
+  const monthTotal = monthResp?.summary?.total ?? 0
+
+  const handleExportCSV = () => {
+    const blob = toCSV(
+      orders.map((o: any) => ({
+        invoiceNo: o.invoiceNo,
+        date: o.date,
+        customer: o.customer?.name,
+        paymentMode: o.paymentMode,
+        subTotal: o.subTotal,
+        vatAmount: o.vatAmount,
+        shippingCharge: o.shippingCharge,
+        total: o.total,
+        status: o.status,
+      }))
+    )
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'all-income.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       <Row>
@@ -33,7 +106,7 @@ const AllIncomeList = () => {
               <div>
                 <h5>Total Income</h5>
                 <h5>
-                  <span className="text-success">AED 2000</span>
+                  <span className="text-success">AED {summary?.total ?? 0}</span>
                 </h5>
               </div>
             </div>
@@ -48,7 +121,7 @@ const AllIncomeList = () => {
               <div>
                 <h5>This Month Income</h5>
                 <h5>
-                  <span className="text-success">AED 2000</span>
+                  <span className="text-success">AED {monthTotal}</span>
                 </h5>
               </div>
             </div>
@@ -66,28 +139,20 @@ const AllIncomeList = () => {
 
               {/* Search Input */}
               <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search invoice No..." />
+                <FormControl placeholder="Search invoice No..." value={q} onChange={(e) => setQ(e.target.value)} />
                 <Button variant="outline-secondary">
                   <IconifyIcon icon="mdi:magnify" />
                 </Button>
               </InputGroup>
 
-              {/* Month Filter Dropdown */}
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
-                <option value="all">Select Month</option>
-                <option value="january">January</option>
-                <option value="february">February</option>
-                <option value="march">March</option>
-                <option value="april">April</option>
-                <option value="may">May</option>
-                <option value="june">June</option>
-                <option value="july">July</option>
-                <option value="august">August</option>
-                <option value="september">September</option>
-                <option value="october">October</option>
-                <option value="november">November</option>
-                <option value="december">December</option>
-              </select>
+              {/* Date Range */}
+              <div className="d-flex gap-2">
+                <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                <Button variant="outline-success" onClick={handleExportCSV}>
+                  <IconifyIcon icon="mdi:file-export-outline" /> Export CSV
+                </Button>
+              </div>
             </CardHeader>
 
             <div>
@@ -111,32 +176,30 @@ const AllIncomeList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>1</td>
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>S001</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 200</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Paid</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>UPI</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any, idx: number) => (
+                      <tr key={o._id}>
+                        <td>
+                          <div className="form-check">
+                            <input type="checkbox" className="form-check-input" />
+                          </div>
+                        </td>
+                        <td style={{ textWrap: 'nowrap' }}>{(page - 1) * limit + idx + 1}</td>
+                        <td style={{ textWrap: 'nowrap' }}>{formatDate(o.date)}</td>
+                        <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo}</td>
+                        <td style={{ textWrap: 'nowrap' }}>AED {o.total}</td>
+                        <td style={{ textWrap: 'nowrap' }}>
+                          <span className={`badge ${o.status === 'paid' ? 'bg-success' : 'bg-warning'}`}>{o.status}</span>
+                        </td>
+                        <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || '-'}</td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <Link href="#" className="btn btn-soft-danger btn-sm" title="Delete (coming soon)">
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -144,30 +207,18 @@ const AllIncomeList = () => {
             <CardFooter className="border-top">
               <nav aria-label="Page navigation example">
                 <ul className="pagination justify-content-end mb-0">
-                  <li className="page-item">
-                    <Link className="page-link" href="">
+                  <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
                       Previous
-                    </Link>
+                    </button>
                   </li>
                   <li className="page-item active">
-                    <Link className="page-link" href="">
-                      1
-                    </Link>
+                    <span className="page-link">{page}</span>
                   </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      2
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      3
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
+                  <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setPage((p) => p + 1)}>
                       Next
-                    </Link>
+                    </button>
                   </li>
                 </ul>
               </nav>
@@ -180,3 +231,4 @@ const AllIncomeList = () => {
 }
 
 export default AllIncomeList
+

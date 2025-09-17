@@ -8,11 +8,13 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useCreateMoreOptionMutation } from '@/services/moreOptionApi'
 
 /** FORM DATA TYPE **/
 type FormData = {
-  title: string
-  status: string
+  name: string
+  price: number | string
+  status: 'active' | 'inactive'
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
@@ -22,8 +24,13 @@ type ControlType = {
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  title: yup.string().required('Please enter title'),
-  status: yup.string().required('Please select a status'),
+  name: yup.string().required('Please enter name'),
+  price: yup
+    .number()
+    .typeError('Please enter a valid price')
+    .min(0, 'Price must be non-negative')
+    .required('Please enter price'),
+  status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
 
 /** GENERAL INFORMATION CARD **/
@@ -37,12 +44,12 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Item Name" />
+              <TextFormInput control={control} type="text" name="name" label="Item Name" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Item Price" />
+              <TextFormInput control={control} type="number" name="price" label="Item Price" />
             </div>
           </Col>
 
@@ -98,12 +105,23 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 const MoreOptionsAdd: React.FC = () => {
   const { reset, handleSubmit, control } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active' },
+    defaultValues: { status: 'active', name: '', price: '' },
   })
+  const [createMoreOption, { isLoading }] = useCreateMoreOptionMutation()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  const onSubmit = async (data: FormData) => {
+    try {
+      const payload = {
+        name: data.name,
+        price: typeof data.price === 'string' ? Number(data.price) : data.price,
+        status: data.status,
+      }
+      await createMoreOption(payload).unwrap()
+      alert('More option created')
+      reset({ status: 'active', name: '', price: '' })
+    } catch (e: any) {
+      alert(e?.message || 'Failed to create more option')
+    }
   }
 
   return (
@@ -112,7 +130,7 @@ const MoreOptionsAdd: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
               Save
             </Button>
           </Col>
@@ -128,3 +146,4 @@ const MoreOptionsAdd: React.FC = () => {
 }
 
 export default MoreOptionsAdd
+

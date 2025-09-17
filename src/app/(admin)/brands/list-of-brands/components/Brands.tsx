@@ -1,46 +1,32 @@
+'use client'
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
-import { Card, CardFooter, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
+import React, { useState } from 'react'
+import { Button, Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { useGetBrandsQuery, useDeleteBrandMutation } from '@/services/brandApi'
 import banner1 from '@/assets/images/brands/dhl.png'
-import banner2 from '@/assets/images/brands/dhl.png'
-import banner3 from '@/assets/images/brands/dhl.png'
 
-const data = [
-  {
-    id: 1,
-    title: 'Totally Health',
-    img: banner1,
-    status: 'Active',
-  },
-  {
-    id: 2,
-    title: 'Subway',
-    img: banner2,
-    status: 'Active',
-  },
-  {
-    id: 3,
-    title: 'KFC',
-    img: banner3,
-    status: 'InActive',
-  },
-  {
-    id: 4,
-    title: 'Pizza Hut',
-    img: banner3,
-    status: 'Active',
-  },
-  {
-    id: 5,
-    title: 'Burger King',
-    img: banner3,
-    status: 'InActive',
-  },
-]
-
-const Brands = async () => {
+const Brands = () => {
+  const [page, setPage] = useState(1)
+  const limit = 10
+  
+  const { data: brandsData } = useGetBrandsQuery()
+  const [deleteBrand] = useDeleteBrandMutation()
+  
+  const brands = brandsData ?? []
+  
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this brand?')) {
+      try {
+        await deleteBrand(id).unwrap()
+        alert('Brand deleted successfully')
+      } catch (error: any) {
+        alert(error?.data?.message || 'Failed to delete brand')
+      }
+    }
+  }
   return (
     <Row>
       <Col xl={12}>
@@ -71,32 +57,45 @@ const Brands = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item) => (
-                    <tr key={item.id}>
+                  {brands.map((item: any) => (
+                    <tr key={item._id}>
                       <td>
                         <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
+                          <input type="checkbox" className="form-check-input" id={`check-${item._id}`} />
+                          <label className="form-check-label" htmlFor={`check-${item._id}`} />
                         </div>
                       </td>
 
-                      <td>{item.title}</td>
+                      <td>{item.name}</td>
 
                       <td>
-                        <Image src={item.img} alt="" width={50} height={50} className="rounded" />
+                        <Image 
+                          src={item.logo || banner1} 
+                          alt={item.name || 'Brand'} 
+                          width={50} 
+                          height={50} 
+                          className="rounded" 
+                          unoptimized={!!item.logo}
+                        />
                       </td>
 
                       <td>
-                        <span className={item.status === 'Active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>{item.status}</span>
+                        <span className={item.status === 'active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>
+                          {item.status || 'active'}
+                        </span>
                       </td>
                       <td>
                         <div className="d-flex gap-2">
-                          <Link href="/brands/brands-edit" className="btn btn-soft-primary btn-sm">
+                          <Link href={`/brands/brands-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
                             <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
                           </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
+                          <Button 
+                            variant="soft-danger" 
+                            size="sm"
+                            onClick={() => handleDelete(item._id)}
+                          >
                             <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
+                          </Button>
                         </div>
                       </td>
                     </tr>

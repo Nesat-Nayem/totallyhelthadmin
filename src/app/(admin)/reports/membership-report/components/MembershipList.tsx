@@ -1,27 +1,26 @@
-import TextFormInput from '@/components/form/TextFormInput'
+'use client'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import {
-  Button,
-  Card,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
-  FormControl,
-  InputGroup,
-  Row,
-} from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { Button, Card, CardFooter, CardHeader, CardTitle, Col, FormControl, InputGroup, Row } from 'react-bootstrap'
+import { useGetOrdersQuery } from '@/services/orderApi'
+
+function formatDate(d: string | Date) {
+  const date = typeof d === 'string' ? new Date(d) : d
+  return date.toLocaleDateString()
+}
 
 const MembershipList = () => {
+  const [q, setQ] = React.useState('')
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
+  const [page, setPage] = React.useState(1)
+  const limit = 20
+
+  const { data: resp } = useGetOrdersQuery({ q: q || undefined, page, limit, startDate: startDate || undefined, endDate: endDate || undefined })
+  const orders = resp?.data ?? []
+  const meta = resp?.meta
+
   return (
     <>
       <Row>
@@ -32,33 +31,20 @@ const MembershipList = () => {
                 Membership Report
               </CardTitle>
 
-              {/* Search Input */}
-              {/* <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search..." />
+              <InputGroup style={{ maxWidth: '250px' }}>
+                <FormControl placeholder="Search invoice or customer..." value={q} onChange={(e) => setQ(e.target.value)} />
                 <Button variant="outline-secondary">
                   <IconifyIcon icon="mdi:magnify" />
                 </Button>
-              </InputGroup> */}
+              </InputGroup>
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  From
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">From</label>
+                <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  To
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">To</label>
+                <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
-
-              {/* Month Filter Dropdown */}
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
-                <option value="all">Select download</option>
-                <option value="pdf">PDF</option>
-                <option value="excel">Excel</option>
-                <option value="csv">CSV</option>
-              </select>
             </CardHeader>
 
             <div>
@@ -87,39 +73,46 @@ const MembershipList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>3581</td>
-                      <td style={{ textWrap: 'nowrap' }}>Ms Round AL Ali</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">wl 3 Meal </span>
-                        <span className="badge bg-success">1 S </span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>951.43</td>
-                      <td style={{ textWrap: 'nowrap' }}>0.00</td>
-                      <td style={{ textWrap: 'nowrap' }}>47.57</td>
-                      <td style={{ textWrap: 'nowrap' }}>0.00</td>
-                      <td style={{ textWrap: 'nowrap' }}>999.00</td>
-                      <td style={{ textWrap: 'nowrap' }}>0.00</td>
-                      <td style={{ textWrap: 'nowrap' }}>999.00</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any) => {
+                      const isCash = (o.paymentMode || '').toLowerCase() === 'cash'
+                      const isCard = (o.paymentMode || '').toLowerCase() === 'card'
+                      const cashAmt = isCash ? o.total : 0
+                      const cardAmt = isCard ? o.total : 0
+                      const mealTitles = Array.isArray(o.items) ? o.items.map((it: any) => it.title).slice(0, 3) : []
+                      return (
+                        <tr key={o._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" />
+                            </div>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{formatDate(o.date)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.customer?.name || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            {mealTitles.map((t: string, i: number) => (
+                              <span key={i} className="badge bg-success me-1">
+                                {t}
+                              </span>
+                            ))}
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.subTotal?.toFixed?.(2) ?? o.subTotal}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.discountAmount?.toFixed?.(2) ?? o.discountAmount ?? 0}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.vatAmount?.toFixed?.(2) ?? o.vatAmount ?? 0}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.shippingCharge?.toFixed?.(2) ?? o.shippingCharge ?? 0}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.total?.toFixed?.(2) ?? o.total}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{cashAmt?.toFixed?.(2) ?? cashAmt}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{cardAmt?.toFixed?.(2) ?? cardAmt}</td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <Link href="#" className="btn btn-soft-danger btn-sm" title="Delete (coming soon)">
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -127,30 +120,18 @@ const MembershipList = () => {
             <CardFooter className="border-top">
               <nav aria-label="Page navigation example">
                 <ul className="pagination justify-content-end mb-0">
-                  <li className="page-item">
-                    <Link className="page-link" href="">
+                  <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
                       Previous
-                    </Link>
+                    </button>
                   </li>
                   <li className="page-item active">
-                    <Link className="page-link" href="">
-                      1
-                    </Link>
+                    <span className="page-link">{page}</span>
                   </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      2
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      3
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
+                  <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setPage((p) => p + 1)}>
                       Next
-                    </Link>
+                    </button>
                   </li>
                 </ul>
               </nav>
@@ -163,3 +144,4 @@ const MembershipList = () => {
 }
 
 export default MembershipList
+

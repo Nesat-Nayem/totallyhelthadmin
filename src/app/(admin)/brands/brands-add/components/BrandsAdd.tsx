@@ -8,11 +8,14 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { uploadSingle } from '@/services/upload'
+import { useCreateBrandMutation } from '@/services/brandApi'
 
 /** FORM DATA TYPE **/
 type FormData = {
-  title: string
-  status: string
+  name: string
+  status: 'active' | 'inactive'
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
@@ -22,12 +25,12 @@ type ControlType = {
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  title: yup.string().required('Please enter title'),
-  status: yup.string().required('Please select a status'),
+  name: yup.string().required('Please enter brand name'),
+  status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
+const GeneralInformationCard: React.FC<ControlType & { onFileChange: (f: File | null) => void }> = ({ control, onFileChange }) => {
   return (
     <Card>
       <CardHeader>
@@ -37,12 +40,13 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Brand Name" />
+              <TextFormInput control={control} type="text" name="name" label="Brand Name" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="title" label="Brand Logo" />
+              <label className="form-label">Brand Logo</label>
+              <input className="form-control" type="file" accept="image/*" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
             </div>
           </Col>
 
@@ -98,21 +102,33 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 const BrandsAdd: React.FC = () => {
   const { reset, handleSubmit, control } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active' },
+    defaultValues: { status: 'active', name: '' },
   })
+  const [file, setFile] = React.useState<File | null>(null)
+  const router = useRouter()
+  const [createBrand, { isLoading }] = useCreateBrandMutation()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  const onSubmit = async (data: FormData) => {
+    try {
+      let logo: string | undefined
+      if (file) {
+        logo = await uploadSingle(file)
+      }
+      const created = await createBrand({ name: data.name, logo, status: data.status }).unwrap()
+      alert('Brand created')
+      router.push('/brands/list-of-brands')
+    } catch (e: any) {
+      alert(e?.message || 'Failed to create brand')
+    }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GeneralInformationCard control={control} />
+      <GeneralInformationCard control={control} onFileChange={setFile} />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
               Save
             </Button>
           </Col>
@@ -128,3 +144,4 @@ const BrandsAdd: React.FC = () => {
 }
 
 export default BrandsAdd
+

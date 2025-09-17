@@ -1,9 +1,17 @@
-import React, { useState } from 'react'
-import { Form, ButtonGroup, Button } from 'react-bootstrap'
+import React from 'react'
+import { Form, Button } from 'react-bootstrap'
 
-const PaymentModeSelector = () => {
-  const paymentModes = ['Cash', 'Card', 'UPI', 'Wallet']
-  const [selectedMode, setSelectedMode] = useState<string>('')
+type Props = {
+  selectedMode?: string
+  onModeChange?: (mode: string) => void
+  paymentMethods?: any[]
+}
+
+const PaymentModeSelector: React.FC<Props> = ({ selectedMode, onModeChange, paymentMethods = [] }) => {
+  // Use backend payment methods or fallback to defaults
+  const paymentModes = paymentMethods.length > 0 
+    ? paymentMethods.map(pm => pm.name)
+    : ['Cash', 'Card', 'UPI', 'Wallet']
 
   return (
     <Form.Group className="mb-3 mt-4">
@@ -14,7 +22,7 @@ const PaymentModeSelector = () => {
             <Button
               key={idx}
               variant={selectedMode === mode ? 'primary' : 'outline-primary'}
-              onClick={() => setSelectedMode(mode)}
+              onClick={() => onModeChange && onModeChange(mode)}
               className="mx-1 btn-lg">
               {mode}
             </Button>

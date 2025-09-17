@@ -21,52 +21,91 @@ import SplitBillModal from './SplitBillModal'
 import PaymentModeSelector from './PaymentModeSelector'
 import DiscountModal from './DiscountModal'
 
-const products = [
-  { id: 1, title: 'International Meal Plan', price: 100, image: product1 },
-  { id: 2, title: 'Arabic Meal Plan', price: 120, image: product2 },
-  { id: 3, title: 'Diabetic Meal Plan', price: 150, image: product3 },
-  { id: 4, title: 'Pescatarian Meal Plan', price: 100, image: product4 },
-  { id: 5, title: 'Vegan Meal Plan', price: 100, image: product1 },
-  { id: 6, title: 'Vegetarian Meal Plan', price: 200, image: product2 },
-  { id: 7, title: 'International Meal Plan', price: 100, image: product1 },
-  { id: 8, title: 'Arabic Meal Plan', price: 120, image: product2 },
-  { id: 9, title: 'Diabetic Meal Plan', price: 150, image: product3 },
-  { id: 10, title: 'Pescatarian Meal Plan', price: 100, image: product4 },
-  { id: 11, title: 'Vegan Meal Plan', price: 100, image: product1 },
-  { id: 12, title: 'Vegetarian Meal Plan', price: 200, image: product2 },
-  { id: 13, title: 'International Meal Plan', price: 100, image: product1 },
-  { id: 14, title: 'Arabic Meal Plan', price: 120, image: product2 },
-  { id: 15, title: 'Diabetic Meal Plan', price: 150, image: product3 },
-  { id: 16, title: 'Pescatarian Meal Plan', price: 100, image: product4 },
-  { id: 17, title: 'Vegan Meal Plan', price: 100, image: product1 },
-  { id: 18, title: 'Vegetarian Meal Plan', price: 200, image: product2 },
-  { id: 19, title: 'International Meal Plan', price: 100, image: product1 },
-  { id: 20, title: 'Arabic Meal Plan', price: 120, image: product2 },
-  { id: 21, title: 'Diabetic Meal Plan', price: 150, image: product3 },
-  { id: 22, title: 'Pescatarian Meal Plan', price: 100, image: product4 },
-  { id: 23, title: 'Vegan Meal Plan', price: 100, image: product1 },
-  { id: 24, title: 'Vegetarian Meal Plan', price: 200, image: product2 },
-]
+// Import API services
+import { useGetMealPlansQuery } from '@/services/mealPlanApi'
+import { useGetBrandsQuery } from '@/services/brandApi'
+import { useGetCategoriesQuery } from '@/services/categoryApi'
+import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
+import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
+import { useCreateOrderMutation } from '@/services/orderApi'
+import { useLazySearchCustomersQuery, useCreateCustomerMutation } from '@/services/customerApi'
 
-const paymentModes = ['Credit Card', 'Cash', 'Bank Transfer', 'Others']
+// Fallback images for meal plans
+const fallbackImages = [product1, product2, product3, product4]
+
 const orderTypes = ['DineIn', 'TakeAway', 'Delivery']
-const aggregatorsTypes = ['Zomato', 'Swiggy', 'Talabat', 'Deliveroo', 'Careem Food']
 const POS = () => {
-  const [selectedProducts, setSelectedProducts] = useState<{ [key: number]: any }>({})
+  const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: any }>({})
   const [showSplitModal, setShowSplitModal] = useState(false)
   const [showDiscountModal, setShowDiscountModal] = useState(false)
   const [discount, setDiscount] = useState<{ type: string; amount: number; reason: string } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedBrand, setSelectedBrand] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [customer, setCustomer] = useState<any>(null)
+  const [moreOptions, setMoreOptions] = useState<any[]>([])
+  const [selectedAggregator, setSelectedAggregator] = useState('')
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash')
+  const [receiveAmount, setReceiveAmount] = useState(0)
+  const [deliveryCharge, setDeliveryCharge] = useState(0)
+  const [rounding, setRounding] = useState(0)
+  const [notes, setNotes] = useState('')
+  const [invoiceNo, setInvoiceNo] = useState('S-001')
+  const [orderNo, setOrderNo] = useState('#001')
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  
+  // Fetch data from APIs
+  const { data: brandsData } = useGetBrandsQuery()
+  const { data: categoriesData } = useGetCategoriesQuery()
+  const { data: aggregatorsData } = useGetAggregatorsQuery()
+  const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
+  const [createOrder] = useCreateOrderMutation()
+  
+  // Get meal plans with filters - fixed search to use proper query
+  const { data: mealPlansData } = useGetMealPlansQuery(
+    searchQuery || selectedBrand || selectedCategory
+      ? {
+          q: searchQuery || undefined,
+          brand: selectedBrand || undefined,
+          category: selectedCategory || undefined,
+          limit: 100
+        }
+      : { limit: 100 }
+  )
+  
+  const brands = brandsData ?? []
+  const categories = categoriesData ?? []
+  const aggregators = aggregatorsData ?? []
+  const paymentMethods = paymentMethodsData ?? []
+  const products = mealPlansData?.data ?? []
 
   const handleProductClick = (product: any) => {
-    setSelectedProducts({
-      [product.id]: {
-        ...product,
-        qty: 1,
-      },
+    const id = product._id || product.id
+    setSelectedProducts(prev => {
+      if (prev[id]) {
+        // If already selected, increase quantity
+        return {
+          ...prev,
+          [id]: {
+            ...prev[id],
+            qty: prev[id].qty + 1,
+          },
+        }
+      } else {
+        // Add new product
+        return {
+          ...prev,
+          [id]: {
+            ...product,
+            qty: 1,
+          },
+        }
+      }
     })
   }
 
-  const handleQtyChange = (id: number, delta: number) => {
+  const handleQtyChange = (id: string, delta: number) => {
     setSelectedProducts((prev) => {
       const updatedQty = Math.max(1, prev[id].qty + delta)
       return {
@@ -79,7 +118,7 @@ const POS = () => {
     })
   }
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     setSelectedProducts((prev) => {
       const updated = { ...prev }
       delete updated[id]
@@ -87,13 +126,83 @@ const POS = () => {
     })
   }
 
-  const totalAmount = Object.values(selectedProducts).reduce((sum, p: any) => sum + p.price * p.qty, 0)
+  // Calculate totals
+  const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
+  const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
+  const vatAmount = ((subTotal + moreOptionsTotal) * 5) / 100
+  const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - (discount?.amount || 0)
+  const totalAmount = totalBeforeRounding + rounding
+  const changeAmount = receiveAmount - totalAmount
 
   const [showDefaultModal, setShowDefaultModal] = useState(false)
 
   useEffect(() => {
     setShowDefaultModal(true)
   }, [])
+  
+  const handleSaveOrder = async () => {
+    try {
+      if (!customer) {
+        alert('Please select a customer')
+        return
+      }
+      
+      const orderData = {
+        customer: customer._id,  // Send just the ID string
+        items: Object.values(selectedProducts).map((p: any) => ({
+          productId: p._id || p.id,
+          title: p.title || p.name,
+          price: p.price,
+          qty: p.qty
+        })),
+        extraItems: moreOptions.map((opt: any) => ({
+          name: opt.name,
+          price: opt.price,
+          qty: opt.qty || 1
+        })),
+        date: startDate,  // Required field
+        subTotal,
+        total: totalAmount,  // Required field
+        vatAmount,
+        discountAmount: discount?.amount || 0,
+        shippingCharge: deliveryCharge,
+        paymentMode: selectedPaymentMode,
+        aggregatorId: selectedAggregator || undefined,
+        startDate,
+        endDate,
+        note: notes,  // Field is 'note' not 'notes'
+        status: 'paid' as 'paid' | 'unpaid'  // Ensure correct type
+      }
+      
+      const result = await createOrder(orderData).unwrap()
+      alert(`Order created successfully! Invoice: ${result.data.invoiceNo}, Order: ${result.data.orderNo}`)
+      
+      // Reset form
+      setSelectedProducts({})
+      setMoreOptions([])
+      setCustomer(null)
+      setDiscount(null)
+      setDeliveryCharge(0)
+      setRounding(0)
+      setNotes('')
+      setReceiveAmount(0)
+    } catch (error: any) {
+      alert(error?.data?.message || 'Failed to create order')
+    }
+  }
+  
+  const handleReset = () => {
+    setSelectedProducts({})
+    setMoreOptions([])
+    setCustomer(null)
+    setDiscount(null)
+    setDeliveryCharge(0)
+    setRounding(0)
+    setNotes('')
+    setReceiveAmount(0)
+    setSelectedAggregator('')
+    setSelectedPaymentMode('Cash')
+  }
 
   return (
     <>
@@ -104,7 +213,11 @@ const POS = () => {
           <Card>
             <CardBody>
               <InputGroup className="mb-2">
-                <FormControl placeholder="Search Meal Plan..." />
+                <FormControl 
+                  placeholder="Search Meal Plan..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
                 <Button variant="outline-secondary">
                   <IconifyIcon icon="mdi:magnify" />
                 </Button>
@@ -114,46 +227,65 @@ const POS = () => {
               <Row>
                 <Col lg={6}>
                   <div className="mb-2">
-                    <select name="" id="" className="form-control form-select">
+                    <select 
+                      className="form-control form-select"
+                      value={selectedBrand}
+                      onChange={(e) => setSelectedBrand(e.target.value)}
+                    >
                       <option value="">Select Brands</option>
-                      <option value="">Totally Health</option>
-                      <option value="">Subway</option>
-                      <option value=""> Burger King</option>
-                      <option value="">Pizzahut</option>
+                      {brands.map((brand: any) => (
+                        <option key={brand._id} value={brand._id}>
+                          {brand.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </Col>
                 <Col lg={6}>
                   <div className="mb-2">
-                    <select name="" id="" className="form-control form-select">
+                    <select 
+                      className="form-control form-select"
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                    >
                       <option value="">Select Meal Category</option>
-                      <option value="">Summer Selections</option>
-                      <option value="">Breakfast</option>
-                      <option value="">Soups & Bites</option>
-                      <option value="">Lunch</option>
-                      <option value="">Dinner</option>
-                      <option value="">Snacks</option>
+                      {categories.map((cat: any) => (
+                        <option key={cat._id} value={cat._id}>
+                          {cat.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </Col>
               </Row>
               <Row className="g-3" style={{ height: 'auto', overflowY: 'auto' }}>
-                {products.map((product) => (
-                  <Col xs={4} key={product.id}>
-                    <div
-                      className={`text-center p-2 border rounded-3 h-100 cursor-pointer 
-                      ${selectedProducts[product.id] ? 'bg-success-subtle border-success' : 'bg-light'}`}
-                      onClick={() => handleProductClick(product)}>
-                      <Image src={product.image} alt={product.title} className="mb-2 rounded" width={60} height={60} />
-                      <div className="fw-semibold small " style={{ fontSize: '10px' }}>
-                        {product.title}
+                {products.map((product: any, index: number) => {
+                  const productId = product._id || product.id
+                  const imageUrl = product.image || fallbackImages[index % fallbackImages.length]
+                  return (
+                    <Col xs={4} key={productId}>
+                      <div
+                        className={`text-center p-2 border rounded-3 h-100 cursor-pointer 
+                        ${selectedProducts[productId] ? 'bg-success-subtle border-success' : 'bg-light'}`}
+                        onClick={() => handleProductClick(product)}>
+                        <Image 
+                          src={product.image || imageUrl} 
+                          alt={product.title || product.name} 
+                          className="mb-2 rounded" 
+                          width={60} 
+                          height={60} 
+                          unoptimized={!!product.image}
+                        />
+                        <div className="fw-semibold small " style={{ fontSize: '10px' }}>
+                          {product.title || product.name}
+                        </div>
+                        <div className="text-success fw-bold" style={{ fontSize: '10px' }}>
+                          AED {product.price || 0}
+                        </div>
                       </div>
-                      <div className="text-success fw-bold" style={{ fontSize: '10px' }}>
-                        AED {product.price}
-                      </div>
-                    </div>
-                  </Col>
-                ))}
+                    </Col>
+                  )
+                })}
               </Row>
             </CardBody>
           </Card>
@@ -181,15 +313,15 @@ const POS = () => {
               <Row className="g-2 mb-3">
                 <Col md={4}>
                   <label htmlFor="date">Invoice No.</label>
-                  <Form.Control placeholder="Invoice Number" defaultValue="S-001" />
+                  <Form.Control placeholder="Invoice Number" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
                 </Col>
                 <Col md={4}>
                   <label htmlFor="date">Meal Plan Start Date</label>
-                  <Form.Control type="date" defaultValue="2025-08-02" />
+                  <Form.Control type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </Col>
                 <Col md={4}>
                   <label htmlFor="date">Meal Plan End Date</label>
-                  <Form.Control type="date" defaultValue="2025-08-02" />
+                  <Form.Control type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </Col>
                 <Col md={9}>
                   <InputGroup>
@@ -200,12 +332,15 @@ const POS = () => {
                   </InputGroup>
                 </Col>
                 <Col md={3}>
-                  <CustomerModal />
+                  <CustomerModal 
+                    onCustomerSelect={setCustomer}
+                    selectedCustomer={customer}
+                  />
                 </Col>
               </Row>
               <div className="text-end mb-2">
                 <Badge bg="dark" className="px-3 py-1 fs-6">
-                  Order ID: #001
+                  Order ID: {orderNo}
                 </Badge>
               </div>
               {/* Order Table */}
@@ -221,62 +356,79 @@ const POS = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.values(selectedProducts).map((product: any) => (
-                      <tr key={product.id}>
-                        <td>
-                          <Image src={product.image} alt={product.title} width={40} height={40} />
-                        </td>
-                        <td>{product.title}</td>
+                    {Object.values(selectedProducts).map((product: any, index: number) => {
+                      const productId = product._id || product.id
+                      const imageUrl = product.image || fallbackImages[index % fallbackImages.length]
+                      return (
+                        <tr key={productId}>
+                          <td>
+                            <Image 
+                              src={product.image || imageUrl} 
+                              alt={product.title || product.name} 
+                              width={40} 
+                              height={40}
+                              unoptimized={!!product.image}
+                            />
+                          </td>
+                          <td>{product.title || product.name}</td>
 
-                        <td>
-                          <div className="d-flex gap-1 align-items-center">
-                            <Button size="sm" onClick={() => handleQtyChange(product.id, -1)}>
-                              -
+                          <td>
+                            <div className="d-flex gap-1 align-items-center">
+                              <Button size="sm" onClick={() => handleQtyChange(productId, -1)}>
+                                -
+                              </Button>
+                              <span className="px-2">{product.qty}</span>
+                              <Button size="sm" onClick={() => handleQtyChange(productId, 1)}>
+                                +
+                              </Button>
+                            </div>
+                          </td>
+                          <td>AED {(product.price * product.qty).toFixed(2)}</td>
+                          <td>
+                            <Button size="sm" variant="danger" onClick={() => handleDelete(productId)}>
+                              <IconifyIcon icon="mdi:delete" />
                             </Button>
-                            <span className="px-2">{product.qty}</span>
-                            <Button size="sm" onClick={() => handleQtyChange(product.id, 1)}>
-                              +
-                            </Button>
-                          </div>
-                        </td>
-                        <td>AED {product.price * product.qty}</td>
-                        <td>
-                          <Button size="sm" variant="danger" onClick={() => handleDelete(product.id)}>
-                            <IconifyIcon icon="mdi:delete" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
                 <div className="text-end">
-                  <MoreOptions />
+                  <MoreOptions onOptionsChange={setMoreOptions} />
                 </div>
               </div>
 
               <Row className="g-3">
                 <Form.Group className="mb-3">
                   <Form.Label>Sub Total</Form.Label>
-                  <Form.Control type="text" value={`AED ${totalAmount}`} disabled />
+                  <Form.Control type="text" value={`AED ${subTotal.toFixed(2)}`} disabled />
                 </Form.Group>
 
                 {/* Left Side */}
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label>Receive Amount (AED)</Form.Label>
-                    <Form.Control type="number" placeholder="Enter received amount" defaultValue="0" min={0} />
+                    <Form.Control 
+                      type="number" 
+                      placeholder="Enter received amount" 
+                      value={receiveAmount} 
+                      onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
+                      min={0} 
+                    />
                     <Form.Text className="text-muted">Amount received from customer</Form.Text>
                   </Form.Group>
 
                   <Form.Group className="mb-3">
                     <Form.Label>Aggregator</Form.Label>
-                    <Form.Select defaultValue="">
-                      <option value="" disabled>
-                        Select aggregator
-                      </option>
-                      {aggregatorsTypes.map((mode, idx) => (
-                        <option key={idx} value={mode}>
-                          {mode}
+                    <Form.Select 
+                      value={selectedAggregator}
+                      onChange={(e) => setSelectedAggregator(e.target.value)}
+                    >
+                      <option value="">Select aggregator</option>
+                      {aggregators.map((agg: any) => (
+                        <option key={agg._id} value={agg._id}>
+                          {agg.name}
                         </option>
                       ))}
                     </Form.Select>
@@ -284,7 +436,13 @@ const POS = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>Notes</Form.Label>
-                    <Form.Control as="textarea" rows={3} placeholder="Add order notes..." />
+                    <Form.Control 
+                      as="textarea" 
+                      rows={3} 
+                      placeholder="Add order notes..." 
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
                   </Form.Group>
 
                   {/* Split Bill Button */}
@@ -302,46 +460,65 @@ const POS = () => {
                   />
 
                   <SplitBillModal show={showSplitModal} onClose={() => setShowSplitModal(false)} totalAmount={totalAmount} />
-                  <PaymentModeSelector />
+                  <PaymentModeSelector 
+                    selectedMode={selectedPaymentMode}
+                    onModeChange={setSelectedPaymentMode}
+                    paymentMethods={paymentMethods}
+                  />
                 </Col>
 
                 {/* Right Side */}
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label>Change Amount (AED)</Form.Label>
-                    <Form.Control type="number" placeholder="Auto calculated" defaultValue="0" disabled />
+                    <Form.Control 
+                      type="text" 
+                      value={`AED ${changeAmount > 0 ? changeAmount.toFixed(2) : '0.00'}`} 
+                      disabled 
+                    />
                     <Form.Text className="text-muted">Change to return (auto-calculated)</Form.Text>
                   </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>VAT (5%)</Form.Label>
-                    <Form.Control type="text" value={`AED ${(totalAmount * 5) / 100}`} disabled />
+                    <Form.Control type="text" value={`AED ${vatAmount.toFixed(2)}`} disabled />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
                     <Form.Label>Delivery Charge (AED)</Form.Label>
-                    <Form.Control type="number" placeholder="Enter shipping charge" defaultValue="0" min={0} />
+                    <Form.Control 
+                      type="number" 
+                      placeholder="Enter shipping charge" 
+                      value={deliveryCharge}
+                      onChange={(e) => setDeliveryCharge(parseFloat(e.target.value) || 0)}
+                      min={0} 
+                    />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
                     <Form.Label>Total Amount</Form.Label>
-                    <Form.Control type="text" value={`AED ${totalAmount}`} disabled />
+                    <Form.Control type="text" value={`AED ${totalAmount.toFixed(2)}`} disabled />
                   </Form.Group>
 
                   <Form.Group className="mb-3">
                     <Form.Label>Rounding (+/-)</Form.Label>
-                    <Form.Control type="number" placeholder="Enter rounding adjustment" defaultValue="0" />
+                    <Form.Control 
+                      type="number" 
+                      placeholder="Enter rounding adjustment" 
+                      value={rounding}
+                      onChange={(e) => setRounding(parseFloat(e.target.value) || 0)}
+                    />
                   </Form.Group>
                 </Col>
               </Row>
 
               <div className="d-flex justify-content-between bg-light p-3 border">
                 <h5>Payable Amount:</h5>
-                <h5 className="text-primary fw-bold">AED {totalAmount}</h5>
+                <h5 className="text-primary fw-bold">AED {totalAmount.toFixed(2)}</h5>
               </div>
             </CardBody>
 
             <CardFooter className="d-flex justify-content-between flex-wrap gap-1">
-              <Button variant="warning" size="lg">
+              <Button variant="warning" size="lg" onClick={handleReset}>
                 <IconifyIcon icon="mdi:restart" /> Reset
               </Button>
               <Button variant="info" size="lg">
@@ -355,7 +532,7 @@ const POS = () => {
               <Link href="/reports/transactions" className="btn btn-lg btn-light">
                 <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
               </Link>
-              <Button variant="primary" size="lg">
+              <Button variant="primary" size="lg" onClick={handleSaveOrder}>
                 <IconifyIcon icon="mdi:content-save-outline" /> Save
               </Button>
             </CardFooter>

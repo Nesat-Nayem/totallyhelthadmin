@@ -1,7 +1,9 @@
+'use client'
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Button,
   Card,
@@ -9,32 +11,54 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
+import { useGetMealPlansQuery, useDeleteMealPlanMutation } from '@/services/mealPlanApi'
+import { useGetBrandsQuery } from '@/services/brandApi'
+import { useGetCategoriesQuery } from '@/services/categoryApi'
 import banner1 from '../../../../../assets/images/sample-menu/biryani.jpg'
 
-const data = [
-  {
-    id: 1,
-    banner: banner1,
-    title: 'Biryani',
-    category: 'Lunch',
-    price: 'AED 5.99',
-    priceCategory: 'Restaurant',
-    brands: 'Totally Health',
-    branch: 'dubai',
-    desc: 'Cooking up made-to-order meal plans to help you look and feel fantastic! Choose from thousands of meal combinations and get healthy, nutritious and delicious meals delivered straight to your door.',
-    status: 'Active',
-  },
-]
-
-const RestaurentsMenu = async () => {
+const RestaurentsMenu = () => {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const limit = 10
+  
+  const { data: mealPlansData } = useGetMealPlansQuery({ 
+    q: searchQuery || undefined, 
+    page, 
+    limit 
+  })
+  const { data: brandsData } = useGetBrandsQuery()
+  const { data: categoriesData } = useGetCategoriesQuery()
+  const [deleteMealPlan] = useDeleteMealPlanMutation()
+  
+  const mealPlans = mealPlansData?.data ?? []
+  const meta = mealPlansData?.meta
+  const brands = brandsData ?? []
+  const categories = categoriesData ?? []
+  
+  const getBrandName = (brandId: string) => {
+    const brand = brands.find((b: any) => b._id === brandId)
+    return brand?.name || brandId
+  }
+  
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find((c: any) => c._id === categoryId)
+    return category?.name || categoryId
+  }
+  
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this meal plan?')) {
+      try {
+        await deleteMealPlan(id).unwrap()
+        alert('Meal plan deleted successfully')
+      } catch (error: any) {
+        alert(error?.data?.message || 'Failed to delete meal plan')
+      }
+    }
+  }
   return (
     <Row>
       <Col xl={12}>
@@ -45,7 +69,12 @@ const RestaurentsMenu = async () => {
             </CardTitle>
             {/* Search Input */}
             <InputGroup style={{ maxWidth: '250px' }}>
-              <FormControl placeholder="Search menu..." type="search" />
+              <FormControl 
+                placeholder="Search menu..." 
+                type="search" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </InputGroup>
 
             <Link href="/menu-master/menu-add" className="btn btn-lg btn-primary">
@@ -76,43 +105,51 @@ const RestaurentsMenu = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item) => (
-                    <tr key={item.id}>
+                  {mealPlans.map((item: any) => (
+                    <tr key={item._id}>
                       <td>
                         <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
+                          <input type="checkbox" className="form-check-input" id={`check-${item._id}`} />
+                          <label className="form-check-label" htmlFor={`check-${item._id}`} />
                         </div>
                       </td>
                       <td>
                         <div className="d-flex align-items-center gap-2">
                           <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
-                            <Image src={item.banner} alt="product" className="avatar-md" />
+                            {item.image ? (
+                              <img src={item.image} alt={item.title || item.name} className="avatar-md" width={60} height={60} style={{ objectFit: 'cover' }} />
+                            ) : (
+                              <Image src={banner1} alt="product" className="avatar-md" />
+                            )}
                           </div>
                         </div>
                       </td>
-                      <td>{item.title}</td>
-                      <td>{item.category}</td>
-                      <td>{item.price}</td>
+                      <td>{item.title || item.name}</td>
+                      <td>{getCategoryName(item.category)}</td>
+                      <td>AED {item.price}</td>
                       <td>
-                        <span className="badge bg-success">{item.priceCategory}</span>
+                        <span className="badge bg-success">Restaurant</span>
                       </td>
-                      <td>{item.brands}</td>
-                      <td>{item.branch}</td>
-
-                      <td>{item.desc.slice(0, 20)}</td>
-
+                      <td>{getBrandName(item.brand)}</td>
+                      <td>{item.branch || 'All'}</td>
+                      <td>{item.description || '-'}</td>
                       <td>
-                        <span className="badge bg-success">{item.status} </span>
+                        <span className={`badge bg-${item.status === 'active' ? 'success' : 'danger'}`}>
+                          {item.status || 'Active'}
+                        </span>
                       </td>
                       <td>
                         <div className="d-flex gap-2">
-                          <Link href="/menu-master/menu-edit" className="btn btn-soft-primary btn-sm">
+                          <Link href={`/menu-master/menu-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
                             <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
                           </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
+                          <Button 
+                            variant="soft-danger" 
+                            size="sm"
+                            onClick={() => handleDelete(item._id)}
+                          >
                             <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -124,30 +161,20 @@ const RestaurentsMenu = async () => {
           <CardFooter className="border-top">
             <nav aria-label="Page navigation example">
               <ul className="pagination justify-content-end mb-0">
-                <li className="page-item">
-                  <Link className="page-link" href="">
+                <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                  <button className="page-link" onClick={() => setPage(p => Math.max(1, p - 1))}>
                     Previous
-                  </Link>
+                  </button>
                 </li>
                 <li className="page-item active">
-                  <Link className="page-link" href="">
-                    1
-                  </Link>
+                  <span className="page-link">
+                    {page}
+                  </span>
                 </li>
-                <li className="page-item">
-                  <Link className="page-link" href="">
-                    2
-                  </Link>
-                </li>
-                <li className="page-item">
-                  <Link className="page-link" href="">
-                    3
-                  </Link>
-                </li>
-                <li className="page-item">
-                  <Link className="page-link" href="">
+                <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
+                  <button className="page-link" onClick={() => setPage(p => p + 1)}>
                     Next
-                  </Link>
+                  </button>
                 </li>
               </ul>
             </nav>
