@@ -16,28 +16,12 @@ const MoreOptions: React.FC<MoreOptionsProps> = ({ onOptionsChange }) => {
   const { data: moreOptionsData } = useGetMoreOptionsQuery()
   const allOptions = moreOptionsData ?? []
   
-  // Group options by category based on their names
+  // Group options by stored category
   const optionGroups = {
-    More: allOptions.filter((opt: any) => 
-      opt.name?.toLowerCase().includes('add') || 
-      opt.name?.toLowerCase().includes('extra') ||
-      opt.name?.toLowerCase().includes('more')
-    ),
-    Less: allOptions.filter((opt: any) => 
-      opt.name?.toLowerCase().includes('less') || 
-      opt.name?.toLowerCase().includes('low') ||
-      opt.name?.toLowerCase().includes('light')
-    ),
-    Without: allOptions.filter((opt: any) => 
-      opt.name?.toLowerCase().includes('no ') || 
-      opt.name?.toLowerCase().includes('without')
-    ),
-    General: allOptions.filter((opt: any) => {
-      const name = opt.name?.toLowerCase() || ''
-      return !name.includes('add') && !name.includes('extra') && !name.includes('more') &&
-             !name.includes('less') && !name.includes('low') && !name.includes('light') &&
-             !name.includes('no ') && !name.includes('without')
-    })
+    More: allOptions.filter((opt: any) => opt.category === 'more'),
+    Less: allOptions.filter((opt: any) => opt.category === 'less'),
+    Without: allOptions.filter((opt: any) => opt.category === 'without'),
+    General: allOptions.filter((opt: any) => opt.category === 'general')
   }
 
   const handleShowModal = () => setShowOptions(true)

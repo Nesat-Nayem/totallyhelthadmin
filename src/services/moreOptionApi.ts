@@ -1,6 +1,6 @@
 import { baseApi } from '@/services/baseApi'
 
-export type MoreOption = { _id: string; name: string; price: number; status: 'active' | 'inactive' }
+export type MoreOption = { _id: string; name: string; price: number; category: 'more' | 'less' | 'without' | 'general'; status: 'active' | 'inactive' }
 
 export const moreOptionApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -12,7 +12,12 @@ export const moreOptionApi = baseApi.injectEndpoints({
           ? [...result.map(({ _id }) => ({ type: 'MoreOption' as const, id: _id })), { type: 'MoreOption' as const, id: 'LIST' }]
           : [{ type: 'MoreOption', id: 'LIST' }],
     }),
-    createMoreOption: build.mutation<MoreOption, { name: string; price: number; status?: 'active' | 'inactive' }>({
+    getMoreOptionById: build.query<MoreOption, string>({
+      query: (id) => ({ url: `/more-options/${id}`, method: 'GET' }),
+      transformResponse: (res: any) => res?.data,
+      providesTags: (_r, _e, id) => [{ type: 'MoreOption', id }],
+    }),
+    createMoreOption: build.mutation<MoreOption, { name: string; price: number; category: 'more' | 'less' | 'without' | 'general'; status?: 'active' | 'inactive' }>({
       query: (body) => ({ url: '/more-options', method: 'POST', body }),
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'MoreOption', id: 'LIST' }],
@@ -31,4 +36,4 @@ export const moreOptionApi = baseApi.injectEndpoints({
   overrideExisting: true,
 })
 
-export const { useGetMoreOptionsQuery, useCreateMoreOptionMutation, useUpdateMoreOptionMutation, useDeleteMoreOptionMutation } = moreOptionApi
+export const { useGetMoreOptionsQuery, useGetMoreOptionByIdQuery, useCreateMoreOptionMutation, useUpdateMoreOptionMutation, useDeleteMoreOptionMutation } = moreOptionApi

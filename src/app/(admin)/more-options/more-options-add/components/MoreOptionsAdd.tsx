@@ -8,12 +8,15 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCreateMoreOptionMutation } from '@/services/moreOptionApi'
+import { toast } from 'react-toastify'
 
 /** FORM DATA TYPE **/
 type FormData = {
   name: string
   price: number | string
+  category: 'more' | 'less' | 'without' | 'general'
   status: 'active' | 'inactive'
 }
 
@@ -30,6 +33,7 @@ const messageSchema: yup.ObjectSchema<FormData> = yup.object({
     .typeError('Please enter a valid price')
     .min(0, 'Price must be non-negative')
     .required('Please enter price'),
+  category: yup.mixed<'more' | 'less' | 'without' | 'general'>().oneOf(['more', 'less', 'without', 'general']).required('Please select a category'),
   status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
 
@@ -51,6 +55,28 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
             <div className="mb-3">
               <TextFormInput control={control} type="number" name="price" label="Item Price" />
             </div>
+          </Col>
+
+          {/* CATEGORY FIELD */}
+          <Col lg={6}>
+            <label className="form-label">Category</label>
+            <Controller
+              control={control}
+              name="category"
+              rules={{ required: 'Please select a category' }}
+              render={({ field, fieldState }) => (
+                <>
+                  <select className="form-select" value={field.value} onChange={field.onChange}>
+                    <option value="">Select Category</option>
+                    <option value="more">More Options</option>
+                    <option value="less">Less Options</option>
+                    <option value="without">Without Options</option>
+                    <option value="general">General Options</option>
+                  </select>
+                  {fieldState.error && <small className="text-danger">{fieldState.error.message}</small>}
+                </>
+              )}
+            />
           </Col>
 
           {/* STATUS FIELD */}
@@ -103,9 +129,10 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 
 /** MAIN COMPONENT **/
 const MoreOptionsAdd: React.FC = () => {
+  const router = useRouter()
   const { reset, handleSubmit, control } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active', name: '', price: '' },
+    defaultValues: { status: 'active', name: '', price: '', category: 'general' },
   })
   const [createMoreOption, { isLoading }] = useCreateMoreOptionMutation()
 
@@ -114,13 +141,14 @@ const MoreOptionsAdd: React.FC = () => {
       const payload = {
         name: data.name,
         price: typeof data.price === 'string' ? Number(data.price) : data.price,
+        category: data.category,
         status: data.status,
       }
       await createMoreOption(payload).unwrap()
-      alert('More option created')
-      reset({ status: 'active', name: '', price: '' })
+      toast.success('More option created successfully')
+      router.push('/more-options')
     } catch (e: any) {
-      alert(e?.message || 'Failed to create more option')
+      toast.error(e?.data?.message || e?.message || 'Failed to create more option')
     }
   }
 
@@ -131,11 +159,18 @@ const MoreOptionsAdd: React.FC = () => {
         <Row className="justify-content-end g-2">
           <Col lg={2}>
             <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
-              Save
+              {isLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/more-options" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>
