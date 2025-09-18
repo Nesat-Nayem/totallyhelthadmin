@@ -1,37 +1,25 @@
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import { Card, CardFooter, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
-import banner1 from '../../../../../assets/images/banner/1.jpg'
-import banner2 from '../../../../../assets/images/banner/2.jpg'
-import banner3 from '../../../../../assets/images/banner/3.jpg'
+import { Button, Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { useGetMenuCategoriesQuery, useDeleteMenuCategoryMutation } from '@/services/menuCategoryApi'
 
-const data = [
-  {
-    id: 1,
-    title: 'Breakfast',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    title: 'Lunch',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    title: 'Dinner',
-    status: 'InActive',
-  },
+const RestaurantsMenuCategory = () => {
+  const { data: categories } = useGetMenuCategoriesQuery()
+  const [deleteCategory] = useDeleteMenuCategoryMutation()
 
-  {
-    id: 4,
-    title: 'Drinks',
-    status: 'Active',
-  },
-]
-
-const RestaurantsMenuCategory = async () => {
+  const handleDelete = async (id: string) => {
+    if (confirm('Delete this category?')) {
+      try {
+        await deleteCategory(id).unwrap()
+        alert('Deleted successfully')
+      } catch (e: any) {
+        alert(e?.data?.message || 'Failed to delete')
+      }
+    }
+  }
   return (
     <Row>
       <Col xl={12}>
@@ -61,8 +49,8 @@ const RestaurantsMenuCategory = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item) => (
-                    <tr key={item.id}>
+                  {(categories ?? []).map((item: any) => (
+                    <tr key={item._id}>
                       <td>
                         <div className="form-check">
                           <input type="checkbox" className="form-check-input" id="customCheck2" />
@@ -73,16 +61,16 @@ const RestaurantsMenuCategory = async () => {
                       <td>{item.title}</td>
 
                       <td>
-                        <span className={item.status === 'Active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>{item.status}</span>
+                        <span className={item.status === 'active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>{item.status}</span>
                       </td>
                       <td>
                         <div className="d-flex gap-2">
-                          <Link href="/menu-master/menu-category/restaurants-menu-category-edit" className="btn btn-soft-primary btn-sm">
+                          <Link href={`/menu-master/menu-category/restaurants-menu-category-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
                             <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
                           </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
+                          <Button onClick={() => handleDelete(item._id)} className="btn btn-soft-danger btn-sm">
                             <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
+                          </Button>
                         </div>
                       </td>
                     </tr>

@@ -8,6 +8,14 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useGetMenuByIdQuery, useUpdateMenuMutation } from '@/services/menuApi'
+import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
+import { useGetBrandsQuery } from '@/services/brandApi'
+import { useGetBranchesQuery } from '@/services/branchApi'
+import Select from 'react-select'
+import { uploadSingle } from '@/services/upload'
+import { toast } from 'react-toastify'
 
 /** FORM DATA TYPE **/
 type FormData = {
@@ -35,11 +43,8 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
   title: yup.string().required('Please enter title'),
   status: yup.string().required('Please select a status'),
   description: yup.string().required('Please enter description'),
-  NutritionFacts: yup.string().required('Please enter Nutrition Facts'),
-  file: yup
-    .mixed<FileList>()
-    .test('required', 'Please upload a banner image', (value) => value && value.length > 0)
-    .required(),
+  NutritionFacts: yup.string().optional(),
+  file: yup.mixed<FileList>().optional(),
 
   // ✅ at least one order type must be selected
   orderTypes: yup.array().of(yup.string()).min(1, 'Please select at least one order type'),
@@ -63,7 +68,17 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) => {
+const GeneralInformationCard: React.FC<ControlType & {
+  categories: any[]
+  selectedCategory: string
+  onCategoryChange: (v: string) => void
+  brands: any[]
+  selectedBrands: any[]
+  setSelectedBrands: (arr: any[]) => void
+  branches: any[]
+  selectedBranches: any[]
+  setSelectedBranches: (arr: any[]) => void
+}> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches }) => {
   return (
     <Card>
       <CardHeader>
@@ -86,25 +101,11 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
           <Col lg={4}>
             <label className="form-label">Category</label>
             <div className="mb-3">
-              <select className="form-control form-select">
-                <option value="0">Select Category</option>
-                <option value="1">Breakfast</option>
-                <option value="2">Lunch</option>
-                <option value="3">Dinner</option>
-                <option value="4">Snacks</option>
-                <option value="5">Salads</option>
-                <option value="6">Soups</option>
-                <option value="7">Smoothies & Juices</option>
-                <option value="8">Fruits</option>
-                <option value="9">Vegetables</option>
-                <option value="10">Whole Grains</option>
-                <option value="11">Low-Carb</option>
-                <option value="12">High-Protein</option>
-                <option value="13">Vegan</option>
-                <option value="14">Vegetarian</option>
-                <option value="15">Gluten-Free</option>
-                <option value="16">Keto</option>
-                <option value="17">Desserts (Healthy)</option>
+              <select className="form-control form-select" value={selectedCategory} onChange={(e) => onCategoryChange(e.target.value)}>
+                <option value="">Select Category</option>
+                {categories.map((c: any) => (
+                  <option key={c._id} value={c._id}>{c.title}</option>
+                ))}
               </select>
             </div>
           </Col>
@@ -113,12 +114,15 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
           <Col lg={4}>
             <label className="form-label">Brands</label>
             <div className="mb-3">
-              <select className="form-control form-select">
-                <option value="0">Select Brands</option>
-                <option value="1">Totally Health</option>
-                <option value="2">KFC</option>
-                <option value="3">Pizza Hut</option>
-              </select>
+              <Select
+                isMulti
+                options={brands.map((b: any) => ({ value: b._id, label: b.name }))}
+                value={selectedBrands}
+                onChange={(items) => setSelectedBrands(items as any[])}
+                placeholder="Select Brands"
+                className="basic-multi-select"
+                classNamePrefix="select"
+              />
             </div>
           </Col>
 
@@ -126,12 +130,15 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
           <Col lg={4}>
             <label className="form-label">Restaurant Branch</label>
             <div className="mb-3">
-              <select className="form-control form-select">
-                <option value="0">Select Branch</option>
-                <option value="1">Dubai</option>
-                <option value="2">Abu Dhabi</option>
-                <option value="3">Sharjah</option>
-              </select>
+              <Select
+                isMulti
+                options={branches.map((b: any) => ({ value: b._id, label: b.name }))}
+                value={selectedBranches}
+                onChange={(items) => setSelectedBranches(items as any[])}
+                placeholder="Select Branches"
+                className="basic-multi-select"
+                classNamePrefix="select"
+              />
             </div>
           </Col>
 
@@ -335,20 +342,100 @@ const MenuEdit: React.FC = () => {
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active', orderTypes: [] },
   })
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id') || ''
+  const { data: menu } = useGetMenuByIdQuery(id, { skip: !id })
+  const [updateMenu, { isLoading }] = useUpdateMenuMutation()
+  const { data: categories = [] } = useGetMenuCategoriesQuery()
+  const { data: brands = [] } = useGetBrandsQuery()
+  const { data: branches = [] } = useGetBranchesQuery()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset({ status: 'active', orderTypes: [] })
+  const [selectedCategory, setSelectedCategory] = React.useState('')
+  const [selectedBrands, setSelectedBrands] = React.useState<any[]>([])
+  const [selectedBranches, setSelectedBranches] = React.useState<any[]>([])
+
+  React.useEffect(() => {
+    if (menu) {
+      reset({
+        title: menu.title,
+        status: menu.status || 'active',
+        description: menu.description || '',
+        NutritionFacts: '',
+        orderTypes: [
+          ...(menu.restaurantPrice ? ['dinein'] as const : []),
+          ...(menu.onlinePrice ? ['takeaway'] as const : []),
+          ...(menu.membershipPrice ? ['aggregator'] as const : []),
+        ],
+        dineinPrice: menu.restaurantPrice ? String(menu.restaurantPrice) : undefined,
+        takeawayPrice: menu.onlinePrice ? String(menu.onlinePrice) : undefined,
+        aggregatorPrice: menu.membershipPrice ? String(menu.membershipPrice) : undefined,
+      } as any)
+      setSelectedCategory(menu.category || '')
+      setSelectedBrands((menu.brands || []).map((id: string) => ({ value: id, label: brands.find((b: any) => b._id === id)?.name || id })))
+      setSelectedBranches((menu.branches || []).map((id: string) => ({ value: id, label: branches.find((b: any) => b._id === id)?.name || id })))
+    }
+  }, [menu, reset, brands, branches])
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      const file = data.file?.[0]
+      let image = menu?.image as string | undefined
+      if (file) {
+        image = await uploadSingle(file as any)
+      }
+
+      const payload: any = {
+        title: data.title,
+        description: data.description,
+        image,
+        status: data.status as any,
+        category: selectedCategory || undefined,
+        brands: selectedBrands.map((x) => x.value),
+        branches: selectedBranches.map((x) => x.value),
+      }
+      if (data.orderTypes?.includes('dinein')) payload.restaurantPrice = parseFloat(String(data.dineinPrice))
+      else payload.restaurantPrice = undefined
+      if (data.orderTypes?.includes('takeaway')) payload.onlinePrice = parseFloat(String(data.takeawayPrice))
+      else payload.onlinePrice = undefined
+      if (data.orderTypes?.includes('aggregator')) payload.membershipPrice = parseFloat(String(data.aggregatorPrice))
+      else payload.membershipPrice = undefined
+
+      await updateMenu({ id, data: payload }).unwrap()
+      toast.success('Menu updated successfully')
+      router.push('/menu-master/restaurant-menu')
+    } catch (e: any) {
+      toast.error(e?.data?.message || e?.message || 'Failed to update menu')
+    }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GeneralInformationCard control={control} register={register} />
+      <GeneralInformationCard 
+        control={control} 
+        register={register}
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        brands={brands}
+        selectedBrands={selectedBrands}
+        setSelectedBrands={setSelectedBrands}
+        branches={branches}
+        selectedBranches={selectedBranches}
+        setSelectedBranches={setSelectedBranches}
+      />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
-              Save
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
             </Button>
           </Col>
           <Col lg={2}>

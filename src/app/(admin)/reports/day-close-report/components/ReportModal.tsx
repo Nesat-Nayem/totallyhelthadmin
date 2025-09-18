@@ -64,7 +64,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ show, onClose, data }) => {
   }
 
   return (
-    <Modal show={show} onHide={onClose} size="md" centered>
+    <Modal show={show} onHide={onClose} size="lg" centered>
       {/* Header */}
       <Modal.Header className="bg-dark text-white py-2">
         <Modal.Title>

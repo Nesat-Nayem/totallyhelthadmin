@@ -2,6 +2,7 @@
 import { SessionProvider } from 'next-auth/react'
 import { useEffect } from 'react'
 import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { DEFAULT_PAGE_TITLE } from '@/context/constants'
 import { ChildrenType } from '@/types/component-props'
 import dynamic from 'next/dynamic'

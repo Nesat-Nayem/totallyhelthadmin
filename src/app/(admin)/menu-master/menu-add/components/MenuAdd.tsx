@@ -3,12 +3,19 @@ import ChoicesFormInput from '@/components/form/ChoicesFormInput'
 import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
 import Select from 'react-select'
+import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
+import { useGetBrandsQuery } from '@/services/brandApi'
+import { useGetBranchesQuery } from '@/services/branchApi'
+import { uploadSingle } from '@/services/upload'
+import { useCreateMenuMutation } from '@/services/menuApi'
+import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
 /** FORM DATA TYPE **/
 type FormData = {
   title: string
@@ -22,12 +29,31 @@ type FormData = {
   dineinPrice?: string
   takeawayPrice?: string
   aggregatorPrice?: string
+  // optional nutrition fields (UI only for now)
+  calories?: string
+  protein?: string
+  carbs?: string
+  fibre?: string
+  sugars?: string
+  sodium?: string
+  iron?: string
+  calcium?: string
+  vitaminC?: string
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
 type ControlType = {
   control: Control<FormData>
   register: ReturnType<typeof useForm<FormData>>['register']
+  categories: any[]
+  selectedCategory: string
+  onCategoryChange: (val: string) => void
+  brands: any[]
+  selectedBrands: any[]
+  setSelectedBrands: (arr: any[]) => void
+  branches: any[]
+  selectedBranches: any[]
+  setSelectedBranches: (arr: any[]) => void
 }
 
 /** VALIDATION SCHEMA **/
@@ -35,7 +61,7 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
   title: yup.string().required('Please enter title'),
   status: yup.string().required('Please select a status'),
   description: yup.string().required('Please enter description'),
-  NutritionFacts: yup.string().required('Please enter Nutrition Facts'),
+  NutritionFacts: yup.string().optional(),
   file: yup
     .mixed<FileList>()
     .test('required', 'Please upload a banner image', (value) => value && value.length > 0)
@@ -62,22 +88,8 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
   }),
 })
 
-const brandOptions = [
-  { value: 'totally-health', label: 'Totally Health' },
-  { value: 'kfc', label: 'KFC' },
-  { value: 'pizza-hut', label: 'Pizza Hut' },
-]
-const branchOptions = [
-  { value: 'dubai', label: 'Dubai' },
-  { value: 'abu-dhabi', label: 'Abu Dhabi' },
-  { value: 'sharjah', label: 'Sharjah' },
-  { value: 'ajman', label: 'Ajman' },
-]
-
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) => {
-  const [selectedBrands, setSelectedBrands] = useState<any[]>([])
-  const [selectedBranches, setSelectedBranches] = useState<any[]>([])
+const GeneralInformationCard: React.FC<ControlType> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches }) => {
   return (
     <Card>
       <CardHeader>
@@ -100,25 +112,11 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
           <Col lg={4}>
             <label className="form-label"> Category</label>
             <div className="mb-3">
-              <select className="form-control form-select">
-                <option value="0">Select Category</option>
-                <option value="1">Breakfast</option>
-                <option value="2">Lunch</option>
-                <option value="3">Dinner</option>
-                <option value="4">Snacks</option>
-                <option value="5">Salads</option>
-                <option value="6">Soups</option>
-                <option value="7">Smoothies & Juices</option>
-                <option value="8">Fruits</option>
-                <option value="9">Vegetables</option>
-                <option value="10">Whole Grains</option>
-                <option value="11">Low-Carb</option>
-                <option value="12">High-Protein</option>
-                <option value="13">Vegan</option>
-                <option value="14">Vegetarian</option>
-                <option value="15">Gluten-Free</option>
-                <option value="16">Keto</option>
-                <option value="17">Desserts (Healthy)</option>
+              <select className="form-control form-select" value={selectedCategory} onChange={(e) => onCategoryChange(e.target.value)}>
+                <option value="">Select Category</option>
+                {categories.map((c: any) => (
+                  <option key={c._id} value={c._id}>{c.title}</option>
+                ))}
               </select>
             </div>
           </Col>
@@ -129,7 +127,7 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
             <div className="mb-3">
               <Select
                 isMulti
-                options={brandOptions}
+                options={brands.map((b: any) => ({ value: b._id, label: b.name }))}
                 value={selectedBrands}
                 onChange={(brands) => setSelectedBrands(brands as any[])}
                 placeholder="Select Brands"
@@ -145,7 +143,7 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
             <div className="">
               <Select
                 isMulti
-                options={branchOptions}
+                options={branches.map((br: any) => ({ value: br._id, label: br.name }))}
                 value={selectedBranches}
                 onChange={(brands) => setSelectedBranches(brands as any[])}
                 placeholder="Select Branches"
@@ -244,55 +242,55 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register }) =>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="calories (kcal)" />
+              <TextFormInput control={control} type="text" name="calories" label="calories (kcal)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Protein (g)" />
+              <TextFormInput control={control} type="text" name="protein" label="Protein (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Carbs (g)" />
+              <TextFormInput control={control} type="text" name="carbs" label="Carbs (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Fibre (g)" />
+              <TextFormInput control={control} type="text" name="fibre" label="Fibre (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="sugars (g)" />
+              <TextFormInput control={control} type="text" name="sugars" label="sugars (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="sodium (mg)" />
+              <TextFormInput control={control} type="text" name="sodium" label="sodium (mg)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="iron (mg)" />
+              <TextFormInput control={control} type="text" name="iron" label="iron (mg)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="calcium (mg)" />
+              <TextFormInput control={control} type="text" name="calcium" label="calcium (mg)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="vitaminC (mg)" />
+              <TextFormInput control={control} type="text" name="vitaminC" label="vitaminC (mg)" />
             </div>
           </Col>
           <Col lg={12}>
@@ -355,20 +353,74 @@ const MenuAdd: React.FC = () => {
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active', orderTypes: [] },
   })
+  const router = useRouter()
+  const { data: categories = [] } = useGetMenuCategoriesQuery()
+  const { data: brands = [] } = useGetBrandsQuery()
+  const { data: branches = [] } = useGetBranchesQuery()
+  const [createMenu, { isLoading }] = useCreateMenuMutation()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset({ status: 'active', orderTypes: [] })
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedBrands, setSelectedBrands] = useState<any[]>([])
+  const [selectedBranches, setSelectedBranches] = useState<any[]>([])
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      const file = data.file?.[0]
+      let image: string | undefined
+      if (file) {
+        image = await uploadSingle(file as any)
+      }
+
+      const payload: any = {
+        title: data.title,
+        description: data.description,
+        image,
+        status: data.status as any,
+        category: selectedCategory || undefined,
+        brands: selectedBrands.map((x) => x.value),
+        branches: selectedBranches.map((x) => x.value),
+      }
+
+      // prices
+      if (data.orderTypes?.includes('dinein')) payload.restaurantPrice = parseFloat(String(data.dineinPrice))
+      if (data.orderTypes?.includes('takeaway')) payload.onlinePrice = parseFloat(String(data.takeawayPrice))
+      if (data.orderTypes?.includes('aggregator')) payload.membershipPrice = parseFloat(String(data.aggregatorPrice))
+
+      await createMenu(payload).unwrap()
+      toast.success('Menu created successfully')
+      router.push('/menu-master/restaurant-menu')
+    } catch (e: any) {
+      toast.error(e?.data?.message || e?.message || 'Failed to create menu')
+    }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GeneralInformationCard control={control} register={register} />
+      <GeneralInformationCard 
+        control={control} 
+        register={register}
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        brands={brands}
+        selectedBrands={selectedBrands}
+        setSelectedBrands={setSelectedBrands}
+        branches={branches}
+        selectedBranches={selectedBranches}
+        setSelectedBranches={setSelectedBranches}
+      />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
-              Save
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
             </Button>
           </Col>
           <Col lg={2}>

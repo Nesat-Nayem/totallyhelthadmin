@@ -15,47 +15,60 @@ import {
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { useGetMealPlansQuery, useDeleteMealPlanMutation } from '@/services/mealPlanApi'
+import { useGetMenusQuery, useDeleteMenuMutation } from '@/services/menuApi'
 import { useGetBrandsQuery } from '@/services/brandApi'
-import { useGetCategoriesQuery } from '@/services/categoryApi'
+import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
+import { useGetBranchesQuery } from '@/services/branchApi'
 import banner1 from '../../../../../assets/images/sample-menu/biryani.jpg'
+import { toast } from 'react-toastify'
 
 const RestaurentsMenu = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(1)
   const limit = 10
   
-  const { data: mealPlansData } = useGetMealPlansQuery({ 
+  const { data: menusData, isLoading, isFetching } = useGetMenusQuery({ 
     q: searchQuery || undefined, 
     page, 
-    limit 
+    limit,
+    priceType: 'restaurant'
   })
   const { data: brandsData } = useGetBrandsQuery()
-  const { data: categoriesData } = useGetCategoriesQuery()
-  const [deleteMealPlan] = useDeleteMealPlanMutation()
+  const { data: categoriesData } = useGetMenuCategoriesQuery()
+  const { data: branchesData } = useGetBranchesQuery()
+  const [deleteMenu] = useDeleteMenuMutation()
   
-  const mealPlans = mealPlansData?.data ?? []
-  const meta = mealPlansData?.meta
+  const menus = menusData?.data ?? []
+  const meta = menusData?.meta
   const brands = brandsData ?? []
   const categories = categoriesData ?? []
+  const branches = branchesData ?? []
   
-  const getBrandName = (brandId: string) => {
-    const brand = brands.find((b: any) => b._id === brandId)
-    return brand?.name || brandId
+  const getBrandNames = (ids: string[] | undefined) => {
+    if (!ids || !ids.length) return '-'
+    return ids.map((id) => brands.find((b: any) => b._id === id)?.name || id).join(', ')
   }
   
   const getCategoryName = (categoryId: string) => {
     const category = categories.find((c: any) => c._id === categoryId)
-    return category?.name || categoryId
+    return category?.title || categoryId
+  }
+  const getBranchNames = (ids: string[] | undefined) => {
+    if (!ids || !ids.length) return 'All'
+    return ids.map((id) => branches.find((b: any) => b._id === id)?.name || id).join(', ')
   }
   
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this meal plan?')) {
+    if (confirm('Are you sure you want to delete this menu?')) {
       try {
-        await deleteMealPlan(id).unwrap()
-        alert('Meal plan deleted successfully')
+        setDeletingId(id)
+        await deleteMenu(id).unwrap()
+        toast.success('Menu deleted successfully')
       } catch (error: any) {
-        alert(error?.data?.message || 'Failed to delete meal plan')
+        toast.error(error?.data?.message || 'Failed to delete menu')
+      } finally {
+        setDeletingId(null)
       }
     }
   }
@@ -105,7 +118,20 @@ const RestaurentsMenu = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {mealPlans.map((item: any) => (
+                  {(isLoading || isFetching) && (
+                    <tr>
+                      <td colSpan={11} className="text-center py-4">
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                        Loading menus...
+                      </td>
+                    </tr>
+                  )}
+                  {!isLoading && !isFetching && menus.length === 0 && (
+                    <tr>
+                      <td colSpan={11} className="text-center py-4">No menus found</td>
+                    </tr>
+                  )}
+                  {!isLoading && !isFetching && menus.map((item: any) => (
                     <tr key={item._id}>
                       <td>
                         <div className="form-check">
@@ -117,21 +143,21 @@ const RestaurentsMenu = () => {
                         <div className="d-flex align-items-center gap-2">
                           <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
                             {item.image ? (
-                              <img src={item.image} alt={item.title || item.name} className="avatar-md" width={60} height={60} style={{ objectFit: 'cover' }} />
+                              <Image src={item.image} alt={item.title || item.name} className="avatar-md" width={60} height={60} style={{ objectFit: 'cover' }} unoptimized />
                             ) : (
                               <Image src={banner1} alt="product" className="avatar-md" />
                             )}
                           </div>
                         </div>
                       </td>
-                      <td>{item.title || item.name}</td>
+                      <td>{item.title}</td>
                       <td>{getCategoryName(item.category)}</td>
-                      <td>AED {item.price}</td>
+                      <td>{item.restaurantPrice ? `AED ${item.restaurantPrice}` : '-'}</td>
                       <td>
                         <span className="badge bg-success">Restaurant</span>
                       </td>
-                      <td>{getBrandName(item.brand)}</td>
-                      <td>{item.branch || 'All'}</td>
+                      <td>{getBrandNames(item.brands)}</td>
+                      <td>{getBranchNames(item.branches)}</td>
                       <td>{item.description || '-'}</td>
                       <td>
                         <span className={`badge bg-${item.status === 'active' ? 'success' : 'danger'}`}>
@@ -147,8 +173,13 @@ const RestaurentsMenu = () => {
                             variant="soft-danger" 
                             size="sm"
                             onClick={() => handleDelete(item._id)}
+                            disabled={deletingId === item._id}
                           >
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            {deletingId === item._id ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            ) : (
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            )}
                           </Button>
                         </div>
                       </td>

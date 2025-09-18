@@ -8,6 +8,8 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useCreateMenuCategoryMutation } from '@/services/menuCategoryApi'
+import { useRouter } from 'next/navigation'
 
 /** FORM DATA TYPE **/
 type FormData = {
@@ -95,10 +97,17 @@ const RestaurantsMenuCategoryAdd: React.FC = () => {
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active' },
   })
+  const router = useRouter()
+  const [createCategory, { isLoading }] = useCreateMenuCategoryMutation()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  const onSubmit = async (data: FormData) => {
+    try {
+      await createCategory({ title: data.title, status: data.status as any }).unwrap()
+      alert('Category created')
+      router.push('/menu-master/menu-category')
+    } catch (e: any) {
+      alert(e?.data?.message || e?.message || 'Failed to create category')
+    }
   }
 
   return (
@@ -107,12 +116,12 @@ const RestaurantsMenuCategoryAdd: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
               Save
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/menu-master/menu-category" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>

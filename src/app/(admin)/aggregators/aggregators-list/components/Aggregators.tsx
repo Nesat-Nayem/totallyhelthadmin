@@ -1,46 +1,27 @@
+"use client"
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import { Card, CardFooter, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
-import banner1 from '../../../../../assets/images/onlinesales/1.png'
-import banner2 from '../../../../../assets/images/onlinesales/2.png'
-import banner3 from '../../../../../assets/images/onlinesales/3.png'
+import { Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { useGetAggregatorsQuery, useDeleteAggregatorMutation } from '@/services/aggregatorApi'
+import { toast } from 'react-toastify'
 
-const data = [
-  {
-    id: 1,
-    title: 'Totally Health',
-    logo: banner1,
-    status: 'Active',
-  },
-  {
-    id: 2,
-    title: 'Zomato',
-    logo: banner2,
-    status: 'Active',
-  },
-  {
-    id: 3,
-    title: 'Talabat',
-    logo: banner3,
-    status: 'InActive',
-  },
-  {
-    id: 4,
-    title: 'Deliveroo',
-    logo: banner1,
-    status: 'Active',
-  },
-  {
-    id: 5,
-    title: 'Careem Food',
-    logo: banner2,
-    status: 'InActive',
-  },
-]
+const Aggregators: React.FC = () => {
+  const { data: aggregators = [], isLoading, isError, error } = useGetAggregatorsQuery()
+  const [deleteAggregator, { isLoading: isDeleting }] = useDeleteAggregatorMutation()
 
-const Aggregators = async () => {
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this aggregator?')
+    if (!confirmed) return
+    try {
+      await deleteAggregator(id).unwrap()
+      toast.success('Aggregator deleted')
+    } catch (e: any) {
+      toast.error(e?.data?.message || e?.message || 'Failed to delete aggregator')
+    }
+  }
+
   return (
     <Row>
       <Col xl={12}>
@@ -53,6 +34,11 @@ const Aggregators = async () => {
               + Add Aggregators
             </Link>
           </CardHeader>
+          {isError && (
+            <div className="alert alert-danger mx-3 mt-3" role="alert">
+              {(error as any)?.data?.message || (error as any)?.message || 'Failed to load aggregators'}
+            </div>
+          )}
           <div>
             <div className="table-responsive">
               <table className="table align-middle mb-0 table-hover table-centered">
@@ -71,34 +57,60 @@ const Aggregators = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
-                        </div>
-                      </td>
-
-                      <td>{item.title}</td>
-                      <td>
-                        <Image src={item.logo} alt="" width={50} height={50} className="img-fluid rounded" />
-                      </td>
-                      <td>
-                        <span className={item.status === 'Active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>{item.status}</span>
-                      </td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="/aggregators/aggregators-edit" className="btn btn-soft-primary btn-sm">
-                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                          </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-4">
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Loading...
                       </td>
                     </tr>
-                  ))}
+                  ) : aggregators.length > 0 ? (
+                    aggregators.map((item) => (
+                      <tr key={item._id}>
+                        <td>
+                          <div className="form-check">
+                            <input type="checkbox" className="form-check-input" id={`agg_${item._id}`} />
+                            <label className="form-check-label" htmlFor={`agg_${item._id}`} />
+                          </div>
+                        </td>
+
+                        <td>{item.name}</td>
+                        <td>
+                          {item.logo ? (
+                            <Image src={item.logo} alt={item.name} width={50} height={50} className="img-fluid rounded" unoptimized />
+                          ) : (
+                            <span className="text-muted">N/A</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={item.status === 'active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>
+                            {item.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <Link href={`/aggregators/aggregators-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
+                              <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                            </Link>
+                            <button
+                              type="button"
+                              className="btn btn-soft-danger btn-sm"
+                              onClick={() => handleDelete(item._id)}
+                              disabled={isDeleting}
+                            >
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="text-center py-4 text-muted">
+                        No aggregators found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -141,3 +153,4 @@ const Aggregators = async () => {
 }
 
 export default Aggregators
+

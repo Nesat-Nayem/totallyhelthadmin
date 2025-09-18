@@ -12,6 +12,11 @@ export const aggregatorApi = baseApi.injectEndpoints({
           ? [...result.map(({ _id }) => ({ type: 'Aggregator' as const, id: _id })), { type: 'Aggregator' as const, id: 'LIST' }]
           : [{ type: 'Aggregator', id: 'LIST' }],
     }),
+    getAggregatorById: build.query<Aggregator, string>({
+      query: (id) => ({ url: `/aggregators/${id}`, method: 'GET' }),
+      transformResponse: (res: any) => res?.data,
+      providesTags: (_r, _e, id) => [{ type: 'Aggregator', id }],
+    }),
     createAggregator: build.mutation<Aggregator, Partial<Aggregator>>({
       query: (body) => ({ url: '/aggregators', method: 'POST', body }),
       transformResponse: (res: any) => res?.data,
@@ -31,4 +36,4 @@ export const aggregatorApi = baseApi.injectEndpoints({
   overrideExisting: true,
 })
 
-export const { useGetAggregatorsQuery, useCreateAggregatorMutation, useUpdateAggregatorMutation, useDeleteAggregatorMutation } = aggregatorApi
+export const { useGetAggregatorsQuery, useGetAggregatorByIdQuery, useCreateAggregatorMutation, useUpdateAggregatorMutation, useDeleteAggregatorMutation } = aggregatorApi

@@ -43,7 +43,7 @@ const BrandsMenu = () => {
   
   const getCategoryName = (categoryId: string) => {
     const category = categories.find((c: any) => c._id === categoryId)
-    return category?.name || categoryId
+    return category?.title || categoryId
   }
   
   const getBrandName = (brandId: string) => {

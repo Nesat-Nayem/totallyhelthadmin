@@ -6,6 +6,8 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useGetMenuCategoryByIdQuery, useUpdateMenuCategoryMutation } from '@/services/menuCategoryApi'
 
 /** FORM DATA TYPE **/
 type FormData = {
@@ -93,10 +95,26 @@ const RestaurantsMenuCategoryEdit: React.FC = () => {
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active' },
   })
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id') || ''
+  const router = useRouter()
+  const { data: category } = useGetMenuCategoryByIdQuery(id, { skip: !id })
+  const [updateCategory, { isLoading }] = useUpdateMenuCategoryMutation()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  React.useEffect(() => {
+    if (category) {
+      reset({ title: category.title, status: category.status })
+    }
+  }, [category, reset])
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      await updateCategory({ id, data: { title: data.title, status: data.status as any } }).unwrap()
+      alert('Category updated')
+      router.push('/menu-master/menu-category')
+    } catch (e: any) {
+      alert(e?.data?.message || e?.message || 'Failed to update category')
+    }
   }
 
   return (
@@ -105,12 +123,12 @@ const RestaurantsMenuCategoryEdit: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
               Save
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/menu-master/menu-category" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>

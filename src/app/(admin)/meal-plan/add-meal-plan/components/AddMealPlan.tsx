@@ -15,6 +15,7 @@ type FormData = {
   description: string
   price: number
   delPrice: number
+  status?: boolean
 }
 
 type SingleValue = { value: string }

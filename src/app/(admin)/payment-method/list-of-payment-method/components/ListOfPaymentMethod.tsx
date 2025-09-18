@@ -1,47 +1,36 @@
-import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import Image from 'next/image'
-import Link from 'next/link'
-import React from 'react'
-import { Card, CardFooter, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
-import banner1 from '../../../../../assets/images/banner/1.jpg'
-import banner2 from '../../../../../assets/images/banner/2.jpg'
-import banner3 from '../../../../../assets/images/banner/3.jpg'
+'use client'
+ import IconifyIcon from '@/components/wrappers/IconifyIcon'
+ import Link from 'next/link'
+ import React, { useEffect } from 'react'
+ import { Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+ import { useGetPaymentMethodsQuery, useDeletePaymentMethodMutation } from '@/services/paymentMethodApi'
+ import { toast } from 'react-toastify'
 
-const data = [
-  {
-    id: 1,
-    title: 'Cash',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    title: 'Card',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    title: 'Payment link',
-    status: 'InActive',
-  },
+// Data will be fetched via RTK Query
 
-  {
-    id: 4,
-    title: 'bank transfer',
-    status: 'Active',
-  },
-  {
-    id: 5,
-    title: 'Aggregator',
-    status: 'Active',
-  },
-  {
-    id: 6,
-    title: 'online ',
-    status: 'Active',
-  },
-]
+const ListOfPaymentMethod: React.FC = () => {
+  const { data: items = [], isLoading, isError, error } = useGetPaymentMethodsQuery()
+  const [deletePaymentMethod, { isLoading: isDeleting }] = useDeletePaymentMethodMutation()
 
-const ListOfPaymentMethod = async () => {
+  useEffect(() => {
+    if (isError) {
+      const msg = (error as any)?.data?.message || (error as any)?.error || 'Failed to load payment methods'
+      toast.error(msg)
+    }
+  }, [isError, error])
+
+  const handleDelete = async (id: string) => {
+    const yes = window.confirm('Are you sure you want to delete this payment method?')
+    if (!yes) return
+    try {
+      await deletePaymentMethod(id).unwrap()
+      toast.success('Payment method deleted')
+    } catch (err) {
+      const msg = (err as any)?.data?.message || (err as any)?.error || 'Failed to delete payment method'
+      toast.error(msg)
+    }
+  }
+
   return (
     <Row>
       <Col xl={12}>
@@ -71,32 +60,53 @@ const ListOfPaymentMethod = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
-                        </div>
-                      </td>
-
-                      <td>{item.title}</td>
-
-                      <td>
-                        <span className={item.status === 'Active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>{item.status}</span>
-                      </td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="/payment-method/edit-new-payment-method" className="btn btn-soft-primary btn-sm">
-                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                          </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
+                  {isLoading && (
+                    <tr>
+                      <td colSpan={4}>Loading...</td>
                     </tr>
-                  ))}
+                  )}
+                  {!isLoading && items.length === 0 && (
+                    <tr>
+                      <td colSpan={4}>No payment methods found</td>
+                    </tr>
+                  )}
+                  {!isLoading &&
+                    items.map((item) => (
+                      <tr key={item._id}>
+                        <td>
+                          <div className="form-check">
+                            <input type="checkbox" className="form-check-input" id={`row-${item._id}`} />
+                            <label className="form-check-label" htmlFor={`row-${item._id}`} />
+                          </div>
+                        </td>
+
+                        <td>{item.name}</td>
+
+                        <td>
+                          <span className={item.status === 'active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>
+                            {item.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <Link
+                              href={`/payment-method/edit-new-payment-method?id=${item._id}`}
+                              className="btn btn-soft-primary btn-sm"
+                            >
+                              <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                            </Link>
+                            <button
+                              type="button"
+                              className="btn btn-soft-danger btn-sm"
+                              disabled={isDeleting}
+                              onClick={() => handleDelete(item._id)}
+                            >
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>

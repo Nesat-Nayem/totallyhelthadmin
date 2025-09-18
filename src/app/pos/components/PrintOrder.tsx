@@ -19,7 +19,7 @@ const PrintOrder = () => {
       </Button>
 
       {/* Invoice Modal */}
-      <Modal show={showModal} onHide={handleClose} centered size="md">
+      <Modal show={showModal} onHide={handleClose} centered size="lg">
         <Modal.Body className="px-4 py-3">
           {/* Header */}
           <div className="text-center mb-2">

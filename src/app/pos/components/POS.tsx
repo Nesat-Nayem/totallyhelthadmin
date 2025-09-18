@@ -28,7 +28,7 @@ import { useGetCategoriesQuery } from '@/services/categoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
 import { useCreateOrderMutation } from '@/services/orderApi'
-import { useLazySearchCustomersQuery, useCreateCustomerMutation } from '@/services/customerApi'
+import { useCreateCustomerMutation } from '@/services/customerApi'
 
 // Fallback images for meal plans
 const fallbackImages = [product1, product2, product3, product4]
@@ -175,7 +175,7 @@ const POS = () => {
       }
       
       const result = await createOrder(orderData).unwrap()
-      alert(`Order created successfully! Invoice: ${result.data.invoiceNo}, Order: ${result.data.orderNo}`)
+      alert(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
       
       // Reset form
       setSelectedProducts({})
@@ -251,7 +251,7 @@ const POS = () => {
                       <option value="">Select Meal Category</option>
                       {categories.map((cat: any) => (
                         <option key={cat._id} value={cat._id}>
-                          {cat.name}
+                          {cat.title || cat.name}
                         </option>
                       ))}
                     </select>
