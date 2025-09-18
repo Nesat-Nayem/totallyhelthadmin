@@ -6,9 +6,15 @@ export async function uploadSingle(file: File): Promise<string> {
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('backend_token') : null
 
+  // Don't set content-type header for FormData - browser will set it with boundary
+  const headers: HeadersInit = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const res = await fetch(`${API_BASE_URL}/upload/single`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers,
     body: formData,
   })
 

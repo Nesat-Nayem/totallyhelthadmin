@@ -21,7 +21,6 @@ type FormData = {
   title: string
   status: string
   description: string
-  file: FileList
   NutritionFacts: string
 
   // ✅ changed from single string to multiple selections
@@ -54,6 +53,7 @@ type ControlType = {
   branches: any[]
   selectedBranches: any[]
   setSelectedBranches: (arr: any[]) => void
+  onFileChange: (f: File | null) => void
 }
 
 /** VALIDATION SCHEMA **/
@@ -62,10 +62,6 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
   status: yup.string().required('Please select a status'),
   description: yup.string().required('Please enter description'),
   NutritionFacts: yup.string().optional(),
-  file: yup
-    .mixed<FileList>()
-    .test('required', 'Please upload a banner image', (value) => value && value.length > 0)
-    .required(),
 
   // ✅ at least one order type must be selected
   orderTypes: yup.array().of(yup.string()).min(1, 'Please select at least one order type'),
@@ -89,7 +85,7 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches }) => {
+const GeneralInformationCard: React.FC<ControlType> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches, onFileChange }) => {
   return (
     <Card>
       <CardHeader>
@@ -105,7 +101,8 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register, cate
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="file" label="Item Image" />
+              <label className="form-label">Item Image</label>
+              <input className="form-control" type="file" accept="image/*" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
             </div>
           </Col>
           {/* Category */}
@@ -362,13 +359,13 @@ const MenuAdd: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedBrands, setSelectedBrands] = useState<any[]>([])
   const [selectedBranches, setSelectedBranches] = useState<any[]>([])
+  const [file, setFile] = useState<File | null>(null)
 
   const onSubmit = async (data: FormData) => {
     try {
-      const file = data.file?.[0]
       let image: string | undefined
       if (file) {
-        image = await uploadSingle(file as any)
+        image = await uploadSingle(file)
       }
 
       const payload: any = {
@@ -385,6 +382,17 @@ const MenuAdd: React.FC = () => {
       if (data.orderTypes?.includes('dinein')) payload.restaurantPrice = parseFloat(String(data.dineinPrice))
       if (data.orderTypes?.includes('takeaway')) payload.onlinePrice = parseFloat(String(data.takeawayPrice))
       if (data.orderTypes?.includes('aggregator')) payload.membershipPrice = parseFloat(String(data.aggregatorPrice))
+
+      // nutrition fields
+      if (data.calories) payload.calories = parseFloat(String(data.calories))
+      if (data.protein) payload.protein = parseFloat(String(data.protein))
+      if (data.carbs) payload.carbs = parseFloat(String(data.carbs))
+      if (data.fibre) payload.fibre = parseFloat(String(data.fibre))
+      if (data.sugars) payload.sugars = parseFloat(String(data.sugars))
+      if (data.sodium) payload.sodium = parseFloat(String(data.sodium))
+      if (data.iron) payload.iron = parseFloat(String(data.iron))
+      if (data.calcium) payload.calcium = parseFloat(String(data.calcium))
+      if (data.vitaminC) payload.vitaminC = parseFloat(String(data.vitaminC))
 
       await createMenu(payload).unwrap()
       toast.success('Menu created successfully')
@@ -408,6 +416,7 @@ const MenuAdd: React.FC = () => {
         branches={branches}
         selectedBranches={selectedBranches}
         setSelectedBranches={setSelectedBranches}
+        onFileChange={setFile}
       />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">

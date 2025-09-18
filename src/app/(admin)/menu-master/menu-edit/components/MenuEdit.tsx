@@ -3,7 +3,7 @@ import ChoicesFormInput from '@/components/form/ChoicesFormInput'
 import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
-import React from 'react'
+import React, { useState } from 'react'
 import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
@@ -22,7 +22,6 @@ type FormData = {
   title: string
   status: string
   description: string
-  file: FileList
   NutritionFacts: string
 
   // ✅ changed from single string to multiple selections
@@ -30,6 +29,16 @@ type FormData = {
   dineinPrice?: string
   takeawayPrice?: string
   aggregatorPrice?: string
+  // optional nutrition fields
+  calories?: string
+  protein?: string
+  carbs?: string
+  fibre?: string
+  sugars?: string
+  sodium?: string
+  iron?: string
+  calcium?: string
+  vitaminC?: string
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
@@ -44,7 +53,6 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
   status: yup.string().required('Please select a status'),
   description: yup.string().required('Please enter description'),
   NutritionFacts: yup.string().optional(),
-  file: yup.mixed<FileList>().optional(),
 
   // ✅ at least one order type must be selected
   orderTypes: yup.array().of(yup.string()).min(1, 'Please select at least one order type'),
@@ -78,7 +86,8 @@ const GeneralInformationCard: React.FC<ControlType & {
   branches: any[]
   selectedBranches: any[]
   setSelectedBranches: (arr: any[]) => void
-}> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches }) => {
+  onFileChange: (f: File | null) => void
+}> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches, onFileChange }) => {
   return (
     <Card>
       <CardHeader>
@@ -94,7 +103,8 @@ const GeneralInformationCard: React.FC<ControlType & {
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="file" label="Menu Banner" />
+              <label className="form-label">Menu Banner</label>
+              <input className="form-control" type="file" accept="image/*" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
             </div>
           </Col>
           {/* Category */}
@@ -231,55 +241,55 @@ const GeneralInformationCard: React.FC<ControlType & {
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="calories (kcal)" />
+              <TextFormInput control={control} type="text" name="calories" label="calories (kcal)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Protein (g)" />
+              <TextFormInput control={control} type="text" name="protein" label="Protein (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Carbs (g)" />
+              <TextFormInput control={control} type="text" name="carbs" label="Carbs (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Fibre (g)" />
+              <TextFormInput control={control} type="text" name="fibre" label="Fibre (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="sugars (g)" />
+              <TextFormInput control={control} type="text" name="sugars" label="sugars (g)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="sodium (mg)" />
+              <TextFormInput control={control} type="text" name="sodium" label="sodium (mg)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="iron (mg)" />
+              <TextFormInput control={control} type="text" name="iron" label="iron (mg)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="calcium (mg)" />
+              <TextFormInput control={control} type="text" name="calcium" label="calcium (mg)" />
             </div>
           </Col>
 
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="vitaminC (mg)" />
+              <TextFormInput control={control} type="text" name="vitaminC" label="vitaminC (mg)" />
             </div>
           </Col>
           <Col lg={12}>
@@ -354,6 +364,7 @@ const MenuEdit: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = React.useState('')
   const [selectedBrands, setSelectedBrands] = React.useState<any[]>([])
   const [selectedBranches, setSelectedBranches] = React.useState<any[]>([])
+  const [file, setFile] = useState<File | null>(null)
 
   React.useEffect(() => {
     if (menu) {
@@ -370,6 +381,16 @@ const MenuEdit: React.FC = () => {
         dineinPrice: menu.restaurantPrice ? String(menu.restaurantPrice) : undefined,
         takeawayPrice: menu.onlinePrice ? String(menu.onlinePrice) : undefined,
         aggregatorPrice: menu.membershipPrice ? String(menu.membershipPrice) : undefined,
+        // Auto-fill nutrition fields
+        calories: menu.calories ? String(menu.calories) : undefined,
+        protein: menu.protein ? String(menu.protein) : undefined,
+        carbs: menu.carbs ? String(menu.carbs) : undefined,
+        fibre: menu.fibre ? String(menu.fibre) : undefined,
+        sugars: menu.sugars ? String(menu.sugars) : undefined,
+        sodium: menu.sodium ? String(menu.sodium) : undefined,
+        iron: menu.iron ? String(menu.iron) : undefined,
+        calcium: menu.calcium ? String(menu.calcium) : undefined,
+        vitaminC: menu.vitaminC ? String(menu.vitaminC) : undefined,
       } as any)
       setSelectedCategory(menu.category || '')
       setSelectedBrands((menu.brands || []).map((id: string) => ({ value: id, label: brands.find((b: any) => b._id === id)?.name || id })))
@@ -379,10 +400,9 @@ const MenuEdit: React.FC = () => {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const file = data.file?.[0]
       let image = menu?.image as string | undefined
       if (file) {
-        image = await uploadSingle(file as any)
+        image = await uploadSingle(file)
       }
 
       const payload: any = {
@@ -400,6 +420,17 @@ const MenuEdit: React.FC = () => {
       else payload.onlinePrice = undefined
       if (data.orderTypes?.includes('aggregator')) payload.membershipPrice = parseFloat(String(data.aggregatorPrice))
       else payload.membershipPrice = undefined
+
+      // nutrition fields
+      payload.calories = data.calories ? parseFloat(String(data.calories)) : undefined
+      payload.protein = data.protein ? parseFloat(String(data.protein)) : undefined
+      payload.carbs = data.carbs ? parseFloat(String(data.carbs)) : undefined
+      payload.fibre = data.fibre ? parseFloat(String(data.fibre)) : undefined
+      payload.sugars = data.sugars ? parseFloat(String(data.sugars)) : undefined
+      payload.sodium = data.sodium ? parseFloat(String(data.sodium)) : undefined
+      payload.iron = data.iron ? parseFloat(String(data.iron)) : undefined
+      payload.calcium = data.calcium ? parseFloat(String(data.calcium)) : undefined
+      payload.vitaminC = data.vitaminC ? parseFloat(String(data.vitaminC)) : undefined
 
       await updateMenu({ id, data: payload }).unwrap()
       toast.success('Menu updated successfully')
@@ -423,6 +454,7 @@ const MenuEdit: React.FC = () => {
         branches={branches}
         selectedBranches={selectedBranches}
         setSelectedBranches={setSelectedBranches}
+        onFileChange={setFile}
       />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">

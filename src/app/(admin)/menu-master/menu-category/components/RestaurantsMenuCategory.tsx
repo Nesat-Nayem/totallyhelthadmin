@@ -1,22 +1,28 @@
 "use client"
 
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
+import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useState } from 'react'
 import { Button, Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { useGetMenuCategoriesQuery, useDeleteMenuCategoryMutation } from '@/services/menuCategoryApi'
+import { toast } from 'react-toastify'
 
 const RestaurantsMenuCategory = () => {
-  const { data: categories } = useGetMenuCategoriesQuery()
+  const { data: categories, isLoading, isFetching } = useGetMenuCategoriesQuery()
   const [deleteCategory] = useDeleteMenuCategoryMutation()
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this category?')) {
+    if (confirm('Are you sure you want to delete this category?')) {
       try {
+        setDeletingId(id)
         await deleteCategory(id).unwrap()
-        alert('Deleted successfully')
+        toast.success('Category deleted successfully')
       } catch (e: any) {
-        alert(e?.data?.message || 'Failed to delete')
+        toast.error(e?.data?.message || 'Failed to delete category')
+      } finally {
+        setDeletingId(null)
       }
     }
   }
@@ -28,8 +34,8 @@ const RestaurantsMenuCategory = () => {
             <CardTitle as={'h4'} className="flex-grow-1">
               Menu Category
             </CardTitle>
-            <Link href="/menu-master/menu-category/restaurants-menu-category-add" className="btn btn-lg btn-primary">
-              + Add Category
+            <Link href="/menu-master/menu-category-add" className="btn btn-lg btn-primary">
+              + Add Menu Category
             </Link>
           </CardHeader>
           <div>
@@ -49,7 +55,20 @@ const RestaurantsMenuCategory = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(categories ?? []).map((item: any) => (
+                  {(isLoading || isFetching) && (
+                    <tr>
+                      <td colSpan={4} className="text-center py-4">
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                        Loading categories...
+                      </td>
+                    </tr>
+                  )}
+                  {!isLoading && !isFetching && (!categories || categories.length === 0) && (
+                    <tr>
+                      <td colSpan={4} className="text-center py-4">No categories found</td>
+                    </tr>
+                  )}
+                  {!isLoading && !isFetching && (categories ?? []).map((item: any) => (
                     <tr key={item._id}>
                       <td>
                         <div className="form-check">
@@ -65,11 +84,19 @@ const RestaurantsMenuCategory = () => {
                       </td>
                       <td>
                         <div className="d-flex gap-2">
-                          <Link href={`/menu-master/menu-category/restaurants-menu-category-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
+                          <Link href={`/menu-master/menu-category-edit?id=${item._id}`} className="btn btn-soft-primary btn-sm">
                             <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
                           </Link>
-                          <Button onClick={() => handleDelete(item._id)} className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                          <Button 
+                            onClick={() => handleDelete(item._id)} 
+                            className="btn btn-soft-danger btn-sm"
+                            disabled={deletingId === item._id}
+                          >
+                            {deletingId === item._id ? (
+                              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            ) : (
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            )}
                           </Button>
                         </div>
                       </td>
