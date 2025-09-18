@@ -3,31 +3,36 @@ import ChoicesFormInput from '@/components/form/ChoicesFormInput'
 import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useGetAggregatorByIdQuery, useUpdateAggregatorMutation } from '@/services/aggregatorApi'
+import { uploadSingle } from '@/services/upload'
+import { toast } from 'react-toastify'
 
 /** FORM DATA TYPE **/
 type FormData = {
-  title: string
-  status: string
+  name: string
+  status: 'active' | 'inactive'
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
 type ControlType = {
   control: Control<FormData>
+  onFileChange: (f: File | null) => void
 }
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  title: yup.string().required('Please enter title'),
-  status: yup.string().required('Please select a status'),
+  name: yup.string().required('Please enter aggregator name'),
+  status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
+const GeneralInformationCard: React.FC<ControlType> = ({ control, onFileChange }) => {
   return (
     <Card>
       <CardHeader>
@@ -37,12 +42,13 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="title" label="Aggregators Name" />
+              <TextFormInput control={control} type="text" name="name" label="Aggregators Name" />
             </div>
           </Col>
           <Col lg={4}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="title" label="Aggregators Logo" />
+              <label className="form-label">Aggregators Logo</label>
+              <input className="form-control" type="file" accept="image/*" onChange={(e) => onFileChange(e.target.files?.[0] || null)} />
             </div>
           </Col>
 
@@ -96,28 +102,89 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 
 /** MAIN COMPONENT **/
 const AggregatorsEdit: React.FC = () => {
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id') || ''
+  const router = useRouter()
+  
   const { reset, handleSubmit, control } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active' },
+    defaultValues: { status: 'active', name: '' },
   })
+  
+  const [file, setFile] = useState<File | null>(null)
+  const { data: aggregator, isLoading: loadingAggregator } = useGetAggregatorByIdQuery(id, { skip: !id })
+  const [updateAggregator, { isLoading }] = useUpdateAggregatorMutation()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  useEffect(() => {
+    if (aggregator) {
+      reset({
+        name: aggregator.name,
+        status: aggregator.status || 'active',
+      })
+    }
+  }, [aggregator, reset])
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      let logo = aggregator?.logo as string | undefined
+      if (file) {
+        logo = await uploadSingle(file)
+      }
+      
+      await updateAggregator({ 
+        id, 
+        data: { 
+          name: data.name, 
+          logo, 
+          status: data.status 
+        } 
+      }).unwrap()
+      toast.success('Aggregator updated successfully')
+      router.push('/aggregators/aggregators-list')
+    } catch (e: any) {
+      toast.error(e?.data?.message || e?.message || 'Failed to update aggregator')
+    }
+  }
+
+  if (loadingAggregator) {
+    return (
+      <div className="text-center py-5">
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+        Loading aggregator...
+      </div>
+    )
+  }
+
+  if (!id || !aggregator) {
+    return (
+      <div className="text-center py-5">
+        <p>Aggregator not found</p>
+        <Link href="/aggregators/aggregators-list" className="btn btn-primary">
+          Back to Aggregators
+        </Link>
+      </div>
+    )
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GeneralInformationCard control={control} />
+      <GeneralInformationCard control={control} onFileChange={setFile} />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
-              Save
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                  Updating...
+                </>
+              ) : (
+                'Update'
+              )}
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/aggregators/aggregators-list" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>

@@ -2,23 +2,32 @@
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { useGetAggregatorsQuery, useDeleteAggregatorMutation } from '@/services/aggregatorApi'
 import { toast } from 'react-toastify'
+import { confirmDelete } from '@/utils/sweetAlert'
 
 const Aggregators: React.FC = () => {
-  const { data: aggregators = [], isLoading, isError, error } = useGetAggregatorsQuery()
-  const [deleteAggregator, { isLoading: isDeleting }] = useDeleteAggregatorMutation()
+  const { data: aggregators = [], isLoading, isFetching, isError, error } = useGetAggregatorsQuery()
+  const [deleteAggregator] = useDeleteAggregatorMutation()
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this aggregator?')
+    const confirmed = await confirmDelete(
+      'Delete Aggregator?', 
+      'Are you sure you want to delete this aggregator? This action cannot be undone.'
+    )
     if (!confirmed) return
+    
     try {
+      setDeletingId(id)
       await deleteAggregator(id).unwrap()
-      toast.success('Aggregator deleted')
+      toast.success('Aggregator deleted successfully')
     } catch (e: any) {
       toast.error(e?.data?.message || e?.message || 'Failed to delete aggregator')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -57,14 +66,22 @@ const Aggregators: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading ? (
+                  {(isLoading || isFetching) && (
                     <tr>
                       <td colSpan={5} className="text-center py-4">
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Loading...
+                        Loading aggregators...
                       </td>
                     </tr>
-                  ) : aggregators.length > 0 ? (
+                  )}
+                  {!isLoading && !isFetching && (!aggregators || aggregators.length === 0) && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-4 text-muted">
+                        No aggregators found
+                      </td>
+                    </tr>
+                  )}
+                  {!isLoading && !isFetching && aggregators && aggregators.length > 0 && (
                     aggregators.map((item) => (
                       <tr key={item._id}>
                         <td>
@@ -96,20 +113,18 @@ const Aggregators: React.FC = () => {
                               type="button"
                               className="btn btn-soft-danger btn-sm"
                               onClick={() => handleDelete(item._id)}
-                              disabled={isDeleting}
+                              disabled={deletingId === item._id}
                             >
-                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              {deletingId === item._id ? (
+                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                              ) : (
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              )}
                             </button>
                           </div>
                         </td>
                       </tr>
                     ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="text-center py-4 text-muted">
-                        No aggregators found
-                      </td>
-                    </tr>
                   )}
                 </tbody>
               </table>

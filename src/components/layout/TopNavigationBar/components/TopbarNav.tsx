@@ -24,10 +24,10 @@ const TopBarNav = () => {
 
           {/* Right: Buttons & Toggles */}
           <div className="d-flex align-items-center flex-wrap gap-2 justify-content-end w-100 w-md-auto">
-            <Button onClick={() => router.push('pos')} className="btn btn-sm btn-info d-flex align-items-center gap-1">
+            <Link href="/pos"  className="btn btn-sm btn-info d-flex align-items-center gap-1">
               <IconifyIcon icon="mdi:cart-outline" />
               <span className="d-none d-sm-inline">POS</span>
-            </Button>
+            </Link>
 
             <Link href="/dashboard" className="btn btn-sm btn-dark d-flex align-items-center gap-1">
               <IconifyIcon icon="mdi:view-dashboard-outline" />

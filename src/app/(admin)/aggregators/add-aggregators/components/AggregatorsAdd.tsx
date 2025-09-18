@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { uploadSingle } from '@/services/upload'
 import { useCreateAggregatorMutation } from '@/services/aggregatorApi'
+import { toast } from 'react-toastify'
 
 /** FORM DATA TYPE **/
 type FormData = {
@@ -111,12 +112,14 @@ const AggregatorsAdd: React.FC = () => {
   const onSubmit = async (data: FormData) => {
     try {
       let logo: string | undefined
-      if (file) logo = await uploadSingle(file)
+      if (file) {
+        logo = await uploadSingle(file)
+      }
       await createAggregator({ name: data.name, logo, status: data.status }).unwrap()
-      alert('Aggregator created')
+      toast.success('Aggregator created successfully')
       router.push('/aggregators/aggregators-list')
     } catch (e: any) {
-      alert(e?.message || 'Failed to create aggregator')
+      toast.error(e?.data?.message || e?.message || 'Failed to create aggregator')
     }
   }
 
@@ -127,11 +130,18 @@ const AggregatorsAdd: React.FC = () => {
         <Row className="justify-content-end g-2">
           <Col lg={2}>
             <Button variant="outline-secondary" type="submit" className="w-100" disabled={isLoading}>
-              Save
+              {isLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/aggregators/aggregators-list" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>
