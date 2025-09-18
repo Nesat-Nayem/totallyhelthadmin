@@ -22,15 +22,15 @@ import PaymentModeSelector from './PaymentModeSelector'
 import DiscountModal from './DiscountModal'
 
 // Import API services
-import { useGetMealPlansQuery } from '@/services/mealPlanApi'
+import { useGetMenusQuery } from '@/services/menuApi'
 import { useGetBrandsQuery } from '@/services/brandApi'
-import { useGetCategoriesQuery } from '@/services/categoryApi'
+import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
 import { useCreateOrderMutation } from '@/services/orderApi'
 import { useCreateCustomerMutation } from '@/services/customerApi'
 
-// Fallback images for meal plans
+// Fallback images for menus
 const fallbackImages = [product1, product2, product3, product4]
 
 const orderTypes = ['DineIn', 'TakeAway', 'Delivery']
@@ -57,13 +57,13 @@ const POS = () => {
   
   // Fetch data from APIs
   const { data: brandsData } = useGetBrandsQuery()
-  const { data: categoriesData } = useGetCategoriesQuery()
+  const { data: categoriesData } = useGetMenuCategoriesQuery()
   const { data: aggregatorsData } = useGetAggregatorsQuery()
   const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
   const [createOrder] = useCreateOrderMutation()
   
-  // Get meal plans with filters - fixed search to use proper query
-  const { data: mealPlansData } = useGetMealPlansQuery(
+  // Get menus with filters - using proper menu API with search, brand, and category filtering
+  const { data: menusData } = useGetMenusQuery(
     searchQuery || selectedBrand || selectedCategory
       ? {
           q: searchQuery || undefined,
@@ -78,10 +78,13 @@ const POS = () => {
   const categories = categoriesData ?? []
   const aggregators = aggregatorsData ?? []
   const paymentMethods = paymentMethodsData ?? []
-  const products = mealPlansData?.data ?? []
+  const menus = menusData?.data ?? []
 
-  const handleProductClick = (product: any) => {
-    const id = product._id || product.id
+  const handleProductClick = (menu: any) => {
+    const id = menu._id || menu.id
+    // Use restaurant price as default, fallback to online price, then membership price
+    const price = menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+    
     setSelectedProducts(prev => {
       if (prev[id]) {
         // If already selected, increase quantity
@@ -93,11 +96,12 @@ const POS = () => {
           },
         }
       } else {
-        // Add new product
+        // Add new menu item
         return {
           ...prev,
           [id]: {
-            ...product,
+            ...menu,
+            price: price, // Store the calculated price
             qty: 1,
           },
         }
@@ -214,7 +218,7 @@ const POS = () => {
             <CardBody>
               <InputGroup className="mb-2">
                 <FormControl 
-                  placeholder="Search Meal Plan..." 
+                  placeholder="Search Menu..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -248,10 +252,10 @@ const POS = () => {
                       value={selectedCategory}
                       onChange={(e) => setSelectedCategory(e.target.value)}
                     >
-                      <option value="">Select Meal Category</option>
+                      <option value="">Select Category</option>
                       {categories.map((cat: any) => (
                         <option key={cat._id} value={cat._id}>
-                          {cat.title || cat.name}
+                          {cat.title}
                         </option>
                       ))}
                     </select>
@@ -259,28 +263,30 @@ const POS = () => {
                 </Col>
               </Row>
               <Row className="g-3" style={{ height: 'auto', overflowY: 'auto' }}>
-                {products.map((product: any, index: number) => {
-                  const productId = product._id || product.id
-                  const imageUrl = product.image || fallbackImages[index % fallbackImages.length]
+                {menus.map((menu: any, index: number) => {
+                  const menuId = menu._id || menu.id
+                  const imageUrl = menu.image || fallbackImages[index % fallbackImages.length]
+                  // Use restaurant price as default, fallback to online price, then membership price
+                  const price = menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
                   return (
-                    <Col xs={4} key={productId}>
+                    <Col xs={4} key={menuId}>
                       <div
                         className={`text-center p-2 border rounded-3 h-100 cursor-pointer 
-                        ${selectedProducts[productId] ? 'bg-success-subtle border-success' : 'bg-light'}`}
-                        onClick={() => handleProductClick(product)}>
+                        ${selectedProducts[menuId] ? 'bg-success-subtle border-success' : 'bg-light'}`}
+                        onClick={() => handleProductClick(menu)}>
                         <Image 
-                          src={product.image || imageUrl} 
-                          alt={product.title || product.name} 
+                          src={menu.image || imageUrl} 
+                          alt={menu.title} 
                           className="mb-2 rounded" 
                           width={60} 
                           height={60} 
-                          unoptimized={!!product.image}
+                          unoptimized={!!menu.image}
                         />
                         <div className="fw-semibold small " style={{ fontSize: '10px' }}>
-                          {product.title || product.name}
+                          {menu.title}
                         </div>
                         <div className="text-success fw-bold" style={{ fontSize: '10px' }}>
-                          AED {product.price || 0}
+                          AED {price}
                         </div>
                       </div>
                     </Col>
