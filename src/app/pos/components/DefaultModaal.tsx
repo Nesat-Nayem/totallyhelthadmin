@@ -1,7 +1,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import React from 'react'
-import { Modal, Button, Row, Col } from 'react-bootstrap'
+import { Modal, Button, Row, Col, Spinner } from 'react-bootstrap'
 import {
   FaUtensils,
   FaShoppingBag,
@@ -19,6 +19,9 @@ import {
   FaArrowUp,
   FaUser,
 } from 'react-icons/fa'
+import { useDispatch, useSelector } from 'react-redux'
+import { RootState } from '@/store'
+import { setOrderType, hideOrderTypeModal, setLoading, OrderType, PriceType } from '@/store/slices/posSlice'
 import ReprintBillsModal from './ReprintBillsModal'
 import OrderCancellationModal from './OrderCancellationModal'
 
@@ -29,6 +32,19 @@ interface DefaultModalProps {
 
 const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
   const router = useRouter()
+  const dispatch = useDispatch()
+  const { isLoading, selectedOrderType } = useSelector((state: RootState) => state.pos)
+
+  const handleOrderTypeSelect = async (orderType: OrderType, priceType: PriceType) => {
+    dispatch(setLoading(true))
+    
+    // Simulate loading for better UX
+    setTimeout(() => {
+      dispatch(setOrderType({ orderType, priceType }))
+      dispatch(setLoading(false))
+      onClose()
+    }, 500)
+  }
 
   return (
     <Modal show={show} onHide={onClose} size="xl" centered>
@@ -42,29 +58,79 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
 
       {/* Body */}
       <Modal.Body>
-        <Row className="g-3">
-          {/* Left Column */}
-          <Col md={4} className="d-grid gap-2 bg-dark p-2">
-            <Button className="btn-custom" size="lg">
-              <FaUtensils /> Dien (restaurant menu show)
-            </Button>
-            <Button className="btn-custom" size="lg">
-              <FaGlobe /> Takeway (restaurant menu show)
-            </Button>
-            <Button className="btn-custom" size="lg">
-              <FaUser /> Delivery (restaurant menu show)
-            </Button>
-            <Button className="btn-custom" size="lg">
-              <FaUser /> Online (Show Aggregate Menu)
-            </Button>
+        {isLoading && (
+          <div className="text-center py-4">
+            <Spinner animation="border" variant="primary" />
+            <p className="mt-2">Loading menu...</p>
+          </div>
+        )}
+        
+        {!isLoading && (
+          <Row className="g-3">
+            {/* Left Column - Order Types */}
+            <Col md={4} className="d-grid gap-2 bg-dark p-3 rounded">
+              <h5 className="text-white text-center mb-3">Select Order Type</h5>
+              
+              <Button 
+                className="btn-custom" 
+                size="lg"
+                onClick={() => handleOrderTypeSelect('dine-in', 'restaurant')}
+                disabled={isLoading}
+              >
+                <FaUtensils /> Dine-In
+                <small className="d-block">Restaurant Menu</small>
+              </Button>
+              
+              <Button 
+                className="btn-custom" 
+                size="lg"
+                onClick={() => handleOrderTypeSelect('takeaway', 'restaurant')}
+                disabled={isLoading}
+              >
+                <FaShoppingBag /> Takeaway
+                <small className="d-block">Restaurant Menu</small>
+              </Button>
+              
+              <Button 
+                className="btn-custom" 
+                size="lg"
+                onClick={() => handleOrderTypeSelect('delivery', 'restaurant')}
+                disabled={isLoading}
+              >
+                <FaTruck /> Delivery
+                <small className="d-block">Restaurant Menu</small>
+              </Button>
+              
+              <Button 
+                className="btn-custom" 
+                size="lg"
+                onClick={() => handleOrderTypeSelect('online', 'online')}
+                disabled={isLoading}
+              >
+                <FaGlobe /> Online
+                <small className="d-block">Online Menu</small>
+              </Button>
 
-            <Button className="btn-custom" size="lg">
-              <FaUserPlus /> New Membership (resgiter new menu)
-            </Button>
-            <Button className="btn-custom" size="lg">
-              <FaIdBadge /> Membership Meal
-            </Button>
-          </Col>
+              <Button 
+                className="btn-custom" 
+                size="lg"
+                onClick={() => handleOrderTypeSelect('membership', 'membership')}
+                disabled={isLoading}
+              >
+                <FaUserPlus /> New Membership
+                <small className="d-block">Membership Menu</small>
+              </Button>
+              
+              <Button 
+                className="btn-custom" 
+                size="lg"
+                onClick={() => handleOrderTypeSelect('membership', 'membership')}
+                disabled={isLoading}
+              >
+                <FaIdBadge /> Membership Meal
+                <small className="d-block">Membership Menu</small>
+              </Button>
+            </Col>
 
           {/* Middle Column */}
           <Col md={4} className="d-grid gap-2">
@@ -99,6 +165,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
             </Button>
           </Col>
         </Row>
+        )}
       </Modal.Body>
 
       {/* Footer */}

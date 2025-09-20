@@ -29,12 +29,18 @@ import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
 import { useCreateOrderMutation } from '@/services/orderApi'
 import { useCreateCustomerMutation } from '@/services/customerApi'
+import { useDispatch, useSelector } from 'react-redux'
+import { RootState } from '@/store'
+import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal } from '@/store/slices/posSlice'
 
 // Fallback images for menus
 const fallbackImages = [product1, product2, product3, product4]
 
 const orderTypes = ['DineIn', 'TakeAway', 'Delivery']
 const POS = () => {
+  const dispatch = useDispatch()
+  const { selectedOrderType, selectedPriceType, showOrderTypeModal } = useSelector((state: RootState) => state.pos)
+  
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: any }>({})
   const [showSplitModal, setShowSplitModal] = useState(false)
   const [showDiscountModal, setShowDiscountModal] = useState(false)
@@ -62,13 +68,14 @@ const POS = () => {
   const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
   const [createOrder] = useCreateOrderMutation()
   
-  // Get menus with filters - using proper menu API with search, brand, and category filtering
+  // Get menus with filters - using proper menu API with search, brand, category, and price type filtering
   const { data: menusData } = useGetMenusQuery(
-    searchQuery || selectedBrand || selectedCategory
+    searchQuery || selectedBrand || selectedCategory || selectedPriceType
       ? {
           q: searchQuery || undefined,
           brand: selectedBrand || undefined,
           category: selectedCategory || undefined,
+          priceType: selectedPriceType || undefined,
           limit: 100
         }
       : { limit: 100 }
@@ -82,8 +89,11 @@ const POS = () => {
 
   const handleProductClick = (menu: any) => {
     const id = menu._id || menu.id
-    // Use restaurant price as default, fallback to online price, then membership price
-    const price = menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+    // Use price based on selected price type
+    const price = selectedPriceType === 'restaurant' ? menu.restaurantPrice :
+                  selectedPriceType === 'online' ? menu.onlinePrice :
+                  selectedPriceType === 'membership' ? menu.membershipPrice :
+                  menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
     
     setSelectedProducts(prev => {
       if (prev[id]) {
@@ -101,7 +111,7 @@ const POS = () => {
           ...prev,
           [id]: {
             ...menu,
-            price: price, // Store the calculated price
+            price: price, // Store the calculated price based on order type
             qty: 1,
           },
         }
@@ -136,7 +146,10 @@ const POS = () => {
   const vatAmount = ((subTotal + moreOptionsTotal) * 5) / 100
   const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - (discount?.amount || 0)
   const totalAmount = totalBeforeRounding + rounding
-  const changeAmount = receiveAmount - totalAmount
+  
+  // Calculate payable amount and change amount
+  const payableAmount = Math.max(0, totalAmount - receiveAmount) // Remaining amount to be paid
+  const changeAmount = Math.max(0, receiveAmount - totalAmount) // Change to be given back
 
   const [showDefaultModal, setShowDefaultModal] = useState(false)
 
@@ -210,7 +223,7 @@ const POS = () => {
 
   return (
     <>
-      <DefaultModaal show={showDefaultModal} onClose={() => setShowDefaultModal(false)} />
+      <DefaultModaal show={showOrderTypeModal} onClose={() => dispatch(hideOrderTypeModal())} />
 
       <Row className="g-3">
         <Col lg={4}>
@@ -263,11 +276,24 @@ const POS = () => {
                 </Col>
               </Row>
               <Row className="g-3" style={{ height: 'auto', overflowY: 'auto' }}>
-                {menus.map((menu: any, index: number) => {
+                {!selectedPriceType && (
+                  <Col xs={12} className="text-center py-4">
+                    <p className="text-muted">Please select an order type to view menus</p>
+                    <Button variant="primary" onClick={() => dispatch(showOrderTypeModalAction())}>
+                      Select Order Type
+                    </Button>
+                  </Col>
+                )}
+                
+                {selectedPriceType && menus.map((menu: any, index: number) => {
                   const menuId = menu._id || menu.id
                   const imageUrl = menu.image || fallbackImages[index % fallbackImages.length]
-                  // Use restaurant price as default, fallback to online price, then membership price
-                  const price = menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+                  // Use price based on selected price type
+                  const price = selectedPriceType === 'restaurant' ? menu.restaurantPrice :
+                                selectedPriceType === 'online' ? menu.onlinePrice :
+                                selectedPriceType === 'membership' ? menu.membershipPrice :
+                                menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+                  
                   return (
                     <Col xs={4} key={menuId}>
                       <div
@@ -287,6 +313,9 @@ const POS = () => {
                         </div>
                         <div className="text-success fw-bold" style={{ fontSize: '10px' }}>
                           AED {price}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: '8px' }}>
+                          {selectedOrderType?.toUpperCase()} - {selectedPriceType?.toUpperCase()}
                         </div>
                       </div>
                     </Col>
@@ -476,10 +505,20 @@ const POS = () => {
                 {/* Right Side */}
                 <Col md={6}>
                   <Form.Group className="mb-3">
+                    <Form.Label>Payable Amount (AED)</Form.Label>
+                    <Form.Control 
+                      type="text" 
+                      value={`AED ${payableAmount.toFixed(2)}`} 
+                      disabled 
+                    />
+                    <Form.Text className="text-muted">Remaining amount to be paid</Form.Text>
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
                     <Form.Label>Change Amount (AED)</Form.Label>
                     <Form.Control 
                       type="text" 
-                      value={`AED ${changeAmount > 0 ? changeAmount.toFixed(2) : '0.00'}`} 
+                      value={`AED ${changeAmount.toFixed(2)}`} 
                       disabled 
                     />
                     <Form.Text className="text-muted">Change to return (auto-calculated)</Form.Text>
@@ -519,7 +558,7 @@ const POS = () => {
 
               <div className="d-flex justify-content-between bg-light p-3 border">
                 <h5>Payable Amount:</h5>
-                <h5 className="text-primary fw-bold">AED {totalAmount.toFixed(2)}</h5>
+                <h5 className="text-primary fw-bold">AED {payableAmount.toFixed(2)}</h5>
               </div>
             </CardBody>
 
