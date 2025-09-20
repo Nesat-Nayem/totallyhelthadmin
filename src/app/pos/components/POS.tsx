@@ -53,6 +53,10 @@ const POS = () => {
   const [selectedAggregator, setSelectedAggregator] = useState('')
   const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash')
   const [receiveAmount, setReceiveAmount] = useState(0)
+  const [payments, setPayments] = useState<Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>>([])
+  const [showAddPayment, setShowAddPayment] = useState(false)
+  const [newPaymentType, setNewPaymentType] = useState<'Cash' | 'Card' | 'Gateway'>('Cash')
+  const [newPaymentAmount, setNewPaymentAmount] = useState<string>('')
   const [deliveryCharge, setDeliveryCharge] = useState(0)
   const [rounding, setRounding] = useState(0)
   const [notes, setNotes] = useState('')
@@ -140,6 +144,27 @@ const POS = () => {
     })
   }
 
+  // Payment split handlers
+  const handleAddPayment = () => {
+    const amt = parseFloat(newPaymentAmount)
+    if (isNaN(amt) || amt <= 0) return
+    setPayments((prev) => [...prev, { type: newPaymentType, amount: amt }])
+    setNewPaymentAmount('')
+    setShowAddPayment(false)
+  }
+
+  const handleRemovePayment = (index: number) => {
+    setPayments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // If there are split payments, keep receiveAmount in sync as the sum
+  useEffect(() => {
+    if (payments.length > 0) {
+      const total = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+      setReceiveAmount(total)
+    }
+  }, [payments])
+
   // Calculate totals
   const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
   const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
@@ -219,6 +244,10 @@ const POS = () => {
     setReceiveAmount(0)
     setSelectedAggregator('')
     setSelectedPaymentMode('Cash')
+    setPayments([])
+    setShowAddPayment(false)
+    setNewPaymentType('Cash')
+    setNewPaymentAmount('')
   }
 
   return (
@@ -444,14 +473,67 @@ const POS = () => {
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label>Receive Amount (AED)</Form.Label>
-                    <Form.Control 
-                      type="number" 
-                      placeholder="Enter received amount" 
-                      value={receiveAmount} 
-                      onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
-                      min={0} 
-                    />
+                    <InputGroup>
+                      <Form.Control 
+                        type="number" 
+                        placeholder="Enter received amount" 
+                        value={receiveAmount} 
+                        onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
+                        min={0} 
+                        disabled={payments.length > 0}
+                      />
+                      <Button variant="outline-primary" onClick={() => setShowAddPayment((v) => !v)} title="Add split payment">
+                        <IconifyIcon icon="mdi:plus" />
+                      </Button>
+                    </InputGroup>
                     <Form.Text className="text-muted">Amount received from customer</Form.Text>
+
+                    {showAddPayment && (
+                      <Row className="mt-2 g-2 align-items-end">
+                        <Col xs={6} md={6}>
+                          <Form.Label className="mb-1">Payment Type</Form.Label>
+                          <Form.Select 
+                            value={newPaymentType}
+                            onChange={(e) => setNewPaymentType(e.target.value as 'Cash' | 'Card' | 'Gateway')}
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="Card">Card</option>
+                            <option value="Gateway">Gateway</option>
+                          </Form.Select>
+                        </Col>
+                        <Col xs={6} md={4}>
+                          <Form.Label className="mb-1">Amount (AED)</Form.Label>
+                          <Form.Control 
+                            type="number" 
+                            placeholder="0.00" 
+                            value={newPaymentAmount}
+                            onChange={(e) => setNewPaymentAmount(e.target.value)}
+                            min={0}
+                          />
+                        </Col>
+                        <Col xs={12} md={2}>
+                          <Button variant="success" onClick={handleAddPayment} className="w-100">
+                            Add
+                          </Button>
+                        </Col>
+                      </Row>
+                    )}
+
+                    {payments.length > 0 && (
+                      <>
+                        <div className="mt-2">
+                          {payments.map((p, idx) => (
+                            <Badge bg="secondary" key={idx} className="me-2 mb-2">
+                              {p.type}: AED {p.amount.toFixed(2)}{' '}
+                              <Button size="sm" variant="light" onClick={() => handleRemovePayment(idx)}>
+                                <IconifyIcon icon="mdi:close" />
+                              </Button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="small text-muted mt-1">Total received from splits: AED {receiveAmount.toFixed(2)}</div>
+                      </>
+                    )}
                   </Form.Group>
 
                   <Form.Group className="mb-3">
