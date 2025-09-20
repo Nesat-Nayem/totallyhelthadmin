@@ -43,12 +43,22 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
-    getOrders: build.query<{ data: Order[]; meta: any; summary: any }, { q?: string; page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; salesType?: string } | void>({
+    getOrders: build.query<{ data: Order[]; meta: any; summary: any }, { q?: string; page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; salesType?: string; customerId?: string } | void>({
       query: (params) => ({ url: '/orders', method: 'GET', params: params ?? {} }),
       providesTags: [{ type: 'Order', id: 'LIST' }],
+    }),
+    holdMembership: build.mutation<Order, string>({
+      query: (orderId) => ({ url: `/orders/${orderId}/membership/hold`, method: 'POST' }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }],
+    }),
+    unholdMembership: build.mutation<Order, string>({
+      query: (orderId) => ({ url: `/orders/${orderId}/membership/unhold`, method: 'POST' }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
   }),
   overrideExisting: true,
 })
 
-export const { useCreateOrderMutation, useGetOrdersQuery } = orderApi
+export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation } = orderApi

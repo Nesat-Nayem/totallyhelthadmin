@@ -1,8 +1,8 @@
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Button,
   Card,
@@ -10,18 +10,63 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import PunchModal from './PunchModal'
+import { useGetCustomersQuery } from '@/services/customerApi'
+import { useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation } from '@/services/orderApi'
 
-const CustomerDataList = async () => {
-  const customerData = await getAllOrders()
+const formatDate = (d?: string | Date) => {
+  if (!d) return '-'
+  try {
+    return new Date(d).toLocaleDateString()
+  } catch {
+    return '-'
+  }
+}
+
+const CustomerDataList = () => {
+  const [query, setQuery] = useState('')
+  const { data: customersRes, isLoading: isCustomersLoading } = useGetCustomersQuery({ limit: 500 }) as any
+  const { data: membershipOrdersRes, isLoading: isOrdersLoading, error } = useGetOrdersQuery({ limit: 1000, salesType: 'membership' }) as any
+  const [holdMembership, { isLoading: isHolding }] = useHoldMembershipMutation()
+  const [unholdMembership, { isLoading: isUnholding }] = useUnholdMembershipMutation()
+
+  const customers = useMemo(() => customersRes?.data ?? [], [customersRes])
+  const membershipOrders = useMemo(() => membershipOrdersRes?.data ?? [], [membershipOrdersRes])
+
+  // Build a map of latest relevant membership order per customer
+  const membershipByCustomer: Record<string, any> = useMemo(() => {
+    const map: Record<string, any> = {}
+    const today = new Date()
+    for (const ord of membershipOrders) {
+      const cid = ord.customer?.id
+      if (!cid) continue
+      // consider only orders with remaining pending meals or endDate in future
+      const pending = Number(ord?.membershipStats?.pendingMeals || 0)
+      const end = ord.endDate ? new Date(ord.endDate) : undefined
+      const active = end ? end >= today : true
+      if (pending > 0 && active) {
+        const prev = map[cid]
+        // pick the latest by startDate or createdAt
+        const prevTime = prev ? new Date(prev.startDate || prev.createdAt || 0).getTime() : -1
+        const curTime = new Date(ord.startDate || ord.createdAt || 0).getTime()
+        if (!prev || curTime >= prevTime) {
+          map[cid] = ord
+        }
+      }
+    }
+    return map
+  }, [membershipOrders])
+
+  const filteredCustomers = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return customers
+    return customers.filter((c: any) =>
+      [c.name, c.email, c.phone].some((f: any) => String(f || '').toLowerCase().includes(q))
+    )
+  }, [customers, query])
 
   return (
     <>
@@ -35,8 +80,8 @@ const CustomerDataList = async () => {
 
               {/* Search Input */}
               <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search..." />
-                <Button variant="outline-secondary">
+                <FormControl placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} />
+                <Button variant="outline-secondary" onClick={() => { /* no-op; live filter */ }}>
                   <IconifyIcon icon="mdi:magnify" />
                 </Button>
               </InputGroup>
@@ -69,34 +114,70 @@ const CustomerDataList = async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
-                        </div>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj Jamdade</td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj@gmail.com</td>
-                      <td style={{ textWrap: 'nowrap' }}>+91 9876543210</td>
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>01 Dec 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>8</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Active</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <div className="d-flex gap-2">
-                          <PunchModal />
-                          <Link href="/customer/customer-edit" className="btn btn-soft-primary btn-sm">
-                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                          </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {(isCustomersLoading || isOrdersLoading) && (
+                      <tr>
+                        <td colSpan={9} className="text-center py-4">Loading...</td>
+                      </tr>
+                    )}
+                    {!isCustomersLoading && !isOrdersLoading && filteredCustomers.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="text-center py-4">No customers found</td>
+                      </tr>
+                    )}
+                    {!isCustomersLoading && !isOrdersLoading && filteredCustomers.map((c: any) => {
+                      const m = membershipByCustomer[c._id]
+                      const hasMembership = !!m
+                      const pendingMeals = hasMembership ? Number(m.membershipStats?.pendingMeals || 0) : 0
+                      const isOnHold = hasMembership ? !!m.membershipStats?.isOnHold : false
+                      const start = hasMembership ? formatDate(m.startDate) : '-'
+                      const end = hasMembership ? formatDate(m.endDate) : '-'
+                      const canToggle = hasMembership
+                      const toggleBtn = !canToggle ? null : (
+                        isOnHold ? (
+                          <Button size="sm" variant="success" disabled={isUnholding} onClick={() => unholdMembership(m._id)}>
+                            <IconifyIcon icon="mdi:play" /> Punch
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="danger" disabled={isHolding} onClick={() => holdMembership(m._id)}>
+                            <IconifyIcon icon="mdi:pause" /> Hold
+                          </Button>
+                        )
+                      )
+                      return (
+                        <tr key={c._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" id={`cust_${c._id}`} />
+                              <label className="form-check-label" htmlFor={`cust_${c._id}`} />
+                            </div>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{c.name || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{c.email || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{c.phone || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{start}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{end}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{hasMembership ? pendingMeals : '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            {hasMembership ? (
+                              <span className={`badge ${isOnHold ? 'bg-danger' : 'bg-success'}`}>{isOnHold ? 'On Hold' : 'Active'}</span>
+                            ) : (
+                              <span className="badge bg-secondary">No Plan</span>
+                            )}
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            <div className="d-flex gap-2">
+                              {toggleBtn}
+                              <Link href="/customer/customer-edit" className="btn btn-soft-primary btn-sm">
+                                <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                              </Link>
+                              <Link href="" className="btn btn-soft-danger btn-sm">
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
