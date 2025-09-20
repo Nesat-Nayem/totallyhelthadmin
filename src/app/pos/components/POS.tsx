@@ -168,8 +168,14 @@ const POS = () => {
   // Calculate totals
   const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
   const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
-  const vatAmount = ((subTotal + moreOptionsTotal) * 5) / 100
-  const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - (discount?.amount || 0)
+  const vatPercent = 5
+  const vatAmount = ((subTotal + moreOptionsTotal) * vatPercent) / 100
+  const discountAmountApplied = discount
+    ? (discount.type?.toLowerCase?.() === 'percent'
+        ? ((subTotal + moreOptionsTotal) * (discount.amount || 0)) / 100
+        : (discount.amount || 0))
+    : 0
+  const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - discountAmountApplied
   const totalAmount = totalBeforeRounding + rounding
   
   // Calculate payable amount and change amount
@@ -190,7 +196,12 @@ const POS = () => {
       }
       
       const orderData = {
-        customer: customer._id,  // Send just the ID string
+        // customer object
+        customer: {
+          id: customer._id || customer.id,
+          name: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
+          phone: customer.phone || customer.mobile || '',
+        },
         items: Object.values(selectedProducts).map((p: any) => ({
           productId: p._id || p.id,
           title: p.title || p.name,
@@ -205,15 +216,24 @@ const POS = () => {
         date: startDate,  // Required field
         subTotal,
         total: totalAmount,  // Required field
+        vatPercent,
         vatAmount,
-        discountAmount: discount?.amount || 0,
+        discountType: discount ? (discount.type?.toLowerCase?.() === 'percent' ? 'percent' : 'flat') : undefined,
+        discountAmount: discountAmountApplied,
         shippingCharge: deliveryCharge,
+        rounding,
+        payableAmount,
+        receiveAmount,
+        changeAmount,
+        dueAmount: payableAmount,
+        note: notes,  // Field is 'note' not 'notes'
         paymentMode: selectedPaymentMode,
+        payments: payments,
+        salesType: selectedPriceType === 'membership' ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined,
         aggregatorId: selectedAggregator || undefined,
         startDate,
         endDate,
-        note: notes,  // Field is 'note' not 'notes'
-        status: 'paid' as 'paid' | 'unpaid'  // Ensure correct type
+        status: (receiveAmount >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
       }
       
       const result = await createOrder(orderData).unwrap()
@@ -228,6 +248,7 @@ const POS = () => {
       setRounding(0)
       setNotes('')
       setReceiveAmount(0)
+      setPayments([])
     } catch (error: any) {
       alert(error?.data?.message || 'Failed to create order')
     }
@@ -608,6 +629,16 @@ const POS = () => {
                   <Form.Group className="mb-3">
                     <Form.Label>VAT (5%)</Form.Label>
                     <Form.Control type="text" value={`AED ${vatAmount.toFixed(2)}`} disabled />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label>Discount</Form.Label>
+                    <Form.Control type="text" value={`AED ${discountAmountApplied.toFixed(2)}`} disabled />
+                    {discount && (
+                      <Form.Text className="text-muted">
+                        Type: {discount.type} {discount.reason ? `| Reason: ${discount.reason}` : ''}
+                      </Form.Text>
+                    )}
                   </Form.Group>
 
                   <Form.Group className="mb-3">

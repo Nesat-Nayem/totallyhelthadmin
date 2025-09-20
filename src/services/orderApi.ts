@@ -19,6 +19,8 @@ export type OrderCreateDto = {
   aggregatorId?: string
   paymentMethodId?: string
   status?: 'paid' | 'unpaid'
+  salesType?: 'restaurant' | 'online' | 'membership'
+  payments?: Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>
   vatPercent?: number
   vatAmount?: number
   discountType?: 'flat' | 'percent'
@@ -41,7 +43,7 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
-    getOrders: build.query<{ data: Order[]; meta: any; summary: any }, { q?: string; page?: number; limit?: number; status?: string; startDate?: string; endDate?: string } | void>({
+    getOrders: build.query<{ data: Order[]; meta: any; summary: any }, { q?: string; page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; salesType?: string } | void>({
       query: (params) => ({ url: '/orders', method: 'GET', params: params ?? {} }),
       providesTags: [{ type: 'Order', id: 'LIST' }],
     }),

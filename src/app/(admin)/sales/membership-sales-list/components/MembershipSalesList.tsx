@@ -1,7 +1,7 @@
 'use client'
 
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
+import { useGetOrdersQuery } from '@/services/orderApi'
 import Image from 'next/image'
 import Link from 'next/link'
 import React, { useState } from 'react'
@@ -22,6 +22,8 @@ import {
 
 const MembershipSalesList = () => {
   const [punchedIn, setPunchedIn] = useState(false)
+  const { data, isLoading, error } = useGetOrdersQuery({ limit: 50, salesType: 'membership' })
+  const orders = data?.data ?? []
 
   const handleToggle = () => {
     setPunchedIn(!punchedIn)
@@ -130,47 +132,71 @@ const MembershipSalesList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>1</td>
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>S001</td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj Jamdade</td>
-                      <td style={{ textWrap: 'nowrap' }}>Diabetic Meal Plan</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 200</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 20</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Paid</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>UPI</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <button
-                            type="button"
-                            className={`btn btn-sm ${punchedIn ? 'bg-success text-white' : 'bg-danger text-white'}`}
-                            onClick={handleToggle}>
-                            <IconifyIcon icon={punchedIn ? 'solar:logout-2-broken' : 'solar:login-2-broken'} />
-                          </button>
-                          <Link href="/sales/invoice" className="btn btn-light btn-sm">
-                            <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-18" />
-                          </Link>
-                          <Link href="/sales/pos" className="btn btn-soft-primary btn-sm">
-                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                          </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {isLoading && (
+                      <tr>
+                        <td colSpan={11} className="text-center py-4">Loading...</td>
+                      </tr>
+                    )}
+                    {error && !isLoading && (
+                      <tr>
+                        <td colSpan={11} className="text-center text-danger py-4">Failed to load orders</td>
+                      </tr>
+                    )}
+                    {!isLoading && !error && orders.length === 0 && (
+                      <tr>
+                        <td colSpan={11} className="text-center py-4">No orders found</td>
+                      </tr>
+                    )}
+                    {!isLoading && !error && orders.map((order, idx) => {
+                      const paymentText = (order.payments && order.payments.length > 0)
+                        ? order.payments.map(p => `${p.type} AED ${p.amount.toFixed(2)}`).join(', ')
+                        : order.paymentMode || '-'
+                      const selectedPlans = Array.isArray(order.items) && order.items.length > 0
+                        ? order.items.map((i) => i.title).join(', ')
+                        : '-'
+                      return (
+                        <tr key={order._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" id={`ord_${order._id}`} />
+                              <label className="form-check-label" htmlFor={`ord_${order._id}`}>
+                                &nbsp;
+                              </label>
+                            </div>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{idx + 1}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{order.date ? new Date(order.date as any).toLocaleDateString() : '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{order.invoiceNo || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{order.customer?.name || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{selectedPlans}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {Number(order.total || 0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {Number(order.discountAmount || 0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            <span className={`badge ${order.status === 'paid' ? 'bg-success' : 'bg-danger'}`}>{order.status === 'paid' ? 'Paid' : 'UnPaid'}</span>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{paymentText}</td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${punchedIn ? 'bg-success text-white' : 'bg-danger text-white'}`}
+                                onClick={handleToggle}>
+                                <IconifyIcon icon={punchedIn ? 'solar:logout-2-broken' : 'solar:login-2-broken'} />
+                              </button>
+                              <Link href="/sales/invoice" className="btn btn-light btn-sm">
+                                <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-18" />
+                              </Link>
+                              <Link href="/sales/pos" className="btn btn-soft-primary btn-sm">
+                                <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                              </Link>
+                              <Link href="" className="btn btn-soft-danger btn-sm">
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
