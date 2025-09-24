@@ -1,6 +1,6 @@
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import {
@@ -10,17 +10,31 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { useGetOrdersQuery } from '@/services/orderApi'
+
+function fmt(d?: string | Date) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleDateString() } catch { return '-' }
+}
 
 const VatReport = () => {
+  const [q, setQ] = React.useState('')
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
+  const { data } = useGetOrdersQuery({ q: q || undefined, startDate: startDate || undefined, endDate: endDate || undefined, limit: 500 })
+  const orders = React.useMemo(() => data?.data ?? [], [data])
+  const totalVat = React.useMemo(() => orders.reduce((s: number, o: any) => s + (Number(o.vatAmount)||0), 0), [orders])
+  const monthVat = React.useMemo(() => {
+    const now = new Date()
+    return orders.filter((o: any) => {
+      const d = new Date(o.date)
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    }).reduce((s: number, o: any) => s + (Number(o.vatAmount)||0), 0)
+  }, [orders])
   return (
     <>
       <Row>
@@ -31,9 +45,9 @@ const VatReport = () => {
                 <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-24" />
               </div>
               <div>
-                <h5>Total Income</h5>
+                <h5>Total VAT</h5>
                 <h5>
-                  <span className="text-success">AED 2000</span>
+                  <span className="text-success">AED {totalVat.toFixed(2)}</span>
                 </h5>
               </div>
             </div>
@@ -46,9 +60,9 @@ const VatReport = () => {
                 <IconifyIcon icon="solar:file-text-broken" className="align-middle fs-24" />
               </div>
               <div>
-                <h5>This Month Income</h5>
+                <h5>This Month VAT</h5>
                 <h5>
-                  <span className="text-success">AED 2000</span>
+                  <span className="text-success">AED {monthVat.toFixed(2)}</span>
                 </h5>
               </div>
             </div>
@@ -60,33 +74,28 @@ const VatReport = () => {
           <Card>
             <CardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <CardTitle as="h4" className="mb-0 flex-grow-1">
-                All VAT Report List
+                VAT Report
               </CardTitle>
 
               {/* Search Input */}
               <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search..." />
+                <FormControl placeholder="Search invoice or customer..." value={q} onChange={(e) => setQ(e.target.value)} />
                 <Button variant="outline-secondary">
                   <IconifyIcon icon="mdi:magnify" />
                 </Button>
               </InputGroup>
 
               {/* Month Filter Dropdown */}
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
-                <option value="all">Select Month</option>
-                <option value="january">January</option>
-                <option value="february">February</option>
-                <option value="march">March</option>
-                <option value="april">April</option>
-                <option value="may">May</option>
-                <option value="june">June</option>
-                <option value="july">July</option>
-                <option value="august">August</option>
-                <option value="september">September</option>
-                <option value="october">October</option>
-                <option value="november">November</option>
-                <option value="december">December</option>
-              </select>
+              <div className="d-flex align-items-end gap-2">
+                <div>
+                  <label className="form-label">From</label>
+                  <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="form-label">To</label>
+                  <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+              </div>
             </CardHeader>
 
             <div>
@@ -110,33 +119,31 @@ const VatReport = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>Inv#001</td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj jamdade</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">18%</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 200</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 200</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any) => (
+                      <tr key={o._id}>
+                        <td>
+                          <div className="form-check">
+                            <input type="checkbox" className="form-check-input" id={`ord_${o._id}`} />
+                            <label className="form-check-label" htmlFor={`ord_${o._id}`}></label>
+                          </div>
+                        </td>
+                        <td style={{ textWrap: 'nowrap' }}>{fmt(o.date)}</td>
+                        <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo || '-'}</td>
+                        <td style={{ textWrap: 'nowrap' }}>{o.customer?.name || '-'}</td>
+                        <td style={{ textWrap: 'nowrap' }}>
+                          <span className="badge bg-success">{typeof o.vatPercent === 'number' ? `${o.vatPercent}%` : '-'}</span>
+                        </td>
+                        <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.vatAmount)||0).toFixed(2)}</td>
+                        <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.total)||0).toFixed(2)}</td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <Link href="" className="btn btn-soft-danger btn-sm">
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

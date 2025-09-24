@@ -1,7 +1,6 @@
-import TextFormInput from '@/components/form/TextFormInput'
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import {
@@ -11,17 +10,32 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { useGetOrdersQuery } from '@/services/orderApi'
+import { useGetBranchesQuery } from '@/services/branchApi'
+
+function fmt(d?: string | Date) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleDateString() } catch { return '-' }
+}
 
 const SalesList = () => {
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
+  const [branchId, setBranchId] = React.useState<string>('')
+  const { data: ordersRes } = useGetOrdersQuery({ startDate: startDate || undefined, endDate: endDate || undefined, branchId: branchId || undefined, limit: 500 })
+  const orders = ordersRes?.data ?? []
+  const { data: branches = [] } = useGetBranchesQuery()
+  const branchMap = React.useMemo(() => Object.fromEntries(branches.map((b: any) => [b._id, b])), [branches])
+
+  const sumPayments = (o: any, type: 'Cash' | 'Card' | 'Gateway') => {
+    const payments = Array.isArray(o.payments) ? o.payments : []
+    return payments.filter((p: any) => (p.type || '').toLowerCase() === type.toLowerCase()).reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0)
+  }
+
   return (
     <>
       <Row>
@@ -32,34 +46,21 @@ const SalesList = () => {
                 Branch Wise Sales Report
               </CardTitle>
 
-              {/* Search Input */}
-              {/* <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search..." />
-                <Button variant="outline-secondary">
-                  <IconifyIcon icon="mdi:magnify" />
-                </Button>
-              </InputGroup> */}
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  From
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">From</label>
+                <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  To
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">To</label>
+                <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
 
               {/* Month Filter Dropdown */}
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
-                <option value="all">Select Branch</option>
-                <option value="dubai">Dubai</option>
-                <option value="sharjah">Sharjah</option>
-                <option value="abudhabi">Abudhabi</option>
-                <option value="ajman">Ajman</option>
-                <option value="umm-al-quwain">Umm al Quwain</option>
+              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                <option value="">All Branches</option>
+                {branches.map((b: any) => (
+                  <option key={b._id} value={b._id}>{b.name}</option>
+                ))}
               </select>
               {/* Month Filter Dropdown */}
               <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
@@ -92,35 +93,38 @@ const SalesList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Dubai</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>99.74</td>
-                      <td style={{ textWrap: 'nowrap' }}>955.09</td>
-
-                      <td style={{ textWrap: 'nowrap' }}>4,235.40</td>
-                      <td style={{ textWrap: 'nowrap' }}>0.00</td>
-                      <td style={{ textWrap: 'nowrap' }}>5,290.23</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any) => {
+                      const cashAmt = sumPayments(o, 'Cash')
+                      const cardAmt = sumPayments(o, 'Card')
+                      const onlineAmt = (o.salesType === 'online') ? (Number(o.total)||0) : 0
+                      const branch = branchMap[o.branchId]
+                      const tawseelAmt = (String(o.aggregatorId) && (branch?.name || '').toLowerCase() && false) ? 0 : 0 // placeholder if Tawseel aggregator exists
+                      return (
+                        <tr key={o._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" />
+                            </div>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{fmt(o.date)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            <span className="badge bg-success">{branch?.name || o.branchId || '-'}</span>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {cashAmt.toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {cardAmt.toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {onlineAmt.toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {tawseelAmt.toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.total)||0).toFixed(2)}</td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <Link href="" className="btn btn-soft-danger btn-sm">
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

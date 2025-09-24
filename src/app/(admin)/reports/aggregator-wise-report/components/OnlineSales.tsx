@@ -1,6 +1,6 @@
-import TextFormInput from '@/components/form/TextFormInput'
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
@@ -11,80 +11,50 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { useGetOrdersQuery } from '@/services/orderApi'
+import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 
-import banner1 from '@/assets/images/onlinesales/1.png'
-import banner2 from '@/assets/images/onlinesales/2.png'
-import banner3 from '@/assets/images/onlinesales/3.png'
-import banner4 from '@/assets/images/onlinesales/4.jpg'
-import banner5 from '@/assets/images/onlinesales/5.png'
-import banner6 from '@/assets/images/onlinesales/6.png'
+function fmt(d?: string | Date) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleDateString() } catch { return '-' }
+}
 
 const OnlineSales = () => {
-  const data = [
-    {
-      id: 1,
-      banner: banner1,
-      title: 'zomato',
-      status: 'Active',
-    },
-    {
-      id: 2,
-      banner: banner2,
-      title: 'Talabat',
-      status: 'Active',
-    },
-    {
-      id: 3,
-      banner: banner3,
-      title: 'Deliveroo',
-      status: 'Active',
-    },
-    {
-      id: 4,
-      banner: banner4,
-      title: 'Uber Eats',
-      status: 'Active',
-    },
-    {
-      id: 5,
-      banner: banner5,
-      title: 'Swiggy',
-      status: 'Active',
-    },
-    {
-      id: 6,
-      banner: banner6,
-      title: 'Foodpanda',
-      status: 'Active',
-    },
-  ]
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
+  const { data: ordersRes } = useGetOrdersQuery({ salesType: 'online', startDate: startDate || undefined, endDate: endDate || undefined, limit: 500 })
+  const orders = React.useMemo(() => ordersRes?.data ?? [], [ordersRes])
+  const { data: aggregators = [] } = useGetAggregatorsQuery()
+
+  const aggrMap = React.useMemo(() => Object.fromEntries(aggregators.map((a: any) => [a._id, a])), [aggregators])
+  const totalsByAgg: Record<string, number> = React.useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const o of orders) {
+      const id = o.aggregatorId || 'unknown'
+      map[id] = (map[id] || 0) + (Number(o.total) || 0)
+    }
+    return map
+  }, [orders])
 
   return (
     <>
       <Row>
-        {data.map((item) => (
-          <Col xs={12} md={4} lg={4} xl={4} key={item.id}>
+        {(aggregators?.length ? aggregators : [{ _id: 'unknown', name: 'Unknown' } as any]).map((item: any) => (
+          <Col xs={12} md={4} lg={4} xl={4} key={item._id}>
             <Card className="text-center p-2">
-              <div style={{ width: '100px', height: '50px', margin: '0 auto' }}>
-                <Image
-                  src={item.banner}
-                  alt=""
-                  width={50}
-                  height={50}
-                  className="img-fluid rounded"
-                  style={{ objectFit: 'contain', width: '100%', height: '100%' }}
-                />
+              {!!item.logo && (
+                <div style={{ width: '100px', height: '50px', margin: '0 auto' }}>
+                  <Image src={item.logo} alt={item.name} width={100} height={50} className="img-fluid rounded" style={{ objectFit: 'contain', width: '100%', height: '100%' }} />
+                </div>
+              )}
+              <div className="mt-2">
+                <h6 className="mb-0">{item.name}</h6>
               </div>
-              <h5 className="text-info mt-2">AED 300</h5>
+              <h5 className="text-info mt-2">AED {(totalsByAgg[item._id] || 0).toFixed(2)}</h5>
             </Card>
           </Col>
         ))}
@@ -99,16 +69,12 @@ const OnlineSales = () => {
               </CardTitle>
 
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  From
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">From</label>
+                <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  To
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">To</label>
+                <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
 
               {/* Month Filter Dropdown */}
@@ -146,44 +112,45 @@ const OnlineSales = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>#001</td>
-                      <td style={{ textWrap: 'nowrap' }}>30 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj jamdade</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-danger">Zomato</span>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Biryani</span>
-                        <span className="badge bg-success">Chicken</span>
-                        <span className="badge bg-success">Tandoor Chiken</span>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>Cash</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 500</td>
-                      <td style={{ textWrap: 'nowrap' }}>0%</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 0</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 0</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 500</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any) => {
+                      const items = Array.isArray(o.items) ? o.items.slice(0, 3) : []
+                      const ag = aggrMap[o.aggregatorId] || { name: 'Unknown' }
+                      const payments = Array.isArray(o.payments) ? o.payments : []
+                      const payText = payments.length ? payments.map((p: any) => `${p.type} AED ${(Number(p.amount)||0).toFixed(2)}`).join(', ') : (o.paymentMode || '-')
+                      return (
+                        <tr key={o._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" />
+                            </div>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{fmt(o.date)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.customer?.name || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            <span className="badge bg-danger">{ag.name}</span>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            {items.map((it: any, idx: number) => (
+                              <span key={idx} className="badge bg-success me-1">{it.title}</span>
+                            ))}
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{payText}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.subTotal)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.vatAmount)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.discountAmount)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.shippingCharge)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.total)||0).toFixed(2)}</td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <Link href="" className="btn btn-soft-danger btn-sm">
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

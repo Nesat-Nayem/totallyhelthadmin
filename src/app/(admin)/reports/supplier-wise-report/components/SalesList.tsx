@@ -1,7 +1,6 @@
-import TextFormInput from '@/components/form/TextFormInput'
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import {
@@ -11,17 +10,15 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import Alert from 'react-bootstrap/Alert'
 
 const SalesList = () => {
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
   return (
     <>
       <Row>
@@ -32,24 +29,27 @@ const SalesList = () => {
                 Supplier Wise Report
               </CardTitle>
 
-              {/* Search Input */}
-              {/* <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search..." />
-                <Button variant="outline-secondary">
-                  <IconifyIcon icon="mdi:magnify" />
-                </Button>
-              </InputGroup> */}
+              <div className="d-flex align-items-end gap-2">
+                <div>
+                  <label className="form-label">From</label>
+                  <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="form-label">To</label>
+                  <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+              </div>
               <div className="mb-3">
                 <label htmlFor="" className="form-label">
                   From
                 </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" disabled />
               </div>
               <div className="mb-3">
                 <label htmlFor="" className="form-label">
                   To
                 </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" disabled />
               </div>
 
               {/* Month Filter Dropdown */}
@@ -62,57 +62,21 @@ const SalesList = () => {
             </CardHeader>
 
             <div>
-              <div className="table-responsive">
-                <table className="table align-middle mb-0 table-hover table-centered table-bordered">
-                  <thead className="bg-light-subtle">
-                    <tr>
-                      <th style={{ width: 20 }}>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck1" />
-                          <label className="form-check-label" htmlFor="customCheck1" />
-                        </div>
-                      </th>
-                      <th style={{ textWrap: 'nowrap' }}>Supplier Name</th>
-                      <th style={{ textWrap: 'nowrap' }}>Purchase No.</th>
-                      <th style={{ textWrap: 'nowrap' }}>Purchase Date</th>
-                      <th style={{ textWrap: 'nowrap' }}>Bill No</th>
-                      <th style={{ textWrap: 'nowrap' }}>Total Amount</th>
-                      <th style={{ textWrap: 'nowrap' }}>VAT Amount</th>
-                      <th style={{ textWrap: 'nowrap' }}>Grand Total</th>
-                      <th style={{ textWrap: 'nowrap' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>COCA COLA/AL AHLIA</td>
-                      <td style={{ textWrap: 'nowrap' }}>LPI07396</td>
-                      <td style={{ textWrap: 'nowrap' }}>Tuesday, April 15, 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>1216100356</td>
-
-                      <td style={{ textWrap: 'nowrap' }}>551.86 </td>
-                      <td style={{ textWrap: 'nowrap' }}>27.59 </td>
-                      <td style={{ textWrap: 'nowrap' }}>579.45 </td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <Alert variant="warning" className="m-3">
+                <div className="d-flex align-items-center gap-2">
+                  <IconifyIcon icon="mdi:alert" className="fs-20" />
+                  <div>
+                    <strong>Supplier-wise Report</strong> requires a Purchase/Supplier backend (purchases, GRN, suppliers, etc.).
+                    We couldn&apos;t find a purchase module in the current project. Once available, we will:
+                    <ul className="mb-0">
+                      <li>Fetch purchases grouped by supplier and date range</li>
+                      <li>Show totals per supplier (subtotal, VAT, grand total)</li>
+                      <li>Support CSV/PDF exports</li>
+                    </ul>
+                    For now, please manage suppliers in <Link href="/staff/supplier-list">Supplier List</Link>.
+                  </div>
+                </div>
+              </Alert>
             </div>
             <CardFooter className="border-top">
               <nav aria-label="Page navigation example">

@@ -1,9 +1,6 @@
-'use client'
+"use client"
 
-import TextFormInput from '@/components/form/TextFormInput'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React, { useState } from 'react'
 import {
@@ -21,28 +18,18 @@ import {
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { useGetOrdersQuery } from '@/services/orderApi'
+
+function fmt(d?: string | Date) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleDateString() } catch { return '-' }
+}
 
 const CancelSalesList = () => {
-  const [showModal, setShowModal] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
-
-  const handleCancelClick = () => {
-    setShowModal(true)
-  }
-
-  const handleConfirmCancel = () => {
-    if (!cancelReason) {
-      alert('Please enter a reason for cancellation.')
-      return
-    }
-    // 🔥 Call API here with cancelReason
-    console.log('Order cancelled. Reason:', cancelReason)
-
-    // reset + close modal
-    setCancelReason('')
-    setShowModal(false)
-  }
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+  const { data } = useGetOrdersQuery({ canceled: true, startDate: startDate || undefined, endDate: endDate || undefined, limit: 500 })
+  const orders = data?.data ?? []
 
   return (
     <>
@@ -55,16 +42,12 @@ const CancelSalesList = () => {
               </CardTitle>
 
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  From
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">From</label>
+                <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  To
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">To</label>
+                <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
 
               {/* Month Filter Dropdown */}
@@ -101,80 +84,53 @@ const CancelSalesList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-                      <td>#001</td>
-                      <td style={{ textWrap: 'nowrap' }}>30 Aug 2025</td>
-                      <td>Suraj jamdade</td>
-                      <td>
-                        <span className="badge bg-danger">Zomato</span>
-                      </td>
-
-                      <td>
-                        <span className="badge bg-success">Biryani</span> <span className="badge bg-success">Chicken</span>{' '}
-                        <span className="badge bg-success">Tandoor Chicken</span>
-                      </td>
-                      <td>
-                        <span className="badge bg-success">Delivery</span>
-                      </td>
-                      <td>Cash</td>
-
-                      <td>AED 0</td>
-                      <td>AED 500</td>
-                      <td>mistake order</td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <button className="btn btn-soft-info btn-sm" onClick={() => setShowModal(true)}>
-                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                          </button>
-                          <button onClick={handleCancelClick} className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any) => {
+                      const items = Array.isArray(o.items) ? o.items.slice(0, 3) : []
+                      const payments = Array.isArray(o.payments) ? o.payments : []
+                      const payText = payments.length ? payments.map((p: any) => `${p.type} AED ${(Number(p.amount)||0).toFixed(2)}`).join(', ') : (o.paymentMode || '-')
+                      return (
+                        <tr key={o._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" id={`ord_${o._id}`} />
+                              <label className="form-check-label" htmlFor={`ord_${o._id}`}></label>
+                            </div>
+                          </td>
+                          <td>{o.invoiceNo || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{fmt(o.date)}</td>
+                          <td>{o.customer?.name || '-'}</td>
+                          <td>
+                            <span className="badge bg-danger">{o.aggregatorId || '-'}</span>
+                          </td>
+                          <td>
+                            {items.map((it: any, idx: number) => (
+                              <span key={idx} className="badge bg-success me-1">{it.title}</span>
+                            ))}
+                          </td>
+                          <td>
+                            <span className="badge bg-success">{o.orderType || '-'}</span>
+                          </td>
+                          <td>{payText}</td>
+                          <td>AED {(Number(o.shippingCharge)||0).toFixed(2)}</td>
+                          <td>AED {(Number(o.total)||0).toFixed(2)}</td>
+                          <td>{o.cancelReason || '-'}</td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <button className="btn btn-soft-info btn-sm" disabled>
+                                <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                              </button>
+                              <button className="btn btn-soft-danger btn-sm" disabled>
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
-              {/* Cancel Modal */}
-              {showModal && (
-                <div className="modal fade show d-block" tabIndex={-1}>
-                  <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content">
-                      <div className="modal-header">
-                        <h5 className="modal-title">Cancel Order</h5>
-                        <button type="button" className="btn-close" onClick={() => setShowModal(false)}></button>
-                      </div>
-                      <div className="modal-body">
-                        <p>Please provide a reason for cancelling this order:</p>
-                        <textarea
-                          className="form-control"
-                          rows={3}
-                          value={cancelReason}
-                          onChange={(e) => setCancelReason(e.target.value)}
-                          placeholder="Enter reason here..."
-                        />
-                      </div>
-                      <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                          Close
-                        </button>
-                        <button type="button" className="btn btn-danger" onClick={handleConfirmCancel}>
-                          Confirm Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
             <CardFooter className="border-top">
               <nav aria-label="Page navigation example">

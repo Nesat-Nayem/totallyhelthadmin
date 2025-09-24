@@ -14,6 +14,7 @@ export type OrderCreateDto = {
   startDate?: string
   endDate?: string
   paymentMode?: string
+  orderType?: 'DineIn' | 'TakeAway' | 'Delivery'
   branchId?: string
   brand?: string
   aggregatorId?: string
@@ -43,7 +44,7 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
-    getOrders: build.query<{ data: Order[]; meta: any; summary: any }, { q?: string; page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; salesType?: string; customerId?: string } | void>({
+    getOrders: build.query<{ data: Order[]; meta: any; summary: any }, { q?: string; page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; salesType?: string; customerId?: string; aggregatorId?: string; branchId?: string; orderType?: string; canceled?: boolean } | void>({
       query: (params) => ({ url: '/orders', method: 'GET', params: params ?? {} }),
       providesTags: [{ type: 'Order', id: 'LIST' }],
     }),
@@ -57,8 +58,13 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
+    cancelOrder: build.mutation<Order, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({ url: `/orders/${id}/cancel`, method: 'POST', body: { reason } }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }],
+    }),
   }),
   overrideExisting: true,
 })
 
-export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation } = orderApi
+export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation } = orderApi

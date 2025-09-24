@@ -1,7 +1,6 @@
-import TextFormInput from '@/components/form/TextFormInput'
+"use client"
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import {
@@ -11,36 +10,54 @@ import {
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { Form } from 'react-hook-form'
+import { useGetOrdersQuery } from '@/services/orderApi'
+
+function fmt(d?: string | Date) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleDateString() } catch { return '-' }
+}
 
 const RestaurantSalesList = () => {
+  const [startDate, setStartDate] = React.useState<string>('')
+  const [endDate, setEndDate] = React.useState<string>('')
+  const [q, setQ] = React.useState('')
+  const { data } = useGetOrdersQuery({ q: q || undefined, salesType: 'restaurant', startDate: startDate || undefined, endDate: endDate || undefined, limit: 200 })
+  const orders = data?.data ?? []
+
+  const sumByType = (type: string) => orders.filter((o: any) => (o.orderType || '') === type).reduce((s: number, o: any) => s + (Number(o.total) || 0), 0)
+  const totalDineIn = sumByType('DineIn')
+  const totalTakeAway = sumByType('TakeAway')
+  const totalDelivery = sumByType('Delivery')
+
+  const paymentText = (o: any) => {
+    const payments = Array.isArray(o.payments) ? o.payments : []
+    if (payments.length > 0) return payments.map((p: any) => `${p.type} AED ${(Number(p.amount)||0).toFixed(2)}`).join(', ')
+    return o.paymentMode || '-'
+  }
+
   return (
     <>
       <Row>
         <Col xs={12} md={4} lg={4} xl={4}>
           <Card className="text-center p-2">
             <h4>Total DineIn</h4>
-            <h5 className="text-info">300</h5>
+            <h5 className="text-info">AED {totalDineIn.toFixed(2)}</h5>
           </Card>
         </Col>
         <Col xs={12} md={4} lg={4} xl={4}>
           <Card className="text-center p-2">
             <h4>Total Takeway</h4>
-            <h5 className="text-info">300</h5>
+            <h5 className="text-info">AED {totalTakeAway.toFixed(2)}</h5>
           </Card>
         </Col>
         <Col xs={12} md={4} lg={4} xl={4}>
           <Card className="text-center p-2">
             <h4>Total Delivery</h4>
-            <h5 className="text-info">300</h5>
+            <h5 className="text-info">AED {totalDelivery.toFixed(2)}</h5>
           </Card>
         </Col>
       </Row>
@@ -54,16 +71,12 @@ const RestaurantSalesList = () => {
               </CardTitle>
 
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  From
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">From</label>
+                <input type="date" className="form-control" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div className="mb-3">
-                <label htmlFor="" className="form-label">
-                  To
-                </label>
-                <input type="date" name="stock" placeholder="Enter Stock" className="form-control" />
+                <label className="form-label">To</label>
+                <input type="date" className="form-control" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
 
               {/* Month Filter Dropdown */}
@@ -89,8 +102,6 @@ const RestaurantSalesList = () => {
                       <th style={{ textWrap: 'nowrap' }}>Invoice No.</th>
                       <th style={{ textWrap: 'nowrap' }}>Order Date</th>
                       <th style={{ textWrap: 'nowrap' }}>Customer Name</th>
-                      <th style={{ textWrap: 'nowrap' }}>Email</th>
-                      <th style={{ textWrap: 'nowrap' }}>Phone</th>
                       <th style={{ textWrap: 'nowrap' }}>Order Items</th>
                       <th style={{ textWrap: 'nowrap' }}>Order Type</th>
                       <th style={{ textWrap: 'nowrap' }}>Payment Mode</th>
@@ -103,45 +114,43 @@ const RestaurantSalesList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2">
-                            &nbsp;
-                          </label>
-                        </div>
-                      </td>
-
-                      <td style={{ textWrap: 'nowrap' }}>#001</td>
-                      <td style={{ textWrap: 'nowrap' }}>30 Aug 2025</td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj jamdade</td>
-                      <td style={{ textWrap: 'nowrap' }}>Suraj@gmail.com</td>
-                      <td style={{ textWrap: 'nowrap' }}>+91 9090909090</td>
-
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Biryani</span>
-                        <span className="badge bg-success">Chicken</span>
-                        <span className="badge bg-success">Tandoor Chiken</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Delivery</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>Cash</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 500</td>
-                      <td style={{ textWrap: 'nowrap' }}>0%</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 0</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 0</td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 500</td>
-
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                    {orders.map((o: any) => {
+                      const items = Array.isArray(o.items) ? o.items.slice(0, 3) : []
+                      return (
+                        <tr key={o._id}>
+                          <td>
+                            <div className="form-check">
+                              <input type="checkbox" className="form-check-input" id={`ord_${o._id}`} />
+                              <label className="form-check-label" htmlFor={`ord_${o._id}`}></label>
+                            </div>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{fmt(o.date)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>{o.customer?.name || '-'}</td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            {items.map((it: any, idx: number) => (
+                              <span key={idx} className="badge bg-success me-1">{it.title}</span>
+                            ))}
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>
+                            <span className="badge bg-primary">{o.orderType || '-'}</span>
+                          </td>
+                          <td style={{ textWrap: 'nowrap' }}>{paymentText(o)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.subTotal)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.vatAmount)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.discountAmount)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.shippingCharge)||0).toFixed(2)}</td>
+                          <td style={{ textWrap: 'nowrap' }}>AED {(Number(o.total)||0).toFixed(2)}</td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <Link href="" className="btn btn-soft-danger btn-sm">
+                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

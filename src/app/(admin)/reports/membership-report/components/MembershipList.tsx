@@ -17,7 +17,7 @@ const MembershipList = () => {
   const [page, setPage] = React.useState(1)
   const limit = 20
 
-  const { data: resp } = useGetOrdersQuery({ q: q || undefined, page, limit, startDate: startDate || undefined, endDate: endDate || undefined })
+  const { data: resp } = useGetOrdersQuery({ q: q || undefined, page, limit, startDate: startDate || undefined, endDate: endDate || undefined, salesType: 'membership' })
   const orders = resp?.data ?? []
   const meta = resp?.meta
 
@@ -74,10 +74,11 @@ const MembershipList = () => {
                   </thead>
                   <tbody>
                     {orders.map((o: any) => {
-                      const isCash = (o.paymentMode || '').toLowerCase() === 'cash'
-                      const isCard = (o.paymentMode || '').toLowerCase() === 'card'
-                      const cashAmt = isCash ? o.total : 0
-                      const cardAmt = isCard ? o.total : 0
+                      // compute payment splits
+                      const payments = Array.isArray(o.payments) ? o.payments : []
+                      const sumBy = (type: string) => payments.filter((p: any) => (p.type || '').toLowerCase() === type.toLowerCase()).reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0)
+                      const cashAmt = payments.length > 0 ? sumBy('Cash') : ((o.paymentMode || '').toLowerCase() === 'cash' ? Number(o.total) || 0 : 0)
+                      const cardAmt = payments.length > 0 ? sumBy('Card') : ((o.paymentMode || '').toLowerCase() === 'card' ? Number(o.total) || 0 : 0)
                       const mealTitles = Array.isArray(o.items) ? o.items.map((it: any) => it.title).slice(0, 3) : []
                       return (
                         <tr key={o._id}>

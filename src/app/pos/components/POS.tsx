@@ -230,7 +230,9 @@ const POS = () => {
         paymentMode: selectedPaymentMode,
         payments: payments,
         salesType: selectedPriceType === 'membership' ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined,
+        orderType: selectedOrderType || undefined,
         aggregatorId: selectedAggregator || undefined,
+        brand: selectedBrand || undefined,
         startDate,
         endDate,
         status: (receiveAmount >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
