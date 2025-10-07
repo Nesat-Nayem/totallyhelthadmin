@@ -74,7 +74,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('dine-in', 'restaurant')}
+                onClick={() => handleOrderTypeSelect('DineIn', 'restaurant')}
                 disabled={isLoading}
               >
                 <FaUtensils /> Dine-In
@@ -84,7 +84,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('takeaway', 'restaurant')}
+                onClick={() => handleOrderTypeSelect('TakeAway', 'restaurant')}
                 disabled={isLoading}
               >
                 <FaShoppingBag /> Takeaway
@@ -94,7 +94,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('delivery', 'restaurant')}
+                onClick={() => handleOrderTypeSelect('Delivery', 'restaurant')}
                 disabled={isLoading}
               >
                 <FaTruck /> Delivery

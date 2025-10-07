@@ -97,9 +97,8 @@ const MoreOptions: React.FC = () => {
                         <label className="form-check-label" htmlFor="customCheck1" />
                       </div>
                     </th>
-                    <th>Item Name</th>
+                    <th>Name</th>
                     <th>Category</th>
-                    <th>Price</th>
                     <th>Status</th>
                     <th>Action</th>
                   </tr>
@@ -107,7 +106,7 @@ const MoreOptions: React.FC = () => {
                 <tbody>
                   {(isLoading || isFetching) && (
                     <tr>
-                      <td colSpan={6} className="text-center py-4">
+                      <td colSpan={5} className="text-center py-4">
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                         Loading more options...
                       </td>
@@ -115,7 +114,7 @@ const MoreOptions: React.FC = () => {
                   )}
                   {!isLoading && !isFetching && (!filteredOptions || filteredOptions.length === 0) && (
                     <tr>
-                      <td colSpan={6} className="text-center py-4 text-muted">
+                      <td colSpan={5} className="text-center py-4 text-muted">
                         {selectedCategory === 'all' ? 'No more options found' : `No ${selectedCategory} options found`}
                       </td>
                     </tr>
@@ -130,7 +129,9 @@ const MoreOptions: React.FC = () => {
                           </div>
                         </td>
 
-                        <td>{item.name}</td>
+                        <td>
+                          <div className="fw-medium">{item.name}</div>
+                        </td>
                         <td>
                           <span className={`badge ${
                             item.category === 'more' ? 'badge-soft-success' :
@@ -144,7 +145,6 @@ const MoreOptions: React.FC = () => {
                              'General'}
                           </span>
                         </td>
-                        <td>AED {item.price.toFixed(2)}</td>
 
                         <td>
                           <span className={item.status === 'active' ? 'badge badge-soft-success' : 'badge badge-soft-danger'}>

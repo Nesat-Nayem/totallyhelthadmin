@@ -1,8 +1,9 @@
 'use client'
 import LogoBox from '@/components/LogoBox'
+import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import React from 'react'
-import { Modal, Button, Table } from 'react-bootstrap'
-import { FaUtensils, FaSignOutAlt, FaReceipt } from 'react-icons/fa'
+import { Modal, Button, Table, Badge } from 'react-bootstrap'
+import { useGetBranchByIdQuery } from '@/services/branchApi'
 
 interface ReportData {
   date: string
@@ -33,260 +34,522 @@ interface ReportData {
 interface ReportModalProps {
   show: boolean
   onClose: () => void
-  data?: ReportData
+  data?: any
+}
+
+function fmtDate(d?: string | Date | null) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleDateString() } catch { return '-' }
+}
+function fmtTime(d?: string | Date | null) {
+  if (!d) return '-'
+  try { return new Date(d).toLocaleTimeString() } catch { return '-' }
 }
 
 const ReportModal: React.FC<ReportModalProps> = ({ show, onClose, data }) => {
-  const report = data || {
-    date: '10 sept 2025',
-    time: '11:51 pm',
-    cashier: 'CASH',
-    logInDate: '10-Sep-2025',
-    logInTime: '10:00 AM',
-    logOutDate: '10-Sep-2025',
-    logOutTime: '07:00 PM',
-    totalInvoice: 2885.43,
-    totalDiscount: 462.2,
-    netSales: 2423.23,
-    vat: 121.2,
-    grandTotal: 2544.43,
-    sales: {
-      restaurant: 2544.43,
-      membershipMeal: 2457.87,
-      membershipRegister: 1099.0,
-    },
-    collections: {
-      cash: 1006.96,
-      card: 799.38,
-      online: 738.13,
-      total: 2544.47,
-    },
+  // Fetch branch details if branchId is available
+  const { data: branchData, isLoading: isLoadingBranch } = useGetBranchByIdQuery(
+    data?.branchId || '', 
+    { skip: !data?.branchId }
+  )
+
+  // Professional status badge function
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'day-close':
+        return (
+          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-3" 
+               style={{ 
+                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                 boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                 border: '1px solid rgba(16, 185, 129, 0.2)'
+               }}>
+            <IconifyIcon icon="solar:check-circle-bold-duotone" className="fs-5 text-white" />
+            <span className="fw-semibold text-white">Shift Closed</span>
+          </div>
+        )
+      case 'closed':
+        return (
+          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-3" 
+               style={{ 
+                 background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                 boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)',
+                 border: '1px solid rgba(59, 130, 246, 0.2)'
+               }}>
+            <IconifyIcon icon="solar:shield-check-bold-duotone" className="fs-5 text-white" />
+            <span className="fw-semibold text-white">Shift Closed</span>
+          </div>
+        )
+      case 'open':
+        return (
+          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-3" 
+               style={{ 
+                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                 boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)',
+                 border: '1px solid rgba(245, 158, 11, 0.2)'
+               }}>
+            <IconifyIcon icon="solar:clock-circle-bold-duotone" className="fs-5 text-white" />
+            <span className="fw-semibold text-white">Shift Open</span>
+          </div>
+        )
+      default:
+        return (
+          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-3" 
+               style={{ 
+                 background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                 boxShadow: '0 2px 8px rgba(107, 114, 128, 0.25)',
+                 border: '1px solid rgba(107, 114, 128, 0.2)'
+               }}>
+            <IconifyIcon icon="solar:question-circle-bold-duotone" className="fs-5 text-white" />
+            <span className="fw-semibold text-white">Unknown</span>
+          </div>
+        )
+    }
+  }
+
+  // Map data directly from the database structure
+  const reportData = React.useMemo(() => {
+    if (!data) return null
+    
+    // Direct mapping from database fields
+    return {
+      _id: data._id,
+      shiftNumber: data.shiftNumber,
+      status: data.status,
+      startDate: data.startDate,
+      startTime: data.startTime,
+      endDate: data.endDate,
+      endTime: data.endTime,
+      loginName: data.loginName,
+      logoutTime: data.logoutTime,
+      branchId: data.branchId,
+      createdBy: data.createdBy,
+      closedBy: data.closedBy,
+      note: data.note,
+      denominations: data.denominations || {},
+      sales: data.sales || {},
+      totalCash: data.totalCash || 0,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
+    }
+  }, [data])
+
+  if (!reportData) {
+    return (
+      <Modal show={show} onHide={onClose} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Shift Close Report</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>No report data available.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </Modal.Footer>
+      </Modal>
+    )
   }
 
   return (
-    <Modal show={show} onHide={onClose} size="lg" centered>
+    <Modal 
+      show={show} 
+      onHide={onClose} 
+      size="xl" 
+      centered 
+      backdrop="static"
+      keyboard={false}
+      className="shift-close-report-modal"
+    >
       {/* Header */}
-      <Modal.Header className="bg-dark text-white py-2">
-        <Modal.Title>
-          <FaReceipt className="me-2" />
-          10 Sept 2025 Report
+      <Modal.Header className="bg-primary text-white py-3 border-0">
+        <Modal.Title className="d-flex align-items-center">
+          <IconifyIcon icon="solar:document-text-bold-duotone" className="me-2 fs-5" />
+          Shift Close Report
         </Modal.Title>
+        <Button 
+          variant="link" 
+          className="text-white p-0 ms-auto" 
+          onClick={onClose}
+          style={{ fontSize: '1.5rem', textDecoration: 'none' }}
+        >
+          <IconifyIcon icon="solar:close-circle-bold-duotone" />
+        </Button>
       </Modal.Header>
 
       {/* Body */}
-      <Modal.Body>
-        <div className="report-container text-center">
+      <Modal.Body className="p-4">
+        <div className="report-container text-center mb-4">
           <LogoBox />
-          <p className="mb-3">Sharjah</p>
         </div>
 
-        {/* Info Table */}
-        <Table bordered size="sm">
-          <tbody>
-            <tr>
-              <td>
-                <strong>Date</strong>
-              </td>
-              <td>{report.date}</td>
-              <td>
-                <strong>Time</strong>
-              </td>
-              <td>{report.time}</td>
-            </tr>
-            <tr>
-              <td colSpan={4} className="text-center">
-                Shift Report
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Cashier</strong>
-              </td>
-              <td colSpan={3}>{report.cashier}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Log In Date</strong>
-              </td>
-              <td>{report.logInDate}</td>
-              <td>
-                <strong>Log In Time</strong>
-              </td>
-              <td>{report.logInTime}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Log Out Date</strong>
-              </td>
-              <td>{report.logOutDate}</td>
-              <td>
-                <strong>Log Out Time</strong>
-              </td>
-              <td>{report.logOutTime}</td>
-            </tr>
-          </tbody>
-        </Table>
+        {/* Day Summary Overview */}
+        <div className="mb-4">
+          <div className="row text-center">
+            <div className="col-md-3">
+              <div className="card border-0 bg-primary bg-opacity-10">
+                <div className="card-body py-3">
+                  <IconifyIcon icon="solar:clock-circle-bold-duotone" className="fs-2 text-primary mb-2" />
+                  <h6 className="text-primary mb-1">Shift #{reportData.shiftNumber}</h6>
+                  <small className="text-muted">Current Shift</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card border-0 bg-success bg-opacity-10">
+                <div className="card-body py-3">
+                  <IconifyIcon icon="solar:wallet-money-bold-duotone" className="fs-2 text-success mb-2" />
+                  <h6 className="text-success mb-1">₹{reportData.denominations?.totalCash?.toFixed(2) || '0.00'}</h6>
+                  <small className="text-muted">Total Cash</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card border-0 bg-info bg-opacity-10">
+                <div className="card-body py-3">
+                  <IconifyIcon icon="solar:shopping-cart-bold-duotone" className="fs-2 text-info mb-2" />
+                  <h6 className="text-info mb-1">{reportData.sales?.totalOrders || 0}</h6>
+                  <small className="text-muted">Total Orders</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card border-0 bg-warning bg-opacity-10">
+                <div className="card-body py-3">
+                  <IconifyIcon icon="solar:chart-2-bold-duotone" className="fs-2 text-warning mb-2" />
+                  <h6 className="text-warning mb-1">₹{reportData.sales?.totalSales?.toFixed(2) || '0.00'}</h6>
+                  <small className="text-muted">Total Sales</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {/* Totals Table */}
-        <Table bordered size="sm">
-          <tbody>
-            <tr>
-              <td>
-                <strong>Total Invoice Amount</strong>
-              </td>
-              <td>{report.totalInvoice.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Total Discount Amount</strong>
-              </td>
-              <td>{report.totalDiscount.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Net Sales Amount</strong>
-              </td>
-              <td>{report.netSales.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>5% VAT Amount</strong>
-              </td>
-              <td>{report.vat.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Grand Total</strong>
-              </td>
-              <td>
-                <strong>{report.grandTotal.toFixed(2)}</strong>
-              </td>
-            </tr>
-          </tbody>
-        </Table>
+        {/* Basic Info Table */}
+        <div className="mb-4">
+          <h6 className="text-primary mb-3">
+            <IconifyIcon icon="solar:info-circle-bold-duotone" className="me-2" />
+            Shift Information
+          </h6>
+          <Table bordered size="sm" className="table-hover">
+            <tbody>
+              <tr>
+                <td className="bg-light fw-semibold" style={{ width: '25%' }}>Shift Number</td>
+                <td style={{ width: '25%' }}>{reportData.shiftNumber}</td>
+                <td className="bg-light fw-semibold" style={{ width: '25%' }}>Status</td>
+                <td style={{ width: '25%' }}>{getStatusBadge(reportData.status)}</td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">Start Date</td>
+                <td>{reportData.startDate}</td>
+                <td className="bg-light fw-semibold">Start Time</td>
+                <td>{fmtTime(reportData.startTime)}</td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">End Date</td>
+                <td>{reportData.endDate || '-'}</td>
+                <td className="bg-light fw-semibold">End Time</td>
+                <td>{fmtTime(reportData.endTime) || '-'}</td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">Login Name</td>
+                <td>{reportData.loginName}</td>
+                <td className="bg-light fw-semibold">Logout Time</td>
+                <td>{fmtTime(reportData.logoutTime) || '-'}</td>
+              </tr>
+              {reportData.note && (
+                <tr>
+                  <td className="bg-light fw-semibold">Note</td>
+                  <td colSpan={3}>{reportData.note}</td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </div>
 
-        {/* Sales Details */}
-        <h6>Sales Details</h6>
-        <Table bordered size="sm">
-          <tbody>
-            <tr>
-              <td>Restaurant Sales</td>
-              <td>{report.sales.restaurant.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Membership Meal</td>
-              <td>{report.sales.membershipMeal.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Membership Register</td>
-              <td>{report.sales.membershipRegister.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </Table>
 
-        {/* Collection Details */}
-        <h6>Collection Details</h6>
-        <Table bordered size="sm">
-          <tbody>
-            <tr>
-              <td>Cash Sales Amt</td>
-              <td>{report.collections.cash.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Credit Card Amt</td>
-              <td>{report.collections.card.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Online Sales Amt</td>
-              <td>{report.collections.online.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Total Collection</strong>
-              </td>
-              <td>
-                <strong>{report.collections.total.toFixed(2)}</strong>
-              </td>
-            </tr>
-          </tbody>
-        </Table>
+        {/* Cash Summary */}
+        <div className="mb-4">
+          <h6 className="text-success mb-3">
+            <IconifyIcon icon="solar:wallet-money-bold-duotone" className="me-2" />
+            Cash Summary
+          </h6>
+          <div className="alert alert-success d-flex align-items-center justify-content-between">
+            <span className="fw-semibold">
+              <IconifyIcon icon="solar:wallet-money-bold-duotone" className="me-2" />
+              Total Cash
+            </span>
+            <span className="fs-5 fw-bold">
+              {reportData.denominations?.totalCash?.toFixed(2) || '0.00'} AED
+            </span>
+          </div>
+        </div>
 
-        {/* denomination Details */}
-        <h6>Denomination Details</h6>
-        <Table bordered size="sm">
-          <tbody>
-            <tr>
-              <td>1000 Dirham </td>
-              <td>*</td>
-              <td>1</td>
-              <td>=</td>
-              <td>1000</td>
-            </tr>
-            <tr>
-              <td>500 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>200 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>100 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>50 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>20 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>10 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>5 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td>1 Dirham </td>
-              <td>*</td>
-              <td></td>
-              <td>=</td>
-              <td></td>
-            </tr>
-          </tbody>
-        </Table>
+        {/* Denomination Details */}
+        <div className="mb-4">
+          <h6 className="text-info mb-3">
+            <IconifyIcon icon="solar:calculator-bold-duotone" className="me-2" />
+            Denomination Breakdown
+          </h6>
+          <Table bordered size="sm" className="table-hover">
+            <thead className="bg-light">
+              <tr>
+                <th>Denomination</th>
+                <th>Quantity</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="fw-semibold">1000 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination1000 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination1000 || 0) * 1000).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">500 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination500 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination500 || 0) * 500).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">200 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination200 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination200 || 0) * 200).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">100 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination100 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination100 || 0) * 100).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">50 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination50 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination50 || 0) * 50).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">20 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination20 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination20 || 0) * 20).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">10 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination10 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination10 || 0) * 10).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">5 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination5 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination5 || 0) * 5).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">2 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination2 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination2 || 0) * 2).toFixed(2)} AED</td>
+              </tr>
+              <tr>
+                <td className="fw-semibold">1 Dirham</td>
+                <td className="text-center">{reportData.denominations.denomination1 || 0}</td>
+                <td className="text-end">{((reportData.denominations.denomination1 || 0) * 1).toFixed(2)} AED</td>
+              </tr>
+              <tr className="table-success">
+                <td className="fw-bold">Total Cash</td>
+                <td></td>
+                <td className="text-end fw-bold">{reportData.denominations?.totalCash?.toFixed(2) || '0.00'} AED</td>
+              </tr>
+            </tbody>
+          </Table>
+        </div>
+
+        {/* Sales Information */}
+        {reportData.sales && Object.keys(reportData.sales).length > 0 && (
+          <div className="mb-4">
+            <h6 className="text-success mb-3">
+              <IconifyIcon icon="solar:chart-2-bold-duotone" className="me-2" />
+              Sales Information
+            </h6>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="card border-0 bg-light">
+                  <div className="card-body">
+                    <h6 className="card-title text-primary">
+                      <IconifyIcon icon="solar:shopping-cart-bold-duotone" className="me-2" />
+                      Order Summary
+                    </h6>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span>Total Orders:</span>
+                      <strong className="text-primary">{reportData.sales.totalOrders || 0}</strong>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span>Total Sales:</span>
+                      <strong className="text-success">₹{reportData.sales.totalSales?.toFixed(2) || '0.00'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="card border-0 bg-light">
+                  <div className="card-body">
+                    <h6 className="card-title text-info">
+                      <IconifyIcon icon="solar:wallet-money-bold-duotone" className="me-2" />
+                      Payment Methods
+                    </h6>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span>Cash:</span>
+                      <strong className="text-success">₹{reportData.sales.payments?.cash?.toFixed(2) || '0.00'}</strong>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span>Card:</span>
+                      <strong className="text-primary">₹{reportData.sales.payments?.card?.toFixed(2) || '0.00'}</strong>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span>Online:</span>
+                      <strong className="text-info">₹{reportData.sales.payments?.online?.toFixed(2) || '0.00'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Shift Duration Information */}
+        <div className="mb-4">
+          <h6 className="text-warning mb-3">
+            <IconifyIcon icon="solar:clock-circle-bold-duotone" className="me-2" />
+            Shift Duration
+          </h6>
+          <div className="row">
+            <div className="col-md-6">
+              <div className="card border-0 bg-warning bg-opacity-10">
+                <div className="card-body">
+                  <h6 className="card-title text-warning">
+                    <IconifyIcon icon="solar:play-circle-bold-duotone" className="me-2" />
+                    Shift Start
+                  </h6>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>Date:</span>
+                    <strong>{reportData.startDate}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between">
+                    <span>Time:</span>
+                    <strong>{fmtTime(reportData.startTime)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="card border-0 bg-success bg-opacity-10">
+                <div className="card-body">
+                  <h6 className="card-title text-success">
+                    <IconifyIcon icon="solar:stop-circle-bold-duotone" className="me-2" />
+                    Shift End
+                  </h6>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>Date:</span>
+                    <strong>{reportData.endDate || 'Still Open'}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between">
+                    <span>Time:</span>
+                    <strong>{fmtTime(reportData.endTime) || 'Still Open'}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* User Information */}
+        <div className="mb-4">
+          <h6 className="text-info mb-3">
+            <IconifyIcon icon="solar:user-bold-duotone" className="me-2" />
+            User Information
+          </h6>
+          <Table bordered size="sm" className="table-hover">
+            <tbody>
+              <tr>
+                <td className="bg-light fw-semibold" style={{ width: '30%' }}>Login Name</td>
+                <td style={{ width: '70%' }}>{reportData.loginName || '-'}</td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">Created By</td>
+                <td>
+                  {data?.createdByDetails ? (
+                    <div>
+                      <div className="fw-medium">{data.createdByDetails.name || 'Unknown'}</div>
+                      <small className="text-muted">{data.createdByDetails.email || 'No email'}</small>
+                    </div>
+                  ) : (
+                    reportData.createdBy || '-'
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">Closed By</td>
+                <td>
+                  {data?.closedByDetails ? (
+                    <div>
+                      <div className="fw-medium">{data.closedByDetails.name || 'Unknown'}</div>
+                      <small className="text-muted">{data.closedByDetails.email || 'No email'}</small>
+                    </div>
+                  ) : (
+                    reportData.closedBy || '-'
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">Branch</td>
+                <td>
+                  {isLoadingBranch ? (
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="spinner-border spinner-border-sm" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <span className="text-muted">Loading branch...</span>
+                    </div>
+                  ) : branchData ? (
+                    <div className="fw-medium">{branchData.name}</div>
+                  ) : (
+                    <span className="text-muted">Unknown Branch</span>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </Table>
+        </div>
+
+        {/* System Information */}
+        <div className="mb-4">
+          <h6 className="text-secondary mb-3">
+            <IconifyIcon icon="solar:settings-bold-duotone" className="me-2" />
+            System Information
+          </h6>
+          <Table bordered size="sm" className="table-hover">
+            <tbody>
+              <tr>
+                <td className="bg-light fw-semibold">Created At</td>
+                <td>{fmtTime(reportData.createdAt)}</td>
+              </tr>
+              <tr>
+                <td className="bg-light fw-semibold">Updated At</td>
+                <td>{fmtTime(reportData.updatedAt)}</td>
+              </tr>
+              {reportData.note && (
+                <tr>
+                  <td className="bg-light fw-semibold">Note</td>
+                  <td>{reportData.note}</td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </div>
       </Modal.Body>
 
-      {/* Footer */}
-      <Modal.Footer className="justify-content-between">
-        <Button className="btn btn-danger" onClick={onClose}>
-          <FaSignOutAlt /> Close
-        </Button>
+      {/* Footer - Clean and minimal */}
+      <Modal.Footer className="bg-light border-0 py-3">
+        <div className="d-flex justify-content-end w-100">
+          <Button variant="outline-secondary" onClick={onClose} size="sm">
+            <IconifyIcon icon="solar:close-circle-bold-duotone" className="me-1" />
+            Close
+          </Button>
+        </div>
       </Modal.Footer>
 
       {/* Styles */}
@@ -298,10 +561,68 @@ const ReportModal: React.FC<ReportModalProps> = ({ show, onClose, data }) => {
         h6 {
           margin-top: 15px;
           font-weight: 600;
+          border-bottom: 2px solid #e9ecef;
+          padding-bottom: 8px;
         }
         table {
           font-size: 13px;
+          margin-bottom: 0;
         }
+        .table th {
+          background-color: #f8f9fa;
+          border-top: none;
+          font-weight: 600;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .table td {
+          vertical-align: middle;
+          border-color: #dee2e6;
+        }
+        .alert {
+          border: none;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .modal-content {
+          border: none;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+          border-radius: 12px 12px 0 0;
+        }
+        .modal-footer {
+          border-radius: 0 0 12px 12px;
+        }
+        .shift-close-report-modal .modal-dialog {
+          max-width: 1200px;
+          margin: 1.75rem auto;
+        }
+        .shift-close-report-modal .modal-content {
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+        .shift-close-report-modal .modal-body {
+          max-height: calc(90vh - 120px);
+          overflow-y: auto;
+        }
+        .card {
+          transition: all 0.3s ease;
+        }
+        .card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .bg-opacity-10 {
+          background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+        }
+        .text-primary { color: #0d6efd !important; }
+        .text-success { color: #198754 !important; }
+        .text-info { color: #0dcaf0 !important; }
+        .text-warning { color: #ffc107 !important; }
+        .text-secondary { color: #6c757d !important; }
       `}</style>
     </Modal>
   )

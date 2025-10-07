@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
-export type OrderType = 'dine-in' | 'takeaway' | 'delivery' | 'online' | 'membership'
+// export type OrderType = 'dine-in' | 'takeaway' | 'delivery' | 'online' | 'membership'
+export type OrderType = 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'membership'
+
 export type PriceType = 'restaurant' | 'online' | 'membership'
 
 interface PosState {

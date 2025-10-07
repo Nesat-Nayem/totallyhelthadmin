@@ -14,7 +14,7 @@ export type OrderCreateDto = {
   startDate?: string
   endDate?: string
   paymentMode?: string
-  orderType?: 'DineIn' | 'TakeAway' | 'Delivery'
+  orderType?: 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'membership'
   branchId?: string
   brand?: string
   aggregatorId?: string

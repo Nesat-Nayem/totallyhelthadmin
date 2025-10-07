@@ -15,7 +15,6 @@ import { toast } from 'react-toastify'
 /** FORM DATA TYPE **/
 type FormData = {
   name: string
-  price: number | string
   category: 'more' | 'less' | 'without' | 'general'
   status: 'active' | 'inactive'
 }
@@ -27,12 +26,7 @@ type ControlType = {
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  name: yup.string().required('Please enter name'),
-  price: yup
-    .number()
-    .typeError('Please enter a valid price')
-    .min(0, 'Price must be non-negative')
-    .required('Please enter price'),
+  name: yup.string().required('Name is required').min(2, 'Name must be at least 2 characters').max(50, 'Name must not exceed 50 characters'),
   category: yup.mixed<'more' | 'less' | 'without' | 'general'>().oneOf(['more', 'less', 'without', 'general']).required('Please select a category'),
   status: yup.mixed<'active' | 'inactive'>().oneOf(['active', 'inactive']).required('Please select a status'),
 })
@@ -46,15 +40,27 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
       </CardHeader>
       <CardBody>
         <Row>
+
+          {/* NAME FIELD */}
           <Col lg={6}>
-            <div className="mb-3">
-              <TextFormInput control={control} type="text" name="name" label="Item Name" />
-            </div>
-          </Col>
-          <Col lg={6}>
-            <div className="mb-3">
-              <TextFormInput control={control} type="number" name="price" label="Item Price" />
-            </div>
+            <label className="form-label">Name</label>
+            <Controller
+              control={control}
+              name="name"
+              rules={{ required: 'Name is required' }}
+              render={({ field, fieldState }) => (
+                <>
+                  <input
+                    type="text"
+                    className={`form-control ${fieldState.error ? 'is-invalid' : ''}`}
+                    placeholder="Enter option name"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                  {fieldState.error && <small className="text-danger">{fieldState.error.message}</small>}
+                </>
+              )}
+            />
           </Col>
 
           {/* CATEGORY FIELD */}
@@ -135,7 +141,7 @@ const MoreOptionsEdit: React.FC = () => {
   
   const { reset, handleSubmit, control } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active', name: '', price: '', category: 'general' },
+    defaultValues: { name: '', status: 'active', category: 'general' },
   })
   
   const { data: moreOption, isLoading: loadingOption } = useGetMoreOptionByIdQuery(id, { skip: !id })
@@ -144,8 +150,7 @@ const MoreOptionsEdit: React.FC = () => {
   useEffect(() => {
     if (moreOption) {
       reset({
-        name: moreOption.name,
-        price: moreOption.price,
+        name: moreOption.name || '',
         category: moreOption.category || 'general',
         status: moreOption.status || 'active',
       })
@@ -156,7 +161,6 @@ const MoreOptionsEdit: React.FC = () => {
     try {
       const payload = {
         name: data.name,
-        price: typeof data.price === 'string' ? Number(data.price) : data.price,
         category: data.category,
         status: data.status,
       }

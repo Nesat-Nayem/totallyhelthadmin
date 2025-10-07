@@ -8,6 +8,7 @@ import Link from 'next/link'
 import CustomerModal from './CustomerModal'
 import Calculator from './Calculator'
 import PrintOrder from './PrintOrder'
+import ReportModal from '@/app/(admin)/reports/day-close-report/components/ReportModal'
 import ViewOrder from './ViewOrders'
 
 // Product images
@@ -28,6 +29,7 @@ import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
 import { useCreateOrderMutation } from '@/services/orderApi'
+import { useGetOpenDayCloseQuery, useStartDayCloseMutation, useCloseDayCloseMutation } from '@/services/dayCloseApi'
 import { useCreateCustomerMutation } from '@/services/customerApi'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
@@ -71,6 +73,12 @@ const POS = () => {
   const { data: aggregatorsData } = useGetAggregatorsQuery()
   const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
   const [createOrder] = useCreateOrderMutation()
+  const { data: openDayRes, refetch: refetchOpenDay } = useGetOpenDayCloseQuery()
+  const [startDayClose] = useStartDayCloseMutation()
+  const [closeDayClose] = useCloseDayCloseMutation()
+  const openDay = openDayRes?.data
+  const [showDayReportModal, setShowDayReportModal] = useState(false)
+  const [dayReportData, setDayReportData] = useState<any>(null)
   
   // Get menus with filters - using proper menu API with search, brand, category, and price type filtering
   const { data: menusData } = useGetMenusQuery(
@@ -187,6 +195,31 @@ const POS = () => {
   useEffect(() => {
     setShowDefaultModal(true)
   }, [])
+
+  const handleStartDay = async () => {
+    try {
+      await startDayClose().unwrap()
+      await refetchOpenDay()
+      alert('Day started successfully')
+    } catch (e: any) {
+      alert(e?.data?.message || 'Failed to start day')
+    }
+  }
+
+  const handleCloseDay = async () => {
+    try {
+      if (!openDay?._id) {
+        alert('No open day found')
+        return
+      }
+      const res = await closeDayClose({ id: String(openDay._id), endTime: new Date().toISOString() }).unwrap()
+      setDayReportData(res?.data)
+      setShowDayReportModal(true)
+      await refetchOpenDay()
+    } catch (e: any) {
+      alert(e?.data?.message || 'Failed to close day')
+    }
+  }
   
   const handleSaveOrder = async () => {
     try {
@@ -218,7 +251,7 @@ const POS = () => {
         total: totalAmount,  // Required field
         vatPercent,
         vatAmount,
-        discountType: discount ? (discount.type?.toLowerCase?.() === 'percent' ? 'percent' : 'flat') : undefined,
+        discountType: discount ? (discount.type?.toLowerCase?.() === 'percent' ? 'percent' : 'flat') as 'flat' | 'percent' : undefined,
         discountAmount: discountAmountApplied,
         shippingCharge: deliveryCharge,
         rounding,
@@ -229,7 +262,7 @@ const POS = () => {
         note: notes,  // Field is 'note' not 'notes'
         paymentMode: selectedPaymentMode,
         payments: payments,
-        salesType: selectedPriceType === 'membership' ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined,
+        salesType: (selectedPriceType === 'membership' ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
         orderType: selectedOrderType || undefined,
         aggregatorId: selectedAggregator || undefined,
         brand: selectedBrand || undefined,
@@ -276,6 +309,7 @@ const POS = () => {
   return (
     <>
       <DefaultModaal show={showOrderTypeModal} onClose={() => dispatch(hideOrderTypeModal())} />
+      <ReportModal show={showDayReportModal} onClose={() => setShowDayReportModal(false)} data={dayReportData || undefined} />
 
       <Row className="g-3">
         <Col lg={4}>
@@ -394,6 +428,20 @@ const POS = () => {
               <Link href="/dashboard" className="btn btn-lg btn-dark">
                 <IconifyIcon icon="mdi:view-dashboard-outline" /> Dashboard
               </Link>
+              <div className="d-flex align-items-center gap-2">
+                <span className="badge bg-secondary">
+                  Day Status: {openDay ? 'Open' : 'Closed'}
+                </span>
+                {openDay ? (
+                  <Button variant="danger" className="btn" onClick={handleCloseDay}>
+                    <IconifyIcon icon="mdi:calendar-check" /> Close Day
+                  </Button>
+                ) : (
+                  <Button variant="success" className="btn" onClick={handleStartDay}>
+                    <IconifyIcon icon="mdi:calendar-start" /> Start Day
+                  </Button>
+                )}
+              </div>
             </CardHeader>
 
             <CardBody>

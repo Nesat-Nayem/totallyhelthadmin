@@ -11,7 +11,7 @@ interface MoreOptionsProps {
 
 const MoreOptions: React.FC<MoreOptionsProps> = ({ onOptionsChange }) => {
   const [showOptions, setShowOptions] = useState(false)
-  const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: { option: any; qty: number } }>({})
+  const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: any }>({})
   
   const { data: moreOptionsData } = useGetMoreOptionsQuery()
   const allOptions = moreOptionsData ?? []
@@ -39,36 +39,20 @@ const MoreOptions: React.FC<MoreOptionsProps> = ({ onOptionsChange }) => {
         delete updated[optId]
         return updated
       } else {
-        // Add with quantity 1
+        // Add option
         return {
           ...prev,
-          [optId]: { option, qty: 1 }
+          [optId]: option
         }
       }
     })
   }
   
-  const handleQtyChange = (optId: string, qty: number) => {
-    if (qty <= 0) {
-      setSelectedOptions(prev => {
-        const updated = { ...prev }
-        delete updated[optId]
-        return updated
-      })
-    } else {
-      setSelectedOptions(prev => ({
-        ...prev,
-        [optId]: { ...prev[optId], qty }
-      }))
-    }
-  }
 
   const handleSave = () => {
-    const options = Object.values(selectedOptions).map(({ option, qty }) => ({
+    const options = Object.values(selectedOptions).map((option) => ({
       _id: option._id,
-      name: option.name,
-      price: option.price,
-      qty
+      category: option.category
     }))
     onOptionsChange?.(options)
     setShowOptions(false)
@@ -98,7 +82,6 @@ const MoreOptions: React.FC<MoreOptionsProps> = ({ onOptionsChange }) => {
                   options.map((option: any) => {
                     const optId = option._id
                     const isSelected = !!selectedOptions[optId]
-                    const qty = selectedOptions[optId]?.qty || 0
                     return (
                       <div key={optId} className="mb-2">
                         <div
@@ -107,31 +90,7 @@ const MoreOptions: React.FC<MoreOptionsProps> = ({ onOptionsChange }) => {
                             ${isSelected ? 'bg-success text-white' : 'bg-light'}`}
                           style={{ userSelect: 'none' }}>
                           <div>{option.name}</div>
-                          {option.price > 0 && (
-                            <small className={isSelected ? 'text-white' : 'text-success'}>
-                              +AED {option.price}
-                            </small>
-                          )}
                         </div>
-                        {isSelected && (
-                          <div className="d-flex align-items-center justify-content-center mt-1 gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline-secondary"
-                              onClick={() => handleQtyChange(optId, qty - 1)}
-                            >
-                              -
-                            </Button>
-                            <span className="px-2">{qty}</span>
-                            <Button 
-                              size="sm" 
-                              variant="outline-secondary"
-                              onClick={() => handleQtyChange(optId, qty + 1)}
-                            >
-                              +
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     )
                   })

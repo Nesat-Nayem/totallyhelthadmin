@@ -1,6 +1,6 @@
 import { baseApi } from '@/services/baseApi'
 
-export type MoreOption = { _id: string; name: string; price: number; category: 'more' | 'less' | 'without' | 'general'; status: 'active' | 'inactive' }
+export type MoreOption = { _id: string; name: string; category: 'more' | 'less' | 'without' | 'general'; status: 'active' | 'inactive' }
 
 export const moreOptionApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
@@ -17,7 +17,7 @@ export const moreOptionApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       providesTags: (_r, _e, id) => [{ type: 'MoreOption', id }],
     }),
-    createMoreOption: build.mutation<MoreOption, { name: string; price: number; category: 'more' | 'less' | 'without' | 'general'; status?: 'active' | 'inactive' }>({
+    createMoreOption: build.mutation<MoreOption, { name: string; category: 'more' | 'less' | 'without' | 'general'; status?: 'active' | 'inactive' }>({
       query: (body) => ({ url: '/more-options', method: 'POST', body }),
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'MoreOption', id: 'LIST' }],

@@ -1,0 +1,94 @@
+.exitConfirmModal {
+  --exit-primary: #dc3545;
+  --exit-secondary: #6c757d;
+  --exit-bg: #ffffff;
+  --exit-border: #dee2e6;
+  --exit-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.exitConfirmModal .modal-content {
+  border: none;
+  border-radius: 8px;
+  box-shadow: var(--exit-shadow);
+  overflow: hidden;
+}
+
+.exitConfirmModal .modal-body {
+  padding: 1.5rem;
+  background: var(--exit-bg);
+}
+
+.exitConfirmModal h4 {
+  color: #2c3e50;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.exitConfirmModal p {
+  color: #6c757d;
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+
+.exitConfirmModal .btn {
+  border-radius: 6px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.exitConfirmModal .btn-outline-secondary {
+  color: white;
+  border-color: #000000;
+  background: #000000;
+  width: 100px;
+  height: 40px;
+}
+
+.exitConfirmModal .btn-outline-secondary:hover {
+  background: #000000;
+  border-color: #000000;
+  color: white;
+}
+
+.exitConfirmModal .btn-outline-secondary:focus {
+  background: #000000;
+  border-color: #000000;
+  color: white;
+  box-shadow: none;
+}
+
+.exitConfirmModal .btn-danger {
+  background: var(--exit-primary);
+  border-color: var(--exit-primary);
+  color: white;
+  width: 100px;
+  height: 40px;
+}
+
+.exitConfirmModal .btn-danger:hover {
+  background: #c82333;
+  border-color: #c82333;
+}
+
+.exitConfirmModal .btn-danger:focus {
+  background: var(--exit-primary);
+  border-color: var(--exit-primary);
+  color: white;
+  box-shadow: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .exitConfirmModal .modal-body {
+    padding: 1.25rem;
+  }
+  
+  .exitConfirmModal .d-flex {
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+  
+  .exitConfirmModal .btn {
+    width: 100%;
+  }
+}
