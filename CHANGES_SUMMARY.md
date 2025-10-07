@@ -52,7 +52,7 @@ To implement these changes in your backend:
 1. Replace the existing download functions in your day-close-report controller with the modified versions
 2. Ensure the `populateUserDetails` function is available in your controller
 3. Update the import statements to include the User model
-4. Test the download functionality with the URL: `http://localhost:5050/v1/api/day-close-report/download?format=pdf&selectedDays=2025-10-01,2025-10-10`
+4. Test the download functionality with the URL: `https://totally-helth.vercel.app/v1/api/day-close-report/download?format=pdf&selectedDays=2025-10-01,2025-10-10`
 
 ## Testing
 The changes preserve all existing functionality while enhancing the user experience by showing meaningful user information instead of cryptic IDs. The download formats (CSV, Excel, PDF) will now display:

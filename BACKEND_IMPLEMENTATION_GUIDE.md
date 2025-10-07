@@ -640,7 +640,7 @@ const downloadEnhancedPDF = async (reportData: any[], res: Response, fileName: s
 
 1. Copy the modified functions above into your backend day-close-report controller
 2. Ensure the `populateUserDetails` function is available in your controller
-3. Test with the URL: `http://localhost:5050/v1/api/day-close-report/download?format=pdf&selectedDays=2025-10-01,2025-10-10`
+3. Test with the URL: `https://totally-helth.vercel.app/v1/api/day-close-report/download?format=pdf&selectedDays=2025-10-01,2025-10-10`
 
 ## Expected Results
 

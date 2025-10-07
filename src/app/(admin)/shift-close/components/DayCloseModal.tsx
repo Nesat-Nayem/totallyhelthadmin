@@ -240,7 +240,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
       // Make direct API call
       console.log('Making direct API call to thermal receipt endpoint...')
       const token = localStorage.getItem('backend_token')
-      const response = await fetch(`http://localhost:5050/v1/api/day-close-report/thermal/${dateToUse}`, {
+      const response = await fetch(`https://totally-helth.vercel.app/v1/api/day-close-report/thermal/${dateToUse}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
