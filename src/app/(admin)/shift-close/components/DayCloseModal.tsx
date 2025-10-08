@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useDayCloseMutation, useGenerateThermalReceiptQuery } from '@/services/shiftApi'
 import { printThermalReceipt, printThermalReceiptIframe } from '@/utils/thermalPrint'
 import { downloadThermalReceipt, downloadThermalPDFAdvanced } from '@/utils/thermalDownload'
+import { fetchThermalReceiptJson, generateThermalReceiptHtml, type ThermalReceiptJsonData } from '@/utils/thermalJsonApi'
+import ThermalReceiptFromJson from '@/components/ThermalReceiptFromJson'
 
 interface DayCloseModalProps {
   show: boolean
@@ -24,6 +26,12 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
   const [isGeneratingThermal, setIsGeneratingThermal] = useState(false)
   const [thermalError, setThermalError] = useState<string | null>(null)
   const [isDayClosed, setIsDayClosed] = useState(false)
+  
+  // New JSON-based thermal receipt states
+  const [jsonThermalData, setJsonThermalData] = useState<ThermalReceiptJsonData['data'] | null>(null)
+  const [isGeneratingJsonThermal, setIsGeneratingJsonThermal] = useState(false)
+  const [jsonThermalError, setJsonThermalError] = useState<string | null>(null)
+  const [showJsonThermalReport, setShowJsonThermalReport] = useState(false)
   
   // Thermal receipt query - only trigger when we have a date and day is closed
   const { data: thermalReceiptData, isLoading: isThermalLoading, error: thermalQueryError } = useGenerateThermalReceiptQuery(
@@ -240,7 +248,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
       // Make direct API call
       console.log('Making direct API call to thermal receipt endpoint...')
       const token = localStorage.getItem('backend_token')
-      const response = await fetch(`https://totally-helth.vercel.app/v1/api/day-close-report/thermal/${dateToUse}`, {
+      const response = await fetch(`https://totally-helth.vercel.app/v1/api/day-close-report/thermal-json/${dateToUse}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -365,6 +373,86 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
     }
   }
 
+  // New function to handle JSON-based thermal receipt generation
+  const handleGenerateJsonThermalReceipt = async () => {
+    console.log('Generate JSON Thermal Receipt clicked')
+    console.log('Current date:', currentDate)
+    console.log('Is day closed:', isDayClosed)
+    
+    // Check if day has been closed
+    if (!isDayClosed) {
+      setJsonThermalError('Cannot generate thermal receipt: Day has not been closed yet. Please close the day first.')
+      return
+    }
+    
+    setIsGeneratingJsonThermal(true)
+    setJsonThermalError(null) // Clear any previous errors
+    
+    try {
+      // Ensure we have a current date
+      const dateToUse = currentDate || new Date().toISOString().split('T')[0]
+      if (!currentDate) {
+        setCurrentDate(dateToUse)
+        console.log('Set current date to:', dateToUse)
+      }
+      
+      // Make API call to fetch JSON data
+      console.log('Making API call to thermal receipt JSON endpoint...')
+      const jsonData = await fetchThermalReceiptJson(dateToUse)
+      
+      console.log('JSON data received:', jsonData)
+      setJsonThermalData(jsonData.data)
+      setShowJsonThermalReport(true)
+      
+    } catch (error) {
+      console.error('Failed to generate JSON thermal receipt:', error)
+      setJsonThermalError('Error generating thermal receipt: ' + (error as any)?.message || 'Unknown error')
+    } finally {
+      setIsGeneratingJsonThermal(false)
+    }
+  }
+
+  const handlePrintJsonThermalReport = () => {
+    if (jsonThermalData) {
+      try {
+        // Generate HTML from JSON data
+        const htmlContent = generateThermalReceiptHtml(jsonThermalData)
+        
+        // Create blob with generated HTML
+        const blob = new Blob([htmlContent], { type: 'text/html' })
+        const url = URL.createObjectURL(blob)
+        
+        // Create download link
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'thermal-receipt-json.html'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        
+      } catch (error) {
+        console.error('JSON thermal download failed:', error)
+        
+        // Fallback: Try to open in new window for printing
+        try {
+          const htmlContent = generateThermalReceiptHtml(jsonThermalData)
+          const printWindow = window.open('', '_blank', 'width=200,height=800,scrollbars=no,resizable=no')
+          if (printWindow) {
+            printWindow.document.write(htmlContent)
+            printWindow.document.close()
+            printWindow.focus()
+            printWindow.print()
+            printWindow.close()
+          }
+        } catch (printError) {
+          console.error('Print window failed:', printError)
+        }
+      }
+    }
+  }
+
   const handleCloseModal = () => {
     setShowThermalReport(false)
     setThermalReport('')
@@ -376,6 +464,13 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
     setIsGeneratingThermal(false)
     setThermalError(null) // Clear thermal error state
     setIsDayClosed(false) // Reset day closed state
+    
+    // Reset JSON thermal states
+    setJsonThermalData(null)
+    setIsGeneratingJsonThermal(false)
+    setJsonThermalError(null)
+    setShowJsonThermalReport(false)
+    
     onSuccess?.()
     onHide()
     setNote('')
@@ -394,14 +489,14 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
   }
 
   return (
-    <Modal show={show} onHide={showThermalReport ? handleCloseModal : onHide} centered size="xl">
+    <Modal show={show} onHide={showThermalReport || showJsonThermalReport ? handleCloseModal : onHide} centered size="xl">
       <Modal.Header closeButton>
         <Modal.Title>
-          {showThermalReport ? 'Day Close Report' : 'Day Close'}
+          {showThermalReport ? 'Day Close Report' : showJsonThermalReport ? 'Thermal Receipt' : 'Day Close'}
         </Modal.Title>
       </Modal.Header>
       
-      {!showThermalReport ? (
+      {!showThermalReport && !showJsonThermalReport && (
         <Form onSubmit={handleSubmit}>
           <Modal.Body>
             {error && !dayCloseResult && (
@@ -413,21 +508,35 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
             {dayCloseResult && showThermalButton && (
               <Alert variant={dayCloseResult.message.includes('already') ? 'info' : 'success'} className="mb-3">
                 <strong>{dayCloseResult.message.includes('already') ? 'Day Already Closed' : 'Day Close Successful!'}</strong> {dayCloseResult.message}
-                <div className="mt-2">
-                  <Button 
+                <div className="mt-2 d-flex gap-2 flex-wrap">
+                  {/* <Button 
                     variant="primary" 
                     size="sm" 
                     onClick={handleGenerateThermalReceipt}
                     disabled={isGeneratingThermal}
                   >
-                    {isGeneratingThermal ? 'Generating...' : 'Generate Thermal Receipt'}
+                    {isGeneratingThermal ? 'Generating...' : 'Generate Thermal Receipts'}
+                  </Button> */}
+                  <Button 
+                    variant="success" 
+                    size="sm" 
+                    onClick={handleGenerateJsonThermalReceipt}
+                    disabled={isGeneratingJsonThermal}
+                  >
+                    {isGeneratingJsonThermal ? 'Generating Thermal Receipt...' : 'Generate Thermal Receipt'}
                   </Button>
-                  {isGeneratingThermal && (
+                  {(isGeneratingThermal || isGeneratingJsonThermal) && (
                     <div className="mt-2">
                       <small className="text-info">Loading thermal receipt data...</small>
                     </div>
                   )}
                 </div>
+              </Alert>
+            )}
+
+            {jsonThermalError && (
+              <Alert variant="danger" className="mb-3">
+                <strong>JSON Thermal Receipt Error:</strong> {jsonThermalError}
               </Alert>
             )}
 
@@ -710,7 +819,9 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
             )}
           </Modal.Footer>
         </Form>
-      ) : (
+      )}
+      
+      {showThermalReport && (
         <>
           <Modal.Body>
             {dayCloseResult && (
@@ -817,6 +928,80 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
                 </Button>
                 <Button variant="primary" onClick={handlePrintThermalReport}>
                   🖨️ Print Thermal Report
+                </Button>
+              </>
+            )}
+          </Modal.Footer>
+        </>
+      )}
+      
+      {showJsonThermalReport && (
+        <>
+          <Modal.Body>
+            {jsonThermalError ? (
+              <div 
+                style={{ 
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  backgroundColor: '#f8f9fa',
+                  padding: '10px',
+                  border: '1px solid #dc3545',
+                  textAlign: 'center',
+                  color: '#dc3545'
+                }}
+              >
+                <p><strong>Error:</strong></p>
+                <p>{jsonThermalError}</p>
+                <small>Please try again or contact support</small>
+              </div>
+            ) : jsonThermalData ? (
+              <div style={{ maxHeight: '500px', overflow: 'auto' }}>
+                <ThermalReceiptFromJson 
+                  data={jsonThermalData} 
+                  onPrint={handlePrintJsonThermalReport}
+                  onDownload={handlePrintJsonThermalReport}
+                />
+              </div>
+            ) : (
+              <div 
+                style={{ 
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  backgroundColor: '#f8f9fa',
+                  padding: '10px',
+                  border: '1px solid #dee2e6',
+                  textAlign: 'center',
+                  color: '#6c757d'
+                }}
+              >
+                <p>No JSON thermal report available</p>
+                <small>
+                  {isDayClosed 
+                    ? 'Click "Generate JSON Thermal" to create a report' 
+                    : 'Please close the day first to generate thermal receipt'
+                  }
+                </small>
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseModal}>
+              Close
+            </Button>
+            {jsonThermalData && (
+              <>
+                <Button variant="info" onClick={() => {
+                  const htmlContent = generateThermalReceiptHtml(jsonThermalData)
+                  const newWindow = window.open('', '_blank')
+                  if (newWindow) {
+                    newWindow.document.write(htmlContent)
+                    newWindow.document.close()
+                  }
+                }} className="me-2">
+                  📄 Open in New Page
+                </Button>
+                <Button variant="primary" onClick={handlePrintJsonThermalReport}>
+                  🖨️ Print JSON Thermal Report
                 </Button>
               </>
             )}

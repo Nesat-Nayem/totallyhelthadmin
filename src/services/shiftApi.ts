@@ -182,7 +182,7 @@ export const shiftApi = baseApi.injectEndpoints({
     // Generate thermal receipt for day close
     generateThermalReceipt: builder.query<string, string>({
       query: (date) => ({
-        url: `/day-close-report/thermal/${date}`,
+        url: `/day-close-report/thermal-json/${date}`,
         responseType: 'text',
       }),
     }),
