@@ -19,7 +19,7 @@ const page = () => {
             <TopBarTitle />
           </div>
           <div className="d-flex align-items-center gap-1">
-            <Link href="pos" className="btn btn-sm btn-info">
+            <Link href="/pos" className="btn btn-sm btn-info">
               <IconifyIcon icon="mdi:cart-outline" /> POS
             </Link>
             <Link href="/dashboard" className="btn btn-sm btn-dark">
