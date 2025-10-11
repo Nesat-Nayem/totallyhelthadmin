@@ -1,15 +1,21 @@
 import React from 'react'
 import PageTItle from '@/components/PageTItle'
 import { Metadata } from 'next'
-import MenuPlanView from './components/MenuPlanView'
+import MenuPlanView from '../components/MenuPlanView'
 
 export const metadata: Metadata = { title: 'Meal Plan View' }
 
-const MenuPlanViewPage = () => {
+interface MenuPlanViewPageProps {
+  params: {
+    id: string
+  }
+}
+
+const MenuPlanViewPage = ({ params }: MenuPlanViewPageProps) => {
   return (
     <>
       <PageTItle title="Meal Plan View" />
-      <MenuPlanView />
+      <MenuPlanView id={params.id} />
     </>
   )
 }

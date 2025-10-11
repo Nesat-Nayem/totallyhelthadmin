@@ -118,7 +118,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
                 disabled={isLoading}
               >
                 <FaUserPlus /> New Membership
-                <small className="d-block">Membership Menu</small>
+                <small className="d-block">Meal Plan Menu</small>
               </Button>
               
               <Button 
@@ -128,7 +128,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
                 disabled={isLoading}
               >
                 <FaIdBadge /> Membership Meal
-                <small className="d-block">Membership Menu</small>
+                <small className="d-block">Meal Plan Menu</small>
               </Button>
             </Col>
 

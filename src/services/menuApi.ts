@@ -9,6 +9,14 @@ export type Menu = {
   restaurantPrice?: number
   onlinePrice?: number
   membershipPrice?: number
+  // VAT fields
+  restaurantVat?: number
+  onlineVat?: number
+  membershipVat?: number
+  // Total price after VAT
+  restaurantTotalPrice?: number
+  onlineTotalPrice?: number
+  membershipTotalPrice?: number
   category?: string
   brands?: string[]
   branches?: string[]

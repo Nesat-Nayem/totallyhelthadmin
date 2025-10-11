@@ -3,19 +3,24 @@ import { baseApi } from '@/services/baseApi'
 export type MealPlan = {
   _id: string
   title: string
-  description?: string
+  description: string
+  badge?: string
+  discount?: string
   price: number
   delPrice?: number
-  restaurantPrice?: number
-  onlinePrice?: number
-  membershipPrice?: number
-  menuType?: 'restaurant' | 'online' | 'membership'
   category?: string
   brand?: string
+  kcalList?: string[]
+  deliveredList?: string[]
+  suitableList?: string[]
+  daysPerWeek?: string[]
+  weeksOffers?: { week: string; offer: string }[]
   images?: string[]
   thumbnail?: string
-  image?: string
-  status?: 'active' | 'inactive'
+  status: 'active' | 'inactive'
+  isDeleted?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const mealPlanApi = baseApi.injectEndpoints({
@@ -30,13 +35,23 @@ export const mealPlanApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       providesTags: (_r, _e, id) => [{ type: 'MealPlan' as const, id }],
     }),
-    createMealPlan: build.mutation<MealPlan, Partial<MealPlan>>({
-      query: (body) => ({ url: '/meal-plans', method: 'POST', body }),
+    createMealPlan: build.mutation<MealPlan, FormData>({
+      query: (formData) => ({ 
+        url: '/meal-plans', 
+        method: 'POST', 
+        body: formData,
+        formData: true
+      }),
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'MealPlan', id: 'LIST' }],
     }),
-    updateMealPlan: build.mutation<MealPlan, { id: string; data: Partial<MealPlan> }>({
-      query: ({ id, data }) => ({ url: `/meal-plans/${id}`, method: 'PATCH', body: data }),
+    updateMealPlan: build.mutation<MealPlan, { id: string; data: FormData }>({
+      query: ({ id, data }) => ({ 
+        url: `/meal-plans/${id}`, 
+        method: 'PUT', 
+        body: data,
+        formData: true
+      }),
       transformResponse: (res: any) => res?.data,
       invalidatesTags: (_r, _e, { id }) => [{ type: 'MealPlan', id }, { type: 'MealPlan', id: 'LIST' }],
     }),

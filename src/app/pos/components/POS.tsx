@@ -24,6 +24,7 @@ import DiscountModal from './DiscountModal'
 
 // Import API services
 import { useGetMenusQuery } from '@/services/menuApi'
+import { useGetMealPlansQuery } from '@/services/mealPlanApi'
 import { useGetBrandsQuery } from '@/services/brandApi'
 import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
@@ -34,6 +35,7 @@ import { useCreateCustomerMutation } from '@/services/customerApi'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
 import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal } from '@/store/slices/posSlice'
+import { showCustomerRequiredAlert, showSuccess, showError } from '@/utils/sweetAlert'
 
 // Fallback images for menus
 const fallbackImages = [product1, product2, product3, product4]
@@ -67,6 +69,15 @@ const POS = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
   
+  // Reset filters when switching between membership and regular orders
+  useEffect(() => {
+    if (selectedPriceType === 'membership') {
+      // Reset to default values for meal plan filtering
+      setSelectedBrand('')
+      setSelectedCategory('')
+    }
+  }, [selectedPriceType])
+  
   // Fetch data from APIs
   const { data: brandsData } = useGetBrandsQuery()
   const { data: categoriesData } = useGetMenuCategoriesQuery()
@@ -81,8 +92,9 @@ const POS = () => {
   const [dayReportData, setDayReportData] = useState<any>(null)
   
   // Get menus with filters - using proper menu API with search, brand, category, and price type filtering
+  // For membership orders, use meal plans instead of regular menus
   const { data: menusData } = useGetMenusQuery(
-    searchQuery || selectedBrand || selectedCategory || selectedPriceType
+    selectedPriceType !== 'membership' && (searchQuery || selectedBrand || selectedCategory || selectedPriceType)
       ? {
           q: searchQuery || undefined,
           brand: selectedBrand || undefined,
@@ -90,43 +102,84 @@ const POS = () => {
           priceType: selectedPriceType || undefined,
           limit: 100
         }
-      : { limit: 100 }
+      : selectedPriceType !== 'membership' ? { limit: 100 } : undefined
+  )
+
+  // Get meal plans for membership orders with proper filtering
+  const { data: mealPlansData } = useGetMealPlansQuery(
+    selectedPriceType === 'membership'
+      ? {
+          q: searchQuery || undefined,
+          brand: selectedBrand || undefined,
+          category: selectedCategory || undefined,
+          limit: 100
+        }
+      : undefined
   )
   
-  const brands = brandsData ?? []
-  const categories = categoriesData ?? []
+  // Use meal plan brands and categories for membership orders, regular ones for others
+  const brands = selectedPriceType === 'membership' 
+    ? [
+        { _id: 'Totally Health', name: 'Totally Health' },
+        { _id: 'Subway', name: 'Subway' },
+        { _id: 'Pizza Hut', name: 'Pizza Hut' },
+        { _id: 'Burger King', name: 'Burger King' }
+      ]
+    : (brandsData ?? [])
+    
+  const categories = selectedPriceType === 'membership'
+    ? [
+        { _id: 'Weight Loss', title: 'Weight Loss' },
+        { _id: 'Weight Gain', title: 'Weight Gain' },
+        { _id: 'Fat Loss', title: 'Fat Loss' },
+        { _id: 'Muscle Gain', title: 'Muscle Gain' },
+        { _id: 'Healthy Diet', title: 'Healthy Diet' },
+        { _id: 'Healthy Lifestyle', title: 'Healthy Lifestyle' },
+        { _id: 'Healthy Eating', title: 'Healthy Eating' }
+      ]
+    : (categoriesData ?? [])
+    
   const aggregators = aggregatorsData ?? []
   const paymentMethods = paymentMethodsData ?? []
-  const menus = menusData?.data ?? []
+  
+  // Use meal plans for membership orders, regular menus for others
+  const menus = selectedPriceType === 'membership'
+    ? (mealPlansData?.data ?? []).map((mealPlan: any) => ({
+        ...mealPlan,
+        // Map meal plan fields to menu fields for compatibility
+        title: mealPlan.title,
+        image: mealPlan.thumbnail || (mealPlan.images && mealPlan.images[0]),
+        membershipTotalPrice: mealPlan.price,
+        membershipPrice: mealPlan.price,
+        // Set other price types to 0 or undefined for membership-only items
+        restaurantTotalPrice: 0,
+        restaurantPrice: 0,
+        onlineTotalPrice: 0,
+        onlinePrice: 0,
+        // Add category and brand info
+        category: mealPlan.category,
+        brands: mealPlan.brand ? [mealPlan.brand] : [],
+      }))
+    : (menusData?.data ?? [])
 
   const handleProductClick = (menu: any) => {
     const id = menu._id || menu.id
-    // Use price based on selected price type
-    const price = selectedPriceType === 'restaurant' ? menu.restaurantPrice :
-                  selectedPriceType === 'online' ? menu.onlinePrice :
-                  selectedPriceType === 'membership' ? menu.membershipPrice :
-                  menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+    // Use total price (including VAT) based on selected price type
+    const price = selectedPriceType === 'restaurant' ? menu.restaurantTotalPrice :
+                  selectedPriceType === 'online' ? menu.onlineTotalPrice :
+                  selectedPriceType === 'membership' ? menu.membershipTotalPrice :
+                  menu.restaurantTotalPrice || menu.onlineTotalPrice || menu.membershipTotalPrice || 0
     
     setSelectedProducts(prev => {
-      if (prev[id]) {
-        // If already selected, increase quantity
-        return {
-          ...prev,
-          [id]: {
-            ...prev[id],
-            qty: prev[id].qty + 1,
-          },
-        }
-      } else {
-        // Add new menu item
-        return {
-          ...prev,
-          [id]: {
-            ...menu,
-            price: price, // Store the calculated price based on order type
-            qty: 1,
-          },
-        }
+      // Always create a new separate record for each click
+      const uniqueId = `${id}_${Date.now()}`
+      return {
+        ...prev,
+        [uniqueId]: {
+          ...menu,
+          price: price,
+          qty: 1,
+        },
       }
     })
   }
@@ -176,17 +229,24 @@ const POS = () => {
   // Calculate totals
   const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
   const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
-  const vatPercent = 5
-  const vatAmount = ((subTotal + moreOptionsTotal) * vatPercent) / 100
+  
+  // VAT% logic - COMMENTED OUT (VAT calculation disabled)
+  // const vatPercent = 5
+  // const vatAmount = ((subTotal + moreOptionsTotal) * vatPercent) / 100
+  
   const discountAmountApplied = discount
     ? (discount.type?.toLowerCase?.() === 'percent'
         ? ((subTotal + moreOptionsTotal) * (discount.amount || 0)) / 100
         : (discount.amount || 0))
     : 0
-  const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - discountAmountApplied
+  
+  // Total calculation without VAT (VAT logic commented out above)
+  const totalBeforeRounding = subTotal + moreOptionsTotal + deliveryCharge - discountAmountApplied
+  // const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - discountAmountApplied // Original with VAT
   const totalAmount = totalBeforeRounding + rounding
   
   // Calculate payable amount and change amount
+  // Note: Payment amount is calculated without VAT% - no VAT is included in the total
   const payableAmount = Math.max(0, totalAmount - receiveAmount) // Remaining amount to be paid
   const changeAmount = Math.max(0, receiveAmount - totalAmount) // Change to be given back
 
@@ -200,16 +260,16 @@ const POS = () => {
     try {
       await startDayClose().unwrap()
       await refetchOpenDay()
-      alert('Day started successfully')
+      showSuccess('Day started successfully')
     } catch (e: any) {
-      alert(e?.data?.message || 'Failed to start day')
+      showError(e?.data?.message || 'Failed to start day')
     }
   }
 
   const handleCloseDay = async () => {
     try {
       if (!openDay?._id) {
-        alert('No open day found')
+        showError('No open day found')
         return
       }
       const res = await closeDayClose({ id: String(openDay._id), endTime: new Date().toISOString() }).unwrap()
@@ -217,24 +277,31 @@ const POS = () => {
       setShowDayReportModal(true)
       await refetchOpenDay()
     } catch (e: any) {
-      alert(e?.data?.message || 'Failed to close day')
+      showError(e?.data?.message || 'Failed to close day')
     }
   }
   
   const handleSaveOrder = async () => {
     try {
-      if (!customer) {
-        alert('Please select a customer')
-        return
+      // Check if this is a membership order and customer is required
+      if (selectedPriceType === 'membership' && !customer) {
+        const shouldProceed = await showCustomerRequiredAlert()
+        if (!shouldProceed) {
+          return // User cancelled, don't proceed with save
+        }
+        // If user clicked "Select Customer", we still need to wait for them to select one
+        if (!customer) {
+          return // Don't proceed without customer
+        }
       }
-      
+
       const orderData = {
-        // customer object
-        customer: {
+        // customer object - now optional for non-membership orders, required for membership
+        customer: customer ? {
           id: customer._id || customer.id,
           name: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
           phone: customer.phone || customer.mobile || '',
-        },
+        } : undefined,
         items: Object.values(selectedProducts).map((p: any) => ({
           productId: p._id || p.id,
           title: p.title || p.name,
@@ -249,8 +316,9 @@ const POS = () => {
         date: startDate,  // Required field
         subTotal,
         total: totalAmount,  // Required field
-        vatPercent,
-        vatAmount,
+        // VAT fields commented out - VAT calculation disabled
+        // vatPercent,
+        // vatAmount,
         discountType: discount ? (discount.type?.toLowerCase?.() === 'percent' ? 'percent' : 'flat') as 'flat' | 'percent' : undefined,
         discountAmount: discountAmountApplied,
         shippingCharge: deliveryCharge,
@@ -272,7 +340,7 @@ const POS = () => {
       }
       
       const result = await createOrder(orderData).unwrap()
-      alert(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+      showSuccess(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
       
       // Reset form
       setSelectedProducts({})
@@ -285,7 +353,7 @@ const POS = () => {
       setReceiveAmount(0)
       setPayments([])
     } catch (error: any) {
-      alert(error?.data?.message || 'Failed to create order')
+      showError(error?.data?.message || 'Failed to create order')
     }
   }
   
@@ -374,11 +442,11 @@ const POS = () => {
                 {selectedPriceType && menus.map((menu: any, index: number) => {
                   const menuId = menu._id || menu.id
                   const imageUrl = menu.image || fallbackImages[index % fallbackImages.length]
-                  // Use price based on selected price type
-                  const price = selectedPriceType === 'restaurant' ? menu.restaurantPrice :
-                                selectedPriceType === 'online' ? menu.onlinePrice :
-                                selectedPriceType === 'membership' ? menu.membershipPrice :
-                                menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+                  // Use total price (including VAT) based on selected price type
+                  const price = selectedPriceType === 'restaurant' ? menu.restaurantTotalPrice :
+                                selectedPriceType === 'online' ? menu.onlineTotalPrice :
+                                selectedPriceType === 'membership' ? menu.membershipTotalPrice :
+                                menu.restaurantTotalPrice || menu.onlineTotalPrice || menu.membershipTotalPrice || 0
                   
                   return (
                     <Col xs={4} key={menuId}>
@@ -487,15 +555,23 @@ const POS = () => {
                       <th>Title</th>
                       <th>Qty</th>
                       <th>Sub Total</th>
+                      {/* VAT columns commented out - VAT calculation disabled */}
+                      {/* <th>VAT (5%)</th> */}
+                      {/* <th>Total with VAT</th> */}
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.values(selectedProducts).map((product: any, index: number) => {
-                      const productId = product._id || product.id
+                    {Object.entries(selectedProducts).map(([uniqueId, product]: [string, any], index: number) => {
                       const imageUrl = product.image || fallbackImages[index % fallbackImages.length]
+                      const itemSubTotal = product.price * product.qty
+                      
+                      // VAT calculation commented out - VAT logic disabled
+                      // const itemVAT = (itemSubTotal * vatPercent) / 100
+                      // const itemTotalWithVAT = itemSubTotal + itemVAT
+                      
                       return (
-                        <tr key={productId}>
+                        <tr key={uniqueId}>
                           <td>
                             <Image 
                               src={product.image || imageUrl} 
@@ -509,18 +585,21 @@ const POS = () => {
 
                           <td>
                             <div className="d-flex gap-1 align-items-center">
-                              <Button size="sm" onClick={() => handleQtyChange(productId, -1)}>
+                              <Button size="sm" onClick={() => handleQtyChange(uniqueId, -1)}>
                                 -
                               </Button>
                               <span className="px-2">{product.qty}</span>
-                              <Button size="sm" onClick={() => handleQtyChange(productId, 1)}>
+                              <Button size="sm" onClick={() => handleQtyChange(uniqueId, 1)}>
                                 +
                               </Button>
                             </div>
                           </td>
-                          <td>AED {(product.price * product.qty).toFixed(2)}</td>
+                          <td>AED {itemSubTotal.toFixed(2)}</td>
+                          {/* VAT columns commented out - VAT calculation disabled */}
+                          {/* <td>AED {itemVAT.toFixed(2)}</td> */}
+                          {/* <td>AED {itemTotalWithVAT.toFixed(2)}</td> */}
                           <td>
-                            <Button size="sm" variant="danger" onClick={() => handleDelete(productId)}>
+                            <Button size="sm" variant="danger" onClick={() => handleDelete(uniqueId)}>
                               <IconifyIcon icon="mdi:delete" />
                             </Button>
                           </td>
@@ -676,10 +755,12 @@ const POS = () => {
                     />
                     <Form.Text className="text-muted">Change to return (auto-calculated)</Form.Text>
                   </Form.Group>
-                  <Form.Group className="mb-3">
+                  
+                  {/* VAT form field commented out - VAT calculation disabled */}
+                  {/* <Form.Group className="mb-3">
                     <Form.Label>VAT (5%)</Form.Label>
                     <Form.Control type="text" value={`AED ${vatAmount.toFixed(2)}`} disabled />
-                  </Form.Group>
+                  </Form.Group> */}
 
                   <Form.Group className="mb-3">
                     <Form.Label>Discount</Form.Label>

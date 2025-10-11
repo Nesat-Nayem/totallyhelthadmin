@@ -16,6 +16,14 @@ import { uploadSingle } from '@/services/upload'
 import { useCreateMenuMutation } from '@/services/menuApi'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
+
+/** HELPER FUNCTION TO CALCULATE VAT **/
+const calculateVatTotal = (price: string, vatPercent: string = '5'): number => {
+  const basePrice = parseFloat(price) || 0
+  const vat = parseFloat(vatPercent) || 5
+  return basePrice + (basePrice * vat / 100)
+}
+
 /** FORM DATA TYPE **/
 type FormData = {
   title: string
@@ -28,6 +36,14 @@ type FormData = {
   dineinPrice?: string
   takeawayPrice?: string
   aggregatorPrice?: string
+  // VAT fields for each price type (3 main categories)
+  restaurantVat?: string
+  onlineVat?: string
+  membershipVat?: string
+  // Total price after VAT (separate fields for backend)
+  restaurantTotalPrice?: string
+  onlineTotalPrice?: string
+  membershipTotalPrice?: string
   // optional nutrition fields (UI only for now)
   calories?: string
   protein?: string
@@ -54,6 +70,7 @@ type ControlType = {
   selectedBranches: any[]
   setSelectedBranches: (arr: any[]) => void
   onFileChange: (f: File | null) => void
+  watch: any
 }
 
 /** VALIDATION SCHEMA **/
@@ -85,7 +102,7 @@ const messageSchema: yup.ObjectSchema<any> = yup.object({
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches, onFileChange }) => {
+const GeneralInformationCard: React.FC<ControlType> = ({ control, register, categories, selectedCategory, onCategoryChange, brands, selectedBrands, setSelectedBrands, branches, selectedBranches, setSelectedBranches, onFileChange, watch }) => {
   return (
     <Card>
       <CardHeader>
@@ -213,20 +230,68 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register, cate
                       </div>
                     </div>
 
-                    {/* Conditional price inputs */}
+                    {/* Conditional price inputs with VAT */}
                     {field.value?.includes('dinein') && (
                       <div className="mb-3">
-                        <input type="number" className="form-control" placeholder="Enter Restaurant price" {...register('dineinPrice')} />
+                        <label className="form-label">Restaurant Price</label>
+                        <div className="row">
+                          <div className="col-md-4">
+                            <label className="form-label small">Base Price</label>
+                            <input type="number" className="form-control" placeholder="Enter base price" {...register('dineinPrice')} />
+                          </div>
+                          <div className="col-md-3">
+                            <label className="form-label small">VAT %</label>
+                            <input type="number" className="form-control" placeholder="5" defaultValue="5" {...register('restaurantVat')} />
+                          </div>
+                          <div className="col-md-5">
+                            <label className="form-label small">Total After VAT</label>
+                            <input type="number" className="form-control bg-light" placeholder="Total" readOnly 
+                              value={calculateVatTotal(watch('dineinPrice') || '0', watch('restaurantVat') || '5')} 
+                              {...register('restaurantTotalPrice')} />
+                          </div>
+                        </div>
                       </div>
                     )}
                     {field.value?.includes('takeaway') && (
                       <div className="mb-3">
-                        <input type="number" className="form-control" placeholder="Enter online price" {...register('takeawayPrice')} />
+                        <label className="form-label">Online Price</label>
+                        <div className="row">
+                          <div className="col-md-4">
+                            <label className="form-label small">Base Price</label>
+                            <input type="number" className="form-control" placeholder="Enter base price" {...register('takeawayPrice')} />
+                          </div>
+                          <div className="col-md-3">
+                            <label className="form-label small">VAT %</label>
+                            <input type="number" className="form-control" placeholder="5" defaultValue="5" {...register('onlineVat')} />
+                          </div>
+                          <div className="col-md-5">
+                            <label className="form-label small">Total After VAT</label>
+                            <input type="number" className="form-control bg-light" placeholder="Total" readOnly 
+                              value={calculateVatTotal(watch('takeawayPrice') || '0', watch('onlineVat') || '5')} 
+                              {...register('onlineTotalPrice')} />
+                          </div>
+                        </div>
                       </div>
                     )}
                     {field.value?.includes('aggregator') && (
                       <div className="mb-3">
-                        <input type="number" className="form-control" placeholder="Enter Membership price" {...register('aggregatorPrice')} />
+                        <label className="form-label">Membership Price</label>
+                        <div className="row">
+                          <div className="col-md-4">
+                            <label className="form-label small">Base Price</label>
+                            <input type="number" className="form-control" placeholder="Enter base price" {...register('aggregatorPrice')} />
+                          </div>
+                          <div className="col-md-3">
+                            <label className="form-label small">VAT %</label>
+                            <input type="number" className="form-control" placeholder="5" defaultValue="5" {...register('membershipVat')} />
+                          </div>
+                          <div className="col-md-5">
+                            <label className="form-label small">Total After VAT</label>
+                            <input type="number" className="form-control bg-light" placeholder="Total" readOnly 
+                              value={calculateVatTotal(watch('aggregatorPrice') || '0', watch('membershipVat') || '5')} 
+                              {...register('membershipTotalPrice')} />
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -346,7 +411,7 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, register, cate
 
 /** MAIN COMPONENT **/
 const MenuAdd: React.FC = () => {
-  const { reset, handleSubmit, control, register } = useForm<FormData>({
+  const { reset, handleSubmit, control, register, watch } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active', orderTypes: [] },
   })
@@ -378,10 +443,31 @@ const MenuAdd: React.FC = () => {
         branches: selectedBranches.map((x) => x.value),
       }
 
-      // prices
-      if (data.orderTypes?.includes('dinein')) payload.restaurantPrice = parseFloat(String(data.dineinPrice))
-      if (data.orderTypes?.includes('takeaway')) payload.onlinePrice = parseFloat(String(data.takeawayPrice))
-      if (data.orderTypes?.includes('aggregator')) payload.membershipPrice = parseFloat(String(data.aggregatorPrice))
+      // Send original prices, total prices, and VAT percentages to backend
+      if (data.orderTypes?.includes('dinein')) {
+        const basePrice = parseFloat(String(data.dineinPrice)) || 0
+        const vatPercent = parseFloat(String(data.restaurantVat)) || 5
+        const totalPrice = basePrice + (basePrice * vatPercent / 100)
+        payload.restaurantPrice = basePrice
+        payload.restaurantTotalPrice = totalPrice
+        payload.restaurantVat = vatPercent
+      }
+      if (data.orderTypes?.includes('takeaway')) {
+        const basePrice = parseFloat(String(data.takeawayPrice)) || 0
+        const vatPercent = parseFloat(String(data.onlineVat)) || 5
+        const totalPrice = basePrice + (basePrice * vatPercent / 100)
+        payload.onlinePrice = basePrice
+        payload.onlineTotalPrice = totalPrice
+        payload.onlineVat = vatPercent
+      }
+      if (data.orderTypes?.includes('aggregator')) {
+        const basePrice = parseFloat(String(data.aggregatorPrice)) || 0
+        const vatPercent = parseFloat(String(data.membershipVat)) || 5
+        const totalPrice = basePrice + (basePrice * vatPercent / 100)
+        payload.membershipPrice = basePrice
+        payload.membershipTotalPrice = totalPrice
+        payload.membershipVat = vatPercent
+      }
 
       // nutrition fields
       if (data.calories) payload.calories = parseFloat(String(data.calories))
@@ -407,6 +493,7 @@ const MenuAdd: React.FC = () => {
       <GeneralInformationCard 
         control={control} 
         register={register}
+        watch={watch}
         categories={categories}
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}

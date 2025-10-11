@@ -3,14 +3,25 @@
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardBody, CardFooter, Carousel, CarouselItem, Col, ListGroup, Row } from 'react-bootstrap'
+import { useGetMealPlanByIdQuery } from '@/services/mealPlanApi'
 import m1 from '../../../../../assets/images/order-view/1.webp'
 import m2 from '../../../../../assets/images/order-view/2.webp'
 import m3 from '../../../../../assets/images/order-view/3.webp'
 
-const MenuPlanView = () => {
+interface MenuPlanViewProps {
+  id: string
+}
+
+const MenuPlanView = ({ id }: MenuPlanViewProps) => {
+  const { data: mealPlan, isLoading, error, refetch } = useGetMealPlanByIdQuery(id)
   const [activeIndex, setActiveIndex] = useState(0)
+
+  // Force refetch when component mounts to get latest data
+  useEffect(() => {
+    refetch()
+  }, [id, refetch])
 
   const handleSelect = (selectedIndex: number) => {
     setActiveIndex(selectedIndex)
@@ -34,11 +45,47 @@ const MenuPlanView = () => {
     }
   }
 
-  const meal = [
-    { id: 'meal1', image: m1 },
-    { id: 'meal2', image: m2 },
-    { id: 'meal3', image: m3 },
-  ]
+  if (isLoading) {
+    return (
+      <Row>
+        <Col xl={12}>
+          <Card>
+            <CardBody className="text-center py-5">
+              <div className="spinner-border" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+    )
+  }
+
+  if (error || !mealPlan) {
+    return (
+      <Row>
+        <Col xl={12}>
+          <Card>
+            <CardBody className="text-center py-5">
+              <p className="text-danger">Error loading meal plan. Please try again.</p>
+              <Link href="/meal-plan/meal-plan-list" className="btn btn-primary">
+                Back to List
+              </Link>
+            </CardBody>
+          </Card>
+        </Col>
+      </Row>
+    )
+  }
+
+  // Use actual images from meal plan or fallback to default
+  const mealImages = mealPlan.images && mealPlan.images.length > 0 
+    ? mealPlan.images.map((img, idx) => ({ id: `meal${idx}`, image: img }))
+    : [
+        { id: 'meal1', image: m1 },
+        { id: 'meal2', image: m2 },
+        { id: 'meal3', image: m3 },
+      ]
   return (
     <Row>
       <Col lg={6}>
@@ -46,9 +93,9 @@ const MenuPlanView = () => {
           <CardBody>
             <div id="carouselExampleFade" className="carousel slide carousel-fade" data-bs-ride="carousel">
               <Carousel activeIndex={activeIndex} onSelect={handleSelect} indicators={false} className="carousel-inner" role="listbox">
-                {meal.map((item, idx) => (
+                {mealImages.map((item, idx) => (
                   <CarouselItem key={idx}>
-                    <Image src={item.image} alt="productImg" className="img-fluid bg-light rounded w-100" />
+                    <Image src={item.image} alt="productImg" className="img-fluid bg-light rounded w-100" width={400} height={300} />
                   </CarouselItem>
                 ))}
               </Carousel>
@@ -59,53 +106,88 @@ const MenuPlanView = () => {
       <Col lg={6}>
         <Card>
           <CardBody>
-            <h4 className="badge bg-success text-light fs-14 py-1 px-2">30% off</h4>
+            {mealPlan.discount && (
+              <h4 className="badge bg-success text-light fs-14 py-1 px-2">{mealPlan.discount}% off</h4>
+            )}
             <p className="mb-1">
               <Link href="" className="fs-24 text-dark fw-medium">
-                International Meal Plan
+                {mealPlan.title}
               </Link>
             </p>
             <div>
               <p>
-                Price : <span className="fw-semibold text-success">AED 50</span>
+                Price : <span className="fw-semibold text-success">AED {mealPlan.price}</span>
               </p>
-              <p>
-                Del Price: <del className="fw-semibold text-success">AED 75</del>
-              </p>
+              {mealPlan.delPrice && (
+                <p>
+                  Del Price: <del className="fw-semibold text-success">AED {mealPlan.delPrice}</del>
+                </p>
+              )}
             </div>
 
             <h4 className="text-dark fw-medium mt-3">Plan Details :</h4>
             <div className="mt-3">
               <ListGroup>
+                {mealPlan.badge && (
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Badge Title</span> :<span>{mealPlan.badge}</span>
+                  </ListGroup.Item>
+                )}
+                {mealPlan.kcalList && mealPlan.kcalList.length > 0 && (
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Added Kcal</span> :
+                    {mealPlan.kcalList.map((kcal, idx) => (
+                      <span key={idx} className="badge bg-success me-1">{kcal}</span>
+                    ))}
+                  </ListGroup.Item>
+                )}
+                {mealPlan.deliveredList && mealPlan.deliveredList.length > 0 && (
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Delivered daily</span> :
+                    {mealPlan.deliveredList.map((delivered, idx) => (
+                      <span key={idx} className="badge bg-success me-1">{delivered}</span>
+                    ))}
+                  </ListGroup.Item>
+                )}
+                {mealPlan.daysPerWeek && mealPlan.daysPerWeek.length > 0 && (
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Days per week</span> :
+                    {mealPlan.daysPerWeek.map((day, idx) => (
+                      <span key={idx} className="badge bg-success me-1">{day}</span>
+                    ))}
+                  </ListGroup.Item>
+                )}
+                {mealPlan.weeksOffers && mealPlan.weeksOffers.length > 0 && (
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Weeks & Offers</span> :
+                    {mealPlan.weeksOffers.map((offer, idx) => (
+                      <span key={idx} className="badge bg-success me-1">{offer.week}: {offer.offer}</span>
+                    ))}
+                  </ListGroup.Item>
+                )}
+                {mealPlan.suitableList && mealPlan.suitableList.length > 0 && (
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Suitable for</span> :
+                    {mealPlan.suitableList.map((suitable, idx) => (
+                      <span key={idx} className="badge bg-success me-1">{suitable}</span>
+                    ))}
+                  </ListGroup.Item>
+                )}
                 <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <span>Badge Title</span> :<span>Best Result</span>{' '}
+                  <span>Category</span> :<span className="badge bg-info">{mealPlan.category || 'N/A'}</span>
                 </ListGroup.Item>
                 <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <span>Added Kcal</span> :<span className="badge bg-success">1,000 -1,400</span>{' '}
-                  <span className="badge bg-success">1,000 -1,400</span>{' '}
+                  <span>Brand</span> :<span className="badge bg-warning">{mealPlan.brand || 'N/A'}</span>
                 </ListGroup.Item>
                 <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <span>Delivered daily</span> :<span className="badge bg-success">3 meal</span>{' '}
-                  <span className="badge bg-success">2 Snacks</span>{' '}
-                </ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <span>Weeks</span> :<span className="badge bg-success">3 Week</span> <span className="badge bg-success">2 Week</span>{' '}
-                </ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <span>Offer</span> :<span className="badge bg-success">15% off</span>
-                </ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between align-items-center">
-                  <span>Suitable for</span> :<span className="badge bg-success">Global test</span>{' '}
+                  <span>Status</span> :<span className={`badge ${mealPlan.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{mealPlan.status}</span>
                 </ListGroup.Item>
               </ListGroup>
             </div>
 
             <h4 className="text-dark fw-medium mt-3">Description :</h4>
             <div className="mt-3">
-              <p>
-                Lorem ipsum dolor sit amet consectetur adipisicing elit. Ipsa maiores molestias laboriosam quas ullam dignissimos illo aliquid autem
-                suscipit similique quaerat voluptate laborum, alias consequatur ipsam odit totam consectetur perspiciatis.
-              </p>
+              <p>{mealPlan.description}</p>
             </div>
           </CardBody>
         </Card>
