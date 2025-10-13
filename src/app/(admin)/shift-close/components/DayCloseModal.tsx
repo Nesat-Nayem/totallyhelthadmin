@@ -33,6 +33,10 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
   const [jsonThermalError, setJsonThermalError] = useState<string | null>(null)
   const [showJsonThermalReport, setShowJsonThermalReport] = useState(false)
   
+  // Unpaid bills error handling
+  const [unpaidBillsError, setUnpaidBillsError] = useState<any>(null)
+  const [showUnpaidBillsModal, setShowUnpaidBillsModal] = useState(false)
+  
   // Thermal receipt query - only trigger when we have a date and day is closed
   const { data: thermalReceiptData, isLoading: isThermalLoading, error: thermalQueryError } = useGenerateThermalReceiptQuery(
     currentDate, 
@@ -69,11 +73,25 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
   // Auto-show thermal report when data is available
   useEffect(() => {
     if (thermalReceiptData && showThermalButton) {
-      console.log('Thermal receipt data received, showing report')
-      setThermalReport(thermalReceiptData)
-      setShowThermalReport(true)
+      console.log('Thermal receipt data received, but not setting thermalReport directly')
+      // Don't set thermalReport here as it's an object, not HTML
+      // The thermal report should be generated through the proper function
     }
   }, [thermalReceiptData, showThermalButton])
+
+  // Debug thermal report content
+  useEffect(() => {
+    if (thermalReport) {
+      console.log('Thermal report updated:', {
+        type: typeof thermalReport,
+        length: thermalReport.length,
+        preview: thermalReport.substring(0, 200) + '...',
+        isHTML: thermalReport.includes('<html>') || thermalReport.includes('<!DOCTYPE'),
+        isObject: thermalReport === '[object Object]',
+        toString: thermalReport.toString().substring(0, 100)
+      })
+    }
+  }, [thermalReport])
 
   // Denomination values
   const denominationValues = {
@@ -194,15 +212,36 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
         setIsDayClosed(true) // Mark day as closed
         // Show thermal report if available
         if (result.thermalReport) {
-          setThermalReport(result.thermalReport)
+          // Ensure thermalReport is a string, not an object
+          const thermalReportString = typeof result.thermalReport === 'string' 
+            ? result.thermalReport 
+            : JSON.stringify(result.thermalReport)
+          setThermalReport(thermalReportString)
           setShowThermalReport(true)
         }
       }
     } catch (err: any) {
       console.error('Failed to perform day close:', err)
       
-      // Check if the error indicates day is already closed
+      // Check if the error indicates unpaid bills
       const errorMessage = err?.data?.message || err?.message || ''
+      const isUnpaidBillsError = errorMessage.toLowerCase().includes('unpaid') && 
+                                (errorMessage.toLowerCase().includes('order') || errorMessage.toLowerCase().includes('bill'))
+      
+      if (isUnpaidBillsError) {
+        // Show unpaid bills error with navigation options
+        console.log('Unpaid bills detected, showing error modal')
+        setUnpaidBillsError({
+          message: errorMessage,
+          unpaidOrdersCount: err?.data?.unpaidOrdersCount || 0,
+          unpaidOrders: err?.data?.unpaidOrders || [],
+          actionRequired: err?.data?.actionRequired || 'Please mark all orders as paid before closing the day'
+        })
+        setShowUnpaidBillsModal(true)
+        return
+      }
+      
+      // Check if the error indicates day is already closed
       const isDayAlreadyClosed = errorMessage.toLowerCase().includes('already') && 
                                 errorMessage.toLowerCase().includes('day') && 
                                 errorMessage.toLowerCase().includes('close')
@@ -245,68 +284,32 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
         console.log('Set current date to:', dateToUse)
       }
       
-      // Make direct API call
-      console.log('Making direct API call to thermal receipt endpoint...')
-      const token = localStorage.getItem('backend_token')
-      const response = await fetch(`http://localhost:5050/v1/api/day-close-report/thermal-json/${dateToUse}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'text/html',
-        },
-      })
+      // Use the JSON thermal receipt generation
+      console.log('Making API call to thermal receipt JSON endpoint...')
+      const jsonData = await fetchThermalReceiptJson(dateToUse)
       
-      console.log('API Response status:', response.status)
-      console.log('API Response headers:', response.headers)
+      console.log('JSON data received:', jsonData)
       
-      // Get the response text regardless of status code
-      const responseText = await response.text()
-      console.log('Response text received:', responseText.substring(0, 200) + '...')
-      console.log('Full response length:', responseText.length)
-      console.log('Response status:', response.status)
-      
-      // Check if the response contains thermal receipt HTML (even if status is 404)
-      const hasThermalReceipt = responseText.includes('thermal-receipt') || 
-                               responseText.includes('TOTALLY HEALTHY') || 
-                               responseText.includes('Shift Report') || 
-                               responseText.includes('<!DOCTYPE html>') ||
-                               responseText.includes('<html') ||
-                               responseText.includes('Courier New') ||
-                               responseText.includes('font-family') ||
-                               responseText.includes('body')
-      
-      console.log('Has thermal receipt content:', hasThermalReceipt)
-      console.log('Response contains TOTALLY HEALTHY:', responseText.includes('TOTALLY HEALTHY'))
-      console.log('Response contains Shift Report:', responseText.includes('Shift Report'))
-      console.log('Response contains DOCTYPE:', responseText.includes('<!DOCTYPE html>'))
-      console.log('Response contains HTML tag:', responseText.includes('<html'))
-      console.log('Response contains body tag:', responseText.includes('<body'))
-      
-      if (hasThermalReceipt) {
-        console.log('Thermal receipt HTML detected in response, displaying report')
-        setThermalReport(responseText)
+      if (jsonData.success && jsonData.data) {
+        console.log('JSON data structure:', {
+          hasHeader: !!jsonData.data.header,
+          hasShiftDetails: !!jsonData.data.shiftDetails,
+          hasSummary: !!jsonData.data.summary,
+          dataKeys: Object.keys(jsonData.data)
+        })
+        
+        // Generate HTML from JSON data using the utility function
+        const htmlContent = generateThermalReceiptHtml(jsonData.data)
+        console.log('Generated HTML content:', htmlContent.substring(0, 200) + '...')
+        console.log('Full HTML content length:', htmlContent.length)
+        console.log('HTML content type:', typeof htmlContent)
+        console.log('HTML content starts with:', htmlContent.substring(0, 50))
+        
+        setThermalReport(htmlContent)
         setShowThermalReport(true)
-        // Don't show error alert if we successfully got the thermal receipt
-        return
-      } else if (response.ok) {
-        console.log('Response OK, displaying content')
-        setThermalReport(responseText)
-        setShowThermalReport(true)
-        return
       } else {
-        console.error('API Error:', response.status, responseText)
-        console.log('Response content preview:', responseText.substring(0, 500))
-        
-        // Check if the response contains any HTML content even with 404
-        if (responseText.length > 0 && (responseText.includes('<') || responseText.includes('html'))) {
-          console.log('Response contains HTML content despite 404, attempting to display')
-          setThermalReport(responseText)
-          setShowThermalReport(true)
-          return
-        }
-        
-        // Set error state instead of showing alert
-        setThermalError(`Error generating thermal receipt: ${response.status} - ${responseText.substring(0, 100)}...`)
+        console.error('JSON data validation failed:', jsonData)
+        setThermalError('Failed to generate thermal receipt: ' + (jsonData.message || 'Unknown error'))
       }
     } catch (error) {
       console.error('Failed to generate thermal receipt:', error)
@@ -322,12 +325,11 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
   }
 
   const handlePrintThermalReport = () => {
-    const reportData = thermalReceiptData || thermalReport
-    if (reportData) {
+    if (thermalReport) {
       // Use backend thermal response directly without modification
       try {
         // Create blob with backend thermal HTML directly
-        const blob = new Blob([reportData], { type: 'text/html' })
+        const blob = new Blob([thermalReport], { type: 'text/html' })
         const url = URL.createObjectURL(blob)
         
         // Create download link
@@ -347,7 +349,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
         try {
           const printWindow = window.open('', '_blank', 'width=200,height=800,scrollbars=no,resizable=no')
           if (printWindow) {
-            printWindow.document.write(reportData)
+            printWindow.document.write(thermalReport)
             printWindow.document.close()
             printWindow.focus()
             printWindow.print()
@@ -357,7 +359,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
           console.error('Print window failed:', printError)
           
           // Final fallback: Simple text download
-          const textContent = reportData.replace(/<[^>]*>/g, '') // Remove HTML tags
+          const textContent = thermalReport.replace(/<[^>]*>/g, '') // Remove HTML tags
           const blob = new Blob([textContent], { type: 'text/plain' })
           const url = URL.createObjectURL(blob)
           const link = document.createElement('a')
@@ -470,6 +472,10 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
     setIsGeneratingJsonThermal(false)
     setJsonThermalError(null)
     setShowJsonThermalReport(false)
+    
+    // Reset unpaid bills states
+    setUnpaidBillsError(null)
+    setShowUnpaidBillsModal(false)
     
     onSuccess?.()
     onHide()
@@ -868,7 +874,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
                           <p>{thermalError}</p>
                           <small>Please try again or contact support</small>
                         </div>
-                      ) : thermalReceiptData || thermalReport ? (
+                      ) : thermalReport ? (
                         <div 
                           style={{ 
                         maxHeight: '300px',
@@ -877,10 +883,17 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
                         padding: '10px',
                         border: '1px solid #dee2e6'
                           }}
-                          dangerouslySetInnerHTML={{ 
-                            __html: thermalReceiptData || thermalReport 
-                          }}
-                        />
+                        >
+                          {typeof thermalReport === 'string' && thermalReport.includes('<') ? (
+                            <div dangerouslySetInnerHTML={{ __html: thermalReport }} />
+                          ) : (
+                            <div style={{ textAlign: 'center', color: '#dc3545' }}>
+                              <p><strong>Error:</strong> Thermal report format is invalid</p>
+                              <p>Expected HTML content, but received: {typeof thermalReport}</p>
+                              <small>Please try generating the thermal report again</small>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div 
                           style={{ 
@@ -912,7 +925,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
             <Button variant="secondary" onClick={handleCloseModal}>
               Close
             </Button>
-            {!thermalReceiptData && !thermalReport && isDayClosed && (
+            {!thermalReport && isDayClosed && (
               <Button 
                 variant="success" 
                 onClick={handleGenerateThermalReceipt}
@@ -921,7 +934,7 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
                 {isGeneratingThermal ? 'Generating...' : 'Generate Thermal Receipt'}
               </Button>
             )}
-            {(thermalReceiptData || thermalReport) && (
+            {thermalReport && (
               <>
                 <Button variant="info" onClick={handleOpenThermalReceiptPage} className="me-2">
                   📄 Open in New Page
@@ -1008,6 +1021,100 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
           </Modal.Footer>
         </>
       )}
+      
+      {/* Unpaid Bills Error Modal - Separate Floating Popup */}
+      <Modal 
+        show={showUnpaidBillsModal} 
+        onHide={() => setShowUnpaidBillsModal(false)} 
+        centered 
+        size="sm"
+        backdrop="static"
+        keyboard={false}
+        style={{ zIndex: 9999 }}
+        contentClassName="shadow-lg border-0"
+        dialogClassName="mb-0"
+      >
+        <Modal.Header 
+          closeButton 
+          className="bg-danger text-white border-0"
+          style={{ 
+            borderRadius: '0.375rem 0.375rem 0 0',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+        >
+          <Modal.Title className="fs-6 fw-bold">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Unpaid Bills Detected
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body 
+          className="text-center py-4 px-4"
+          style={{ 
+            backgroundColor: '#fff',
+            borderRadius: '0 0 0.375rem 0.375rem'
+          }}
+        >
+          <div className="mb-3">
+            <i className="fas fa-ban text-danger" style={{ fontSize: '2.5rem' }}></i>
+          </div>
+          <h6 className="text-danger mb-2 fw-bold">Cannot Close Day</h6>
+          <p className="text-muted mb-3 small">
+            {unpaidBillsError?.message || 'There are unpaid orders that need to be settled first.'}
+          </p>
+          {unpaidBillsError?.unpaidOrdersCount > 0 && (
+            <div className="mb-3">
+              <span className="badge bg-danger fs-6 px-3 py-2">
+                {unpaidBillsError.unpaidOrdersCount} unpaid orders
+              </span>
+            </div>
+          )}
+          <p className="text-muted small mb-0">
+            Please settle all unpaid bills before closing the day.
+          </p>
+        </Modal.Body>
+        <Modal.Footer 
+          className="border-0 pt-0 pb-3 px-4"
+          style={{ 
+            backgroundColor: '#f8f9fa',
+            borderRadius: '0 0 0.375rem 0.375rem'
+          }}
+        >
+          <div className="d-flex justify-content-center w-100 gap-2">
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => setShowUnpaidBillsModal(false)}
+              size="sm"
+              className="px-3"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="info" 
+              onClick={() => {
+                setShowUnpaidBillsModal(false)
+                router.push('/reports/all-income')
+              }}
+              size="sm"
+              className="px-3"
+            >
+              <i className="fas fa-chart-line me-1"></i>
+              Reports
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={() => {
+                setShowUnpaidBillsModal(false)
+                router.push('/pos')
+              }}
+              size="sm"
+              className="px-3"
+            >
+              <i className="fas fa-cash-register me-1"></i>
+              POS
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
     </Modal>
   )
 }

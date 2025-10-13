@@ -63,8 +63,13 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
+    updateOrder: build.mutation<Order, { id: string; data: Partial<OrderCreateDto> }>({
+      query: ({ id, data }) => ({ url: `/orders/${id}`, method: 'PUT', body: data }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }],
+    }),
   }),
   overrideExisting: true,
 })
 
-export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation } = orderApi
+export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation, useUpdateOrderMutation } = orderApi

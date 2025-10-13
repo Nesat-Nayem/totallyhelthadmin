@@ -85,7 +85,7 @@ const POS = () => {
   const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
   const [createOrder] = useCreateOrderMutation()
   const { data: openDayRes, refetch: refetchOpenDay } = useGetOpenDayCloseQuery()
-  const [startDayClose] = useStartDayCloseMutation()
+  const [startDayClose, { isLoading: isStartingDay }] = useStartDayCloseMutation()
   const [closeDayClose] = useCloseDayCloseMutation()
   const openDay = openDayRes?.data
   const [showDayReportModal, setShowDayReportModal] = useState(false)
@@ -258,11 +258,28 @@ const POS = () => {
 
   const handleStartDay = async () => {
     try {
-      await startDayClose().unwrap()
+      console.log('Starting day...')
+      const result = await startDayClose({
+        startTime: new Date().toISOString(),
+        note: 'Day started from POS system'
+      }).unwrap()
+      
+      console.log('Start day result:', result)
       await refetchOpenDay()
       showSuccess('Day started successfully')
     } catch (e: any) {
-      showError(e?.data?.message || 'Failed to start day')
+      console.error('Start day error:', e)
+      
+      // Check if it's a network error
+      if (e?.status === 'FETCH_ERROR' || e?.error === 'FETCH_ERROR') {
+        showError('Unable to connect to server. Please check your internet connection and try again.')
+      } else if (e?.status === 404) {
+        showError('Day start endpoint not found. Please contact support.')
+      } else if (e?.status === 500) {
+        showError('Server error occurred. Please try again later.')
+      } else {
+        showError(e?.data?.message || e?.message || 'Failed to start day. Please try again.')
+      }
     }
   }
 
@@ -505,8 +522,22 @@ const POS = () => {
                     <IconifyIcon icon="mdi:calendar-check" /> Close Day
                   </Button>
                 ) : (
-                  <Button variant="success" className="btn" onClick={handleStartDay}>
-                    <IconifyIcon icon="mdi:calendar-start" /> Start Day
+                  <Button 
+                    variant="success" 
+                    className="btn" 
+                    onClick={handleStartDay}
+                    disabled={isStartingDay}
+                  >
+                    {isStartingDay ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <IconifyIcon icon="mdi:calendar-start" /> Start Day
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
