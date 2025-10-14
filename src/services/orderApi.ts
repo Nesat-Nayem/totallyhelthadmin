@@ -14,7 +14,7 @@ export type OrderCreateDto = {
   startDate?: string
   endDate?: string
   paymentMode?: string
-  orderType?: 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'membership'
+  orderType?: 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal'
   branchId?: string
   brand?: string
   aggregatorId?: string
@@ -68,8 +68,16 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
+    getPaidOrdersToday: build.query<{ data: Order[]; summary: any; date: string }, { branchId?: string } | void>({
+      query: (params) => ({ url: '/orders/today/paid', method: 'GET', params: params ?? {} }),
+      providesTags: [{ type: 'Order', id: 'PAID_TODAY' }],
+    }),
+    getUnpaidOrdersToday: build.query<{ data: Order[]; summary: any; date: string }, { branchId?: string } | void>({
+      query: (params) => ({ url: '/orders/today/unpaid', method: 'GET', params: params ?? {} }),
+      providesTags: [{ type: 'Order', id: 'UNPAID_TODAY' }],
+    }),
   }),
   overrideExisting: true,
 })
 
-export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation, useUpdateOrderMutation } = orderApi
+export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation, useUpdateOrderMutation, useGetPaidOrdersTodayQuery, useGetUnpaidOrdersTodayQuery } = orderApi

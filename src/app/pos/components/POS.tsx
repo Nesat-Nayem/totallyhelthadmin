@@ -5,6 +5,7 @@ import { Card, CardBody, CardFooter, CardHeader, CardTitle, Col, Row, Form, Butt
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import CustomerModal from './CustomerModal'
 import Calculator from './Calculator'
 import PrintOrder from './PrintOrder'
@@ -29,12 +30,12 @@ import { useGetBrandsQuery } from '@/services/brandApi'
 import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
-import { useCreateOrderMutation } from '@/services/orderApi'
+import { useCreateOrderMutation, useUpdateOrderMutation } from '@/services/orderApi'
 import { useGetOpenDayCloseQuery, useStartDayCloseMutation, useCloseDayCloseMutation } from '@/services/dayCloseApi'
 import { useCreateCustomerMutation } from '@/services/customerApi'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
-import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal } from '@/store/slices/posSlice'
+import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal, setEditMode, exitEditMode } from '@/store/slices/posSlice'
 import { showCustomerRequiredAlert, showSuccess, showError } from '@/utils/sweetAlert'
 
 // Fallback images for menus
@@ -43,7 +44,8 @@ const fallbackImages = [product1, product2, product3, product4]
 const orderTypes = ['DineIn', 'TakeAway', 'Delivery']
 const POS = () => {
   const dispatch = useDispatch()
-  const { selectedOrderType, selectedPriceType, showOrderTypeModal } = useSelector((state: RootState) => state.pos)
+  const router = useRouter()
+  const { selectedOrderType, selectedPriceType, showOrderTypeModal, editingOrder, isEditMode } = useSelector((state: RootState) => state.pos)
   
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: any }>({})
   const [showSplitModal, setShowSplitModal] = useState(false)
@@ -69,14 +71,87 @@ const POS = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
   
-  // Reset filters when switching between membership and regular orders
+  // Reset filters when switching between different order types
   useEffect(() => {
-    if (selectedPriceType === 'membership') {
-      // Reset to default values for meal plan filtering
-      setSelectedBrand('')
-      setSelectedCategory('')
+    // Reset to default values when switching order types
+    setSelectedBrand('')
+    setSelectedCategory('')
+  }, [selectedOrderType])
+
+  // Handle edit mode - populate form with existing order data
+  useEffect(() => {
+    if (isEditMode && editingOrder) {
+      // Set order type and price type
+      const orderType = editingOrder.orderType || 'DineIn'
+      const priceType = editingOrder.salesType === 'membership' ? 'membership' : 
+                       editingOrder.salesType === 'restaurant' ? 'restaurant' : 'online'
+      
+      // Populate selected products
+      const products: { [key: string]: any } = {}
+      if (editingOrder.items && editingOrder.items.length > 0) {
+        editingOrder.items.forEach((item: any, index: number) => {
+          const uniqueId = `${item.productId}_${Date.now()}_${index}`
+          products[uniqueId] = {
+            _id: item.productId,
+            title: item.title,
+            price: item.price,
+            qty: item.qty,
+          }
+        })
+      }
+      setSelectedProducts(products)
+      
+      // Set other form fields
+      setCustomer(editingOrder.customer || null)
+      setSelectedPaymentMode(editingOrder.paymentMode || 'Cash')
+      setReceiveAmount(editingOrder.receiveAmount || 0)
+      setDeliveryCharge(editingOrder.shippingCharge || 0)
+      setRounding(editingOrder.rounding || 0)
+      setNotes(editingOrder.note || '')
+      setInvoiceNo(editingOrder.invoiceNo || 'S-001')
+      setOrderNo(editingOrder.orderNo || '#001')
+      setStartDate(editingOrder.startDate || new Date().toISOString().split('T')[0])
+      setEndDate(editingOrder.endDate || new Date().toISOString().split('T')[0])
+      
+      // Set discount if exists
+      if (editingOrder.discountAmount && editingOrder.discountAmount > 0) {
+        setDiscount({
+          type: 'amount',
+          amount: editingOrder.discountAmount,
+          reason: 'Edit mode discount'
+        })
+      }
     }
-  }, [selectedPriceType])
+  }, [isEditMode, editingOrder])
+
+  // Handle order data from sessionStorage (when navigating from reports)
+  useEffect(() => {
+    const checkForEditOrderData = () => {
+      try {
+        const editOrderData = sessionStorage.getItem('editOrderData')
+        if (editOrderData) {
+          const orderData = JSON.parse(editOrderData)
+          
+          // Determine order type and price type from the order data
+          const orderType = orderData.orderType || 'DineIn'
+          const priceType = orderData.salesType === 'membership' ? 'membership' : 
+                           orderData.salesType === 'restaurant' ? 'restaurant' : 'online'
+          
+          // Set edit mode in Redux
+          dispatch(setEditMode({ orderData, orderType, priceType }))
+          
+          // Clear the sessionStorage data
+          sessionStorage.removeItem('editOrderData')
+        }
+      } catch (error) {
+        console.error('Error parsing edit order data:', error)
+        sessionStorage.removeItem('editOrderData')
+      }
+    }
+
+    // Check for edit order data on component mount
+    checkForEditOrderData()
+  }, [dispatch])
   
   // Fetch data from APIs
   const { data: brandsData } = useGetBrandsQuery()
@@ -84,6 +159,7 @@ const POS = () => {
   const { data: aggregatorsData } = useGetAggregatorsQuery()
   const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
   const [createOrder] = useCreateOrderMutation()
+  const [updateOrder] = useUpdateOrderMutation()
   const { data: openDayRes, refetch: refetchOpenDay } = useGetOpenDayCloseQuery()
   const [startDayClose, { isLoading: isStartingDay }] = useStartDayCloseMutation()
   const [closeDayClose] = useCloseDayCloseMutation()
@@ -92,9 +168,9 @@ const POS = () => {
   const [dayReportData, setDayReportData] = useState<any>(null)
   
   // Get menus with filters - using proper menu API with search, brand, category, and price type filtering
-  // For membership orders, use meal plans instead of regular menus
+  // For membershipMeal orders, use master menu API; for regular membership (New Membership), use meal plan API
   const { data: menusData } = useGetMenusQuery(
-    selectedPriceType !== 'membership' && (searchQuery || selectedBrand || selectedCategory || selectedPriceType)
+    selectedOrderType !== 'NewMembership' && (searchQuery || selectedBrand || selectedCategory || selectedPriceType)
       ? {
           q: searchQuery || undefined,
           brand: selectedBrand || undefined,
@@ -102,12 +178,12 @@ const POS = () => {
           priceType: selectedPriceType || undefined,
           limit: 100
         }
-      : selectedPriceType !== 'membership' ? { limit: 100 } : undefined
+      : selectedOrderType !== 'NewMembership' ? { limit: 100 } : undefined
   )
 
-  // Get meal plans for membership orders with proper filtering
+  // Get meal plans for New Membership orders (orderType: 'membership')
   const { data: mealPlansData } = useGetMealPlansQuery(
-    selectedPriceType === 'membership'
+    selectedOrderType === 'NewMembership'
       ? {
           q: searchQuery || undefined,
           brand: selectedBrand || undefined,
@@ -117,8 +193,8 @@ const POS = () => {
       : undefined
   )
   
-  // Use meal plan brands and categories for membership orders, regular ones for others
-  const brands = selectedPriceType === 'membership' 
+  // Use meal plan brands and categories for New Membership orders, master menu ones for others
+  const brands = selectedOrderType === 'NewMembership' 
     ? [
         { _id: 'Totally Health', name: 'Totally Health' },
         { _id: 'Subway', name: 'Subway' },
@@ -127,7 +203,7 @@ const POS = () => {
       ]
     : (brandsData ?? [])
     
-  const categories = selectedPriceType === 'membership'
+  const categories = selectedOrderType === 'NewMembership'
     ? [
         { _id: 'Weight Loss', title: 'Weight Loss' },
         { _id: 'Weight Gain', title: 'Weight Gain' },
@@ -142,8 +218,8 @@ const POS = () => {
   const aggregators = aggregatorsData ?? []
   const paymentMethods = paymentMethodsData ?? []
   
-  // Use meal plans for membership orders, regular menus for others
-  const menus = selectedPriceType === 'membership'
+  // Use meal plans for New Membership orders, master menu data for others including Membership Meal
+  const menus = selectedOrderType === 'NewMembership'
     ? (mealPlansData?.data ?? []).map((mealPlan: any) => ({
         ...mealPlan,
         // Map meal plan fields to menu fields for compatibility
@@ -301,7 +377,7 @@ const POS = () => {
   const handleSaveOrder = async () => {
     try {
       // Check if this is a membership order and customer is required
-      if (selectedPriceType === 'membership' && !customer) {
+      if ((selectedOrderType === 'NewMembership' || selectedOrderType === 'MembershipMeal') && !customer) {
         const shouldProceed = await showCustomerRequiredAlert()
         if (!shouldProceed) {
           return // User cancelled, don't proceed with save
@@ -347,8 +423,8 @@ const POS = () => {
         note: notes,  // Field is 'note' not 'notes'
         paymentMode: selectedPaymentMode,
         payments: payments,
-        salesType: (selectedPriceType === 'membership' ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
-        orderType: selectedOrderType || undefined,
+        salesType: ((selectedOrderType === 'NewMembership' || selectedOrderType === 'MembershipMeal') ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
+        orderType: selectedOrderType as 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal' | undefined,
         aggregatorId: selectedAggregator || undefined,
         brand: selectedBrand || undefined,
         startDate,
@@ -356,8 +432,23 @@ const POS = () => {
         status: (receiveAmount >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
       }
       
-      const result = await createOrder(orderData).unwrap()
-      showSuccess(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+      let result
+      if (isEditMode && editingOrder) {
+        // Update existing order (called from Settle Bill button)
+        result = await updateOrder({ id: editingOrder._id, data: orderData }).unwrap()
+        showSuccess(`Order updated successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+        
+        // Exit edit mode after successful update
+        dispatch(exitEditMode())
+        
+        // Optionally navigate back to reports after successful update
+        // Uncomment the line below if you want automatic navigation back to reports
+        // setTimeout(() => router.push('/reports/all-income'), 2000)
+      } else {
+        // Create new order (called from Save button)
+        result = await createOrder(orderData).unwrap()
+        showSuccess(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+      }
       
       // Reset form
       setSelectedProducts({})
@@ -370,8 +461,25 @@ const POS = () => {
       setReceiveAmount(0)
       setPayments([])
     } catch (error: any) {
-      showError(error?.data?.message || 'Failed to create order')
+      const action = isEditMode ? 'update' : 'create'
+      showError(error?.data?.message || `Failed to ${action} order`)
     }
+  }
+
+  const handleEditOrder = (orderData: any) => {
+    // Determine order type and price type from the order data
+    const orderType = orderData.orderType || 'DineIn'
+    const priceType = orderData.salesType === 'membership' ? 'membership' : 
+                     orderData.salesType === 'restaurant' ? 'restaurant' : 'online'
+    
+    // Add source identifier for ViewOrders
+    const orderDataWithSource = {
+      ...orderData,
+      editSource: 'viewOrders'
+    }
+    
+    // Set edit mode in Redux
+    dispatch(setEditMode({ orderData: orderDataWithSource, orderType, priceType }))
   }
   
   const handleReset = () => {
@@ -389,12 +497,57 @@ const POS = () => {
     setShowAddPayment(false)
     setNewPaymentType('Cash')
     setNewPaymentAmount('')
+    
+    // Exit edit mode if in edit mode
+    if (isEditMode) {
+      dispatch(exitEditMode())
+    }
   }
 
   return (
     <>
       <DefaultModaal show={showOrderTypeModal} onClose={() => dispatch(hideOrderTypeModal())} />
       <ReportModal show={showDayReportModal} onClose={() => setShowDayReportModal(false)} data={dayReportData || undefined} />
+      
+      {/* Edit Mode Indicator */}
+      {isEditMode && editingOrder && (
+        <div className="alert alert-info d-flex justify-content-between align-items-center mb-3">
+          <div className="d-flex align-items-center">
+            <IconifyIcon icon="mdi:pencil-outline" className="me-2" />
+            <strong>Editing Order:</strong> {editingOrder.orderNo || editingOrder.invoiceNo}
+            <span className={`badge ms-2 ${editingOrder.editSource === 'reports' ? 'bg-success' : 'bg-primary'}`}>
+              From {editingOrder.editSource === 'reports' ? 'Reports' : 'View Orders'}
+            </span>
+          </div>
+          <div className="d-flex gap-2">
+            <Button 
+              variant="outline-primary" 
+              size="sm" 
+              onClick={() => {
+                if (editingOrder.editSource === 'reports') {
+                  window.history.back()
+                } else {
+                  // For View Orders, we need to trigger the ViewOrders modal
+                  // We'll use a custom event to communicate with ViewOrders component
+                  window.dispatchEvent(new CustomEvent('reopenViewOrders'))
+                  dispatch(exitEditMode())
+                }
+              }}
+            >
+              <IconifyIcon icon="mdi:arrow-left" className="me-1" />
+              Back to {editingOrder.editSource === 'reports' ? 'Reports' : 'View Orders'}
+            </Button>
+            <Button 
+              variant="outline-secondary" 
+              size="sm" 
+              onClick={() => dispatch(exitEditMode())}
+            >
+              <IconifyIcon icon="mdi:close" className="me-1" />
+              Exit Edit Mode
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Row className="g-3">
         <Col lg={4}>
@@ -841,18 +994,30 @@ const POS = () => {
               <Button variant="warning" size="lg" onClick={handleReset}>
                 <IconifyIcon icon="mdi:restart" /> Reset
               </Button>
-              <Button variant="info" size="lg">
+              <Button 
+                variant="info" 
+                size="lg"
+                onClick={isEditMode ? handleSaveOrder : undefined}
+                disabled={!isEditMode}
+                style={{ opacity: !isEditMode ? 0.5 : 1 }}
+              >
                 <IconifyIcon icon="mdi:restart" /> Settle Bill
               </Button>
               <PrintOrder />
-              <ViewOrder />
+              <ViewOrder onEditOrder={handleEditOrder} />
               <Link href="/reports/all-income" className="btn btn-lg btn-dark">
                 <IconifyIcon icon="mdi:document" /> Reports
               </Link>
               <Link href="/reports/transactions" className="btn btn-lg btn-light">
                 <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
               </Link>
-              <Button variant="primary" size="lg" onClick={handleSaveOrder}>
+              <Button 
+                variant="primary" 
+                size="lg" 
+                onClick={handleSaveOrder}
+                disabled={isEditMode}
+                style={{ opacity: isEditMode ? 0.5 : 1 }}
+              >
                 <IconifyIcon icon="mdi:content-save-outline" /> Save
               </Button>
             </CardFooter>

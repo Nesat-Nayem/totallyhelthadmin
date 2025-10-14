@@ -1,6 +1,7 @@
 'use client'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import React from 'react'
 import {
   Button,
@@ -12,12 +13,9 @@ import {
   FormControl,
   InputGroup,
   Row,
-  Modal,
-  Form,
-  Alert,
-  Spinner,
 } from 'react-bootstrap'
-import { useGetOrdersQuery, useUpdateOrderMutation } from '@/services/orderApi'
+import { useGetOrdersQuery } from '@/services/orderApi'
+import { useSession } from 'next-auth/react'
 
 function formatDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d
@@ -62,223 +60,97 @@ function toCSV(rows: any[]) {
 
 
 
-// Edit Order Modal Component
-const EditOrderModal = ({ 
-  show, 
-  onHide, 
-  order, 
-  onSave 
-}: { 
-  show: boolean; 
-  onHide: () => void; 
-  order: any; 
-  onSave: (orderId: string, data: any) => void 
-}) => {
-  const [formData, setFormData] = React.useState({
-    status: 'paid',
-    paymentMode: '',
-    note: '',
-    total: 0,
-    subTotal: 0,
-    vatAmount: 0,
-    shippingCharge: 0,
-    discountAmount: 0,
-  })
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState('')
-
-  React.useEffect(() => {
-    if (order) {
-      setFormData({
-        status: order.status || 'paid',
-        paymentMode: order.paymentMode || '',
-        note: order.note || '',
-        total: order.total || 0,
-        subTotal: order.subTotal || 0,
-        vatAmount: order.vatAmount || 0,
-        shippingCharge: order.shippingCharge || 0,
-        discountAmount: order.discountAmount || 0,
-      })
-    }
-  }, [order])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
-
-    try {
-      await onSave(order._id, formData)
-      onHide()
-    } catch (err: any) {
-      setError(err.message || 'Failed to update order')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  return (
-    <Modal show={show} onHide={onHide} size="lg" centered>
-      <Modal.Header closeButton>
-        <Modal.Title>Edit Order - {order?.invoiceNo}</Modal.Title>
-      </Modal.Header>
-      <Form onSubmit={handleSubmit}>
-        <Modal.Body>
-          {error && <Alert variant="danger">{error}</Alert>}
-          
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Status</Form.Label>
-                <Form.Select 
-                  value={formData.status} 
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                >
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Payment Mode</Form.Label>
-                <Form.Select 
-                  value={formData.paymentMode} 
-                  onChange={(e) => handleInputChange('paymentMode', e.target.value)}
-                >
-                  <option value="">Select Payment Mode</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="Online Transfer">Online Transfer</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Sub Total</Form.Label>
-                <FormControl
-                  type="number"
-                  step="0.01"
-                  value={formData.subTotal}
-                  onChange={(e) => handleInputChange('subTotal', parseFloat(e.target.value) || 0)}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Total Amount</Form.Label>
-                <FormControl
-                  type="number"
-                  step="0.01"
-                  value={formData.total}
-                  onChange={(e) => handleInputChange('total', parseFloat(e.target.value) || 0)}
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>VAT Amount</Form.Label>
-                <FormControl
-                  type="number"
-                  step="0.01"
-                  value={formData.vatAmount}
-                  onChange={(e) => handleInputChange('vatAmount', parseFloat(e.target.value) || 0)}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Shipping Charge</Form.Label>
-                <FormControl
-                  type="number"
-                  step="0.01"
-                  value={formData.shippingCharge}
-                  onChange={(e) => handleInputChange('shippingCharge', parseFloat(e.target.value) || 0)}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label>Discount Amount</Form.Label>
-                <FormControl
-                  type="number"
-                  step="0.01"
-                  value={formData.discountAmount}
-                  onChange={(e) => handleInputChange('discountAmount', parseFloat(e.target.value) || 0)}
-                />
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Notes</Form.Label>
-            <FormControl
-              as="textarea"
-              rows={3}
-              value={formData.note}
-              onChange={(e) => handleInputChange('note', e.target.value)}
-              placeholder="Add order notes..."
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" disabled={isLoading}>
-            {isLoading ? <><Spinner size="sm" className="me-2" />Saving...</> : 'Save Changes'}
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
-  )
-}
 
 const AllIncomeList = () => {
+  const router = useRouter()
+  const { data: session, status } = useSession()
   const [q, setQ] = React.useState('')
   const [startDate, setStartDate] = React.useState<string>('')
   const [endDate, setEndDate] = React.useState<string>('')
   const [page, setPage] = React.useState(1)
-  const [showEditModal, setShowEditModal] = React.useState(false)
-  const [selectedOrder, setSelectedOrder] = React.useState<any>(null)
   const limit = 20
 
-  const { data: ordersResp } = useGetOrdersQuery({ q: q || undefined, page, limit, startDate: startDate || undefined, endDate: endDate || undefined })
+  // Wait for session to be ready before making API calls
+  const isSessionReady = status !== 'loading'
+  
+  // Check for token with a small delay to ensure localStorage is synced
+  const [tokenReady, setTokenReady] = React.useState(false)
+  const [showNoData, setShowNoData] = React.useState(false)
+  
+  React.useEffect(() => {
+    if (isSessionReady) {
+      // Small delay to ensure LocalAuthSync has updated localStorage
+      const timer = setTimeout(() => {
+        const token = localStorage.getItem('backend_token')
+        setTokenReady(!!token)
+      }, 50) // Reduced delay
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isSessionReady])
+  
+  const hasToken = tokenReady
+
+  const { data: ordersResp, isLoading, error, refetch } = useGetOrdersQuery({ 
+    ...(q && { q }), 
+    page, 
+    limit, 
+    ...(startDate && { startDate }), 
+    ...(endDate && { endDate }) 
+  }, {
+    skip: !isSessionReady || !hasToken,
+    // Force fresh data on mount
+    refetchOnMountOrArgChange: true
+  })
+
+  // this month
+  const { data: monthResp } = useGetOrdersQuery({ startDate: firstDayOfMonthISO(), endDate: todayISO(), page: 1, limit: 1 }, {
+    skip: !isSessionReady || !hasToken
+  })
+  const monthTotal = monthResp?.summary?.total ?? 0
+
   const orders = ordersResp?.data ?? []
   const meta = ordersResp?.meta
   const summary = ordersResp?.summary
+  
+  // Delay showing "No Data" message to prevent blinking
+  React.useEffect(() => {
+    if (isSessionReady && !isLoading && !error && orders.length === 0) {
+      const timer = setTimeout(() => {
+        setShowNoData(true)
+      }, 300) // 300ms delay before showing "No Data"
+      
+      return () => clearTimeout(timer)
+    } else {
+      setShowNoData(false)
+    }
+  }, [isSessionReady, isLoading, error, orders.length])
 
-  // this month
-  const { data: monthResp } = useGetOrdersQuery({ startDate: firstDayOfMonthISO(), endDate: todayISO(), page: 1, limit: 1 })
-  const monthTotal = monthResp?.summary?.total ?? 0
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Session status:', { status, isSessionReady, hasToken })
+    console.log('Orders query state:', { ordersResp, isLoading, error })
+    console.log('Orders data:', orders)
+    
+    if (error) {
+      console.error('Orders query error:', error)
+    }
+  }, [ordersResp, isLoading, error, status, isSessionReady, hasToken, orders])
 
-  // Update order mutation
-  const [updateOrder, { isLoading: isUpdating }] = useUpdateOrderMutation()
 
 
   const handleEditOrder = (order: any) => {
-    setSelectedOrder(order)
-    setShowEditModal(true)
+    // Store order data in sessionStorage for POS to access with source identifier
+    const orderDataWithSource = {
+      ...order,
+      editSource: 'reports'
+    }
+    sessionStorage.setItem('editOrderData', JSON.stringify(orderDataWithSource))
+    // Navigate to POS page
+    router.push('/pos')
   }
 
-  const handleSaveOrder = async (orderId: string, data: any) => {
-    try {
-      await updateOrder({ id: orderId, data }).unwrap()
-    } catch (error) {
-      console.error('Failed to update order:', error)
-      throw error
-    }
-  }
+
 
   const handleExportCSV = () => {
     const blob = toCSV(
@@ -364,8 +236,103 @@ const AllIncomeList = () => {
             </CardHeader>
 
             <div>
-              <div className="table-responsive">
-                <table className="table align-middle mb-0 table-hover table-centered table-bordered">
+              {/* Combined Loading State - Show only when actually loading */}
+              {(!isSessionReady || isLoading) && (
+                <div className="text-center py-4">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2">Loading orders...</p>
+                </div>
+              )}
+
+              {/* Error State */}
+              {isSessionReady && error && (
+                <div className="alert alert-danger text-center">
+                  <p>Failed to load orders. Please try again.</p>
+                  <div className="small text-muted mb-2">
+                    {(() => {
+                      const errorStatus = (error as any)?.status
+                      const errorMessage = (error as any)?.data?.message
+                      
+                      return (
+                        <>
+                          Error: {errorStatus ? `Status ${errorStatus}` : 'Network Error'}
+                          {errorMessage && <div>Message: {errorMessage}</div>}
+                          {errorStatus === 401 && (
+                            <div className="text-warning mt-2">
+                              <strong>Authentication Error:</strong> Please check if you're logged in properly.
+                            </div>
+                          )}
+                          {errorStatus === 'FETCH_ERROR' && (
+                            <div className="text-warning mt-2">
+                              <strong>Connection Error:</strong> Unable to connect to the server. Please check your internet connection.
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                  <div className="d-flex gap-2 justify-content-center">
+                    <button className="btn btn-outline-danger btn-sm" onClick={() => window.location.reload()}>
+                      Retry
+                    </button>
+                    {(error as any)?.status === 401 && (
+                      <button className="btn btn-outline-warning btn-sm" onClick={() => {
+                        localStorage.removeItem('backend_token')
+                        window.location.href = '/auth/login'
+                      }}>
+                        Login Again
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* No Data Message - Only show after delay to prevent blinking */}
+              {showNoData && (
+                <div className="text-center py-4">
+                  <div className="alert alert-info">
+                    <h5>No orders found</h5>
+                    <p className="mb-0">
+                      {q || startDate || endDate 
+                        ? 'No orders match your current search criteria. Try adjusting your filters.'
+                        : 'No orders have been created yet. Create your first order to see it here.'
+                      }
+                    </p>
+                    <div className="d-flex gap-2 justify-content-center mt-3">
+                      {(q || startDate || endDate) && (
+                        <button 
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => {
+                            setQ('')
+                            setStartDate('')
+                            setEndDate('')
+                            setPage(1)
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                      <button 
+                        className="btn btn-outline-success btn-sm"
+                        onClick={() => {
+                          console.log('Manual refresh triggered')
+                          refetch()
+                        }}
+                      >
+                        <IconifyIcon icon="mdi:refresh" className="me-1" />
+                        Refresh Data
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Orders Table */}
+              {isSessionReady && !isLoading && !error && orders.length > 0 && (
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0 table-hover table-centered table-bordered">
                   <thead className="bg-light-subtle">
                     <tr>
                       <th style={{ width: 20 }}>
@@ -429,38 +396,36 @@ const AllIncomeList = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {isSessionReady && !isLoading && !error && orders.length > 0 && (
+                <CardFooter className="border-top">
+                  <nav aria-label="Page navigation example">
+                    <ul className="pagination justify-content-end mb-0">
+                      <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                          Previous
+                        </button>
+                      </li>
+                      <li className="page-item active">
+                        <span className="page-link">{page}</span>
+                      </li>
+                      <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={() => setPage((p) => p + 1)}>
+                          Next
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </CardFooter>
+              )}
             </div>
-            <CardFooter className="border-top">
-              <nav aria-label="Page navigation example">
-                <ul className="pagination justify-content-end mb-0">
-                  <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                      Previous
-                    </button>
-                  </li>
-                  <li className="page-item active">
-                    <span className="page-link">{page}</span>
-                  </li>
-                  <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setPage((p) => p + 1)}>
-                      Next
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-            </CardFooter>
           </Card>
         </Col>
       </Row>
 
-      {/* Edit Order Modal */}
-      <EditOrderModal
-        show={showEditModal}
-        onHide={() => setShowEditModal(false)}
-        order={selectedOrder}
-        onSave={handleSaveOrder}
-      />
 
     </>
   )

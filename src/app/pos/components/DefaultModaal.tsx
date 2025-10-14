@@ -114,7 +114,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('membership', 'membership')}
+                onClick={() => handleOrderTypeSelect('NewMembership', 'membership')}
                 disabled={isLoading}
               >
                 <FaUserPlus /> New Membership
@@ -124,11 +124,11 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('membership', 'membership')}
+                onClick={() => handleOrderTypeSelect('MembershipMeal', 'membership')}
                 disabled={isLoading}
               >
                 <FaIdBadge /> Membership Meal
-                <small className="d-block">Meal Plan Menu</small>
+                <small className="d-block">Master Menu</small>
               </Button>
             </Col>
 
