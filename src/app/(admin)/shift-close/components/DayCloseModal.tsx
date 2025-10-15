@@ -849,6 +849,12 @@ const DayCloseModal: React.FC<DayCloseModalProps> = ({ show, onHide, onSuccess }
                           <p><strong>Shift Total Sales:</strong> {dayCloseResult.summary.shiftWise.totalSales.toFixed(2)} AED</p>
                         </>
                       )}
+                      {dayCloseResult.membershipBreakdown && (
+                        <>
+                          <p><strong>Membership Meal Sales:</strong> {dayCloseResult.membershipBreakdown.membershipMeal.toFixed(2)} AED</p>
+                          <p><strong>Membership Register Sales:</strong> {dayCloseResult.membershipBreakdown.membershipRegister.toFixed(2)} AED</p>
+                        </>
+                      )}
                     </Card.Body>
                   </Card>
                 </Col>

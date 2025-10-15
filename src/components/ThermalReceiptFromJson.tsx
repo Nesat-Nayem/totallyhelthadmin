@@ -273,7 +273,6 @@ const ThermalReceiptFromJson: React.FC<ThermalReceiptFromJsonProps> = ({
             <span>{formatCurrency(data.salesDetails.membershipRegister)}</span>
           </div>
           <div style={{ borderTop: '1px solid #000', margin: '1px 0' }}></div>
-          <div style={{ borderTop: '1px solid #000', margin: '1px 0' }}></div>
         </div>
 
         {/* Collection Details */}
