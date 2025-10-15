@@ -13,7 +13,7 @@ export type OrderCreateDto = {
   total: number
   startDate?: string
   endDate?: string
-  paymentMode?: string
+  // paymentMode?: string // Commented out - using paymentType instead
   orderType?: 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal'
   branchId?: string
   brand?: string
@@ -30,6 +30,7 @@ export type OrderCreateDto = {
   rounding?: number
   payableAmount?: number
   receiveAmount?: number
+  cumulativePaid?: number
   changeAmount?: number
   dueAmount?: number
   note?: string

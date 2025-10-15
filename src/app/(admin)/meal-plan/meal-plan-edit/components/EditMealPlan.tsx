@@ -575,7 +575,7 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
                 </label>
                 <div className="input-group mb-3">
                   <span className="input-group-text fs-20">
-                    <IconifyIcon icon="bx:dollar" />
+                    AED
                   </span>
                   <input type="number" id="product-price" className="form-control" {...register('price')} />
                 </div>

@@ -120,7 +120,7 @@ const MenuPlanView = ({ id }: MenuPlanViewProps) => {
               </p>
               {mealPlan.delPrice && (
                 <p>
-                  Del Price: <del className="fw-semibold text-success">AED {mealPlan.delPrice}</del>
+                  Del Price: <span className="fw-semibold text-success">AED {mealPlan.delPrice}</span>
                 </p>
               )}
             </div>

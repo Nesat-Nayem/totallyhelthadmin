@@ -57,8 +57,10 @@ const POS = () => {
   const [customer, setCustomer] = useState<any>(null)
   const [moreOptions, setMoreOptions] = useState<any[]>([])
   const [selectedAggregator, setSelectedAggregator] = useState('')
-  const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash')
+  // const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash') // Commented out - using paymentType instead
   const [receiveAmount, setReceiveAmount] = useState(0)
+  const [cumulativePaid, setCumulativePaid] = useState(0)
+  const [originalCumulativePaid, setOriginalCumulativePaid] = useState(0) // Track original cumulative paid when editing
   const [payments, setPayments] = useState<Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>>([])
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [newPaymentType, setNewPaymentType] = useState<'Cash' | 'Card' | 'Gateway'>('Cash')
@@ -103,8 +105,10 @@ const POS = () => {
       
       // Set other form fields
       setCustomer(editingOrder.customer || null)
-      setSelectedPaymentMode(editingOrder.paymentMode || 'Cash')
+      // setSelectedPaymentMode(editingOrder.paymentMode || 'Cash') // Commented out - using paymentType instead
       setReceiveAmount(editingOrder.receiveAmount || 0)
+      setCumulativePaid(editingOrder.cumulativePaid || 0)
+      setOriginalCumulativePaid(editingOrder.cumulativePaid || 0) // Store original cumulative paid amount
       setDeliveryCharge(editingOrder.shippingCharge || 0)
       setRounding(editingOrder.rounding || 0)
       setNotes(editingOrder.note || '')
@@ -225,8 +229,9 @@ const POS = () => {
         // Map meal plan fields to menu fields for compatibility
         title: mealPlan.title,
         image: mealPlan.thumbnail || (mealPlan.images && mealPlan.images[0]),
-        membershipTotalPrice: mealPlan.price,
-        membershipPrice: mealPlan.price,
+        // Use delPrice (discounted price) for new membership if available, otherwise fallback to regular price
+        membershipTotalPrice: mealPlan.delPrice || mealPlan.price,
+        membershipPrice: mealPlan.delPrice || mealPlan.price,
         // Set other price types to 0 or undefined for membership-only items
         restaurantTotalPrice: 0,
         restaurantPrice: 0,
@@ -291,16 +296,31 @@ const POS = () => {
   }
 
   const handleRemovePayment = (index: number) => {
-    setPayments((prev) => prev.filter((_, i) => i !== index))
+    setPayments((prev) => {
+      const newPayments = prev.filter((_, i) => i !== index)
+      // If all payments are removed, keep the current cumulativePaid value
+      // Don't reset it to 0
+      return newPayments
+    })
   }
 
-  // If there are split payments, keep receiveAmount in sync as the sum
+  // If there are split payments, keep receiveAmount and cumulativePaid in sync as the sum
+  // Only update when payments array changes, not when it's empty
   useEffect(() => {
     if (payments.length > 0) {
       const total = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
       setReceiveAmount(total)
+      
+      if (isEditMode) {
+        // In edit mode, cumulative paid = original cumulative + new split payments
+        setCumulativePaid(originalCumulativePaid + total)
+      } else {
+        // In create mode, cumulative paid equals split payments total
+        setCumulativePaid(total)
+      }
     }
-  }, [payments])
+    // Don't reset to 0 when payments array is empty - preserve manual input
+  }, [payments, isEditMode, originalCumulativePaid])
 
   // Calculate totals
   const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
@@ -323,8 +343,8 @@ const POS = () => {
   
   // Calculate payable amount and change amount
   // Note: Payment amount is calculated without VAT% - no VAT is included in the total
-  const payableAmount = Math.max(0, totalAmount - receiveAmount) // Remaining amount to be paid
-  const changeAmount = Math.max(0, receiveAmount - totalAmount) // Change to be given back
+  const payableAmount = Math.max(0, totalAmount - cumulativePaid) // Remaining amount to be paid
+  const changeAmount = Math.max(0, cumulativePaid - totalAmount) // Change to be given back
 
   const [showDefaultModal, setShowDefaultModal] = useState(false)
 
@@ -418,10 +438,11 @@ const POS = () => {
         rounding,
         payableAmount,
         receiveAmount,
+        cumulativePaid,
         changeAmount,
         dueAmount: payableAmount,
         note: notes,  // Field is 'note' not 'notes'
-        paymentMode: selectedPaymentMode,
+        // paymentMode: selectedPaymentMode, // Commented out - using paymentType instead
         payments: payments,
         salesType: ((selectedOrderType === 'NewMembership' || selectedOrderType === 'MembershipMeal') ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
         orderType: selectedOrderType as 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal' | undefined,
@@ -429,7 +450,7 @@ const POS = () => {
         brand: selectedBrand || undefined,
         startDate,
         endDate,
-        status: (receiveAmount >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
+        status: (cumulativePaid >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
       }
       
       let result
@@ -459,6 +480,8 @@ const POS = () => {
       setRounding(0)
       setNotes('')
       setReceiveAmount(0)
+      setCumulativePaid(0)
+      setOriginalCumulativePaid(0)
       setPayments([])
     } catch (error: any) {
       const action = isEditMode ? 'update' : 'create'
@@ -491,8 +514,10 @@ const POS = () => {
     setRounding(0)
     setNotes('')
     setReceiveAmount(0)
+    setCumulativePaid(0)
+    setOriginalCumulativePaid(0)
     setSelectedAggregator('')
-    setSelectedPaymentMode('Cash')
+    // setSelectedPaymentMode('Cash') // Commented out - using paymentType instead
     setPayments([])
     setShowAddPayment(false)
     setNewPaymentType('Cash')
@@ -812,7 +837,24 @@ const POS = () => {
                         type="number" 
                         placeholder="Enter received amount" 
                         value={receiveAmount} 
-                        onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const amount = parseFloat(e.target.value) || 0
+                          setReceiveAmount(amount)
+                          
+                          // Only update cumulativePaid if there are no split payments
+                          // If there are split payments, cumulativePaid should be managed by the payments array
+                          if (payments.length === 0) {
+                            if (isEditMode) {
+                              // In edit mode, treat the receive amount as additional payment
+                              // New cumulative = original cumulative + new receive amount
+                              const newCumulative = originalCumulativePaid + amount
+                              setCumulativePaid(newCumulative)
+                            } else {
+                              // In create mode, receive amount equals cumulative paid
+                              setCumulativePaid(amount)
+                            }
+                          }
+                        }}
                         min={0} 
                         disabled={payments.length > 0}
                       />
@@ -820,7 +862,12 @@ const POS = () => {
                         <IconifyIcon icon="mdi:plus" />
                       </Button>
                     </InputGroup>
-                    <Form.Text className="text-muted">Amount received from customer</Form.Text>
+                    <Form.Text className="text-muted">
+                      {isEditMode 
+                        ? "Additional amount received (will be added to existing payments)" 
+                        : "Amount received from customer"
+                      }
+                    </Form.Text>
 
                     {showAddPayment && (
                       <Row className="mt-2 g-2 align-items-end">
@@ -871,6 +918,38 @@ const POS = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
+                    <Form.Label>Cumulative Paid (AED)</Form.Label>
+                    <Form.Control 
+                      type="number" 
+                      placeholder="Enter cumulative paid amount" 
+                      value={cumulativePaid} 
+                      onChange={(e) => {
+                        const amount = parseFloat(e.target.value) || 0
+                        setCumulativePaid(amount)
+                        
+                        // If there are no split payments, also update receiveAmount to match
+                        if (payments.length === 0) {
+                          if (isEditMode) {
+                            // In edit mode, receive amount = new cumulative - original cumulative
+                            const newReceiveAmount = amount - originalCumulativePaid
+                            setReceiveAmount(Math.max(0, newReceiveAmount))
+                          } else {
+                            // In create mode, receive amount equals cumulative paid
+                            setReceiveAmount(amount)
+                          }
+                        }
+                      }}
+                      min={0} 
+                    />
+                    <Form.Text className="text-muted">
+                      {isEditMode 
+                        ? "Total amount paid so far (original + additional payments)" 
+                        : "Total amount paid so far (for tracking payment history)"
+                      }
+                    </Form.Text>
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
                     <Form.Label>Aggregator</Form.Label>
                     <Form.Select 
                       value={selectedAggregator}
@@ -911,11 +990,13 @@ const POS = () => {
                   />
 
                   <SplitBillModal show={showSplitModal} onClose={() => setShowSplitModal(false)} totalAmount={totalAmount} />
+                  {/* PaymentModeSelector commented out - using paymentType instead
                   <PaymentModeSelector 
                     selectedMode={selectedPaymentMode}
                     onModeChange={setSelectedPaymentMode}
                     paymentMethods={paymentMethods}
                   />
+                  */}
                 </Col>
 
                 {/* Right Side */}
