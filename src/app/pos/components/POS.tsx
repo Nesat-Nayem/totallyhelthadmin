@@ -22,6 +22,8 @@ import MoreOptions from './MoreOptions'
 import SplitBillModal from './SplitBillModal'
 import PaymentModeSelector from './PaymentModeSelector'
 import DiscountModal from './DiscountModal'
+import ShiftStartModal from './ShiftStartModal'
+import ShiftCloseModal from './ShiftCloseModal'
 
 // Import API services
 import { useGetMenusQuery } from '@/services/menuApi'
@@ -31,8 +33,11 @@ import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
 import { useCreateOrderMutation, useUpdateOrderMutation } from '@/services/orderApi'
+import { useDispatch as useRTKDispatch } from 'react-redux'
+import { orderApi } from '@/services/orderApi'
 import { useGetOpenDayCloseQuery, useStartDayCloseMutation, useCloseDayCloseMutation } from '@/services/dayCloseApi'
 import { useCreateCustomerMutation } from '@/services/customerApi'
+import { useGetCurrentShiftQuery, useStartShiftMutation, useCloseShiftMutation } from '@/services/shiftApi'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
 import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal, setEditMode, exitEditMode } from '@/store/slices/posSlice'
@@ -44,6 +49,7 @@ const fallbackImages = [product1, product2, product3, product4]
 const orderTypes = ['DineIn', 'TakeAway', 'Delivery']
 const POS = () => {
   const dispatch = useDispatch()
+  const rtkDispatch = useRTKDispatch()
   const router = useRouter()
   const { selectedOrderType, selectedPriceType, showOrderTypeModal, editingOrder, isEditMode } = useSelector((state: RootState) => state.pos)
   
@@ -170,6 +176,14 @@ const POS = () => {
   const openDay = openDayRes?.data
   const [showDayReportModal, setShowDayReportModal] = useState(false)
   const [dayReportData, setDayReportData] = useState<any>(null)
+  
+  // Shift-related state
+  const [showShiftStartModal, setShowShiftStartModal] = useState(false)
+  const [showShiftCloseModal, setShowShiftCloseModal] = useState(false)
+  const { data: currentShiftData, refetch: refetchCurrentShift } = useGetCurrentShiftQuery()
+  const [startShift] = useStartShiftMutation()
+  const [closeShift] = useCloseShiftMutation()
+  const currentShift = currentShiftData?.data
   
   // Get menus with filters - using proper menu API with search, brand, category, and price type filtering
   // For membershipMeal orders, use master menu API; for regular membership (New Membership), use meal plan API
@@ -393,6 +407,29 @@ const POS = () => {
       showError(e?.data?.message || 'Failed to close day')
     }
   }
+
+  // Shift handlers
+  const handleStartShift = () => {
+    setShowShiftStartModal(true)
+  }
+
+  const handleCloseShift = () => {
+    setShowShiftCloseModal(true)
+  }
+
+  const handleShiftStartSuccess = async () => {
+    await refetchCurrentShift()
+    // Invalidate order cache to refresh paid/unpaid lists
+    rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+    showSuccess('Shift started successfully')
+  }
+
+  const handleShiftCloseSuccess = async () => {
+    await refetchCurrentShift()
+    // Invalidate order cache to refresh paid/unpaid lists
+    rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+    showSuccess('Shift closed successfully')
+  }
   
   const handleSaveOrder = async () => {
     try {
@@ -462,6 +499,9 @@ const POS = () => {
         // Exit edit mode after successful update
         dispatch(exitEditMode())
         
+        // Invalidate order cache to refresh paid/unpaid lists
+        rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+        
         // Optionally navigate back to reports after successful update
         // Uncomment the line below if you want automatic navigation back to reports
         // setTimeout(() => router.push('/reports/all-income'), 2000)
@@ -469,6 +509,9 @@ const POS = () => {
         // Create new order (called from Save button)
         result = await createOrder(orderData).unwrap()
         showSuccess(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+        
+        // Invalidate order cache to refresh paid/unpaid lists
+        rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
       }
       
       // Reset form
@@ -533,6 +576,20 @@ const POS = () => {
     <>
       <DefaultModaal show={showOrderTypeModal} onClose={() => dispatch(hideOrderTypeModal())} />
       <ReportModal show={showDayReportModal} onClose={() => setShowDayReportModal(false)} data={dayReportData || undefined} />
+      
+      {/* Shift Modals */}
+      <ShiftStartModal
+        show={showShiftStartModal}
+        onHide={() => setShowShiftStartModal(false)}
+        onSuccess={handleShiftStartSuccess}
+      />
+      
+      <ShiftCloseModal
+        show={showShiftCloseModal}
+        onHide={() => setShowShiftCloseModal(false)}
+        onSuccess={handleShiftCloseSuccess}
+        currentShift={currentShift}
+      />
       
       {/* Edit Mode Indicator */}
       {isEditMode && editingOrder && (
@@ -692,30 +749,20 @@ const POS = () => {
                 <IconifyIcon icon="mdi:view-dashboard-outline" /> Dashboard
               </Link>
               <div className="d-flex align-items-center gap-2">
-                <span className="badge bg-secondary">
+                {/* <span className="badge bg-secondary">
                   Day Status: {openDay ? 'Open' : 'Closed'}
-                </span>
-                {openDay ? (
-                  <Button variant="danger" className="btn" onClick={handleCloseDay}>
+                </span> */}
+                <Button 
+                  variant={currentShift ? "danger" : "success"}
+                  className="btn" 
+                  onClick={currentShift ? handleCloseShift : handleStartShift}
+                >
+                  <IconifyIcon icon={currentShift ? "mdi:clock-out" : "mdi:clock-in"} /> 
+                  {currentShift ? "Close Shift" : "Start Shift"}
+                </Button>
+                {openDay && (
+                  <Button variant="warning" className="btn" onClick={handleCloseDay}>
                     <IconifyIcon icon="mdi:calendar-check" /> Close Day
-                  </Button>
-                ) : (
-                  <Button 
-                    variant="success" 
-                    className="btn" 
-                    onClick={handleStartDay}
-                    disabled={isStartingDay}
-                  >
-                    {isStartingDay ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Starting...
-                      </>
-                    ) : (
-                      <>
-                        <IconifyIcon icon="mdi:calendar-start" /> Start Day
-                      </>
-                    )}
                   </Button>
                 )}
               </div>

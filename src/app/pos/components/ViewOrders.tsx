@@ -339,18 +339,27 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
 
   // Fetch orders from new APIs - only when modal is open
-  const { data: paidOrdersData, isLoading: isLoadingPaid, error: errorPaid } = useGetPaidOrdersTodayQuery(
+  const { data: paidOrdersData, isLoading: isLoadingPaid, error: errorPaid, refetch: refetchPaid } = useGetPaidOrdersTodayQuery(
     undefined,
     { skip: !showModal || activeTab !== 'paid' }
   )
   
-  const { data: unpaidOrdersData, isLoading: isLoadingUnpaid, error: errorUnpaid } = useGetUnpaidOrdersTodayQuery(
+  const { data: unpaidOrdersData, isLoading: isLoadingUnpaid, error: errorUnpaid, refetch: refetchUnpaid } = useGetUnpaidOrdersTodayQuery(
     undefined,
     { skip: !showModal || activeTab !== 'unpaid' }
   )
 
   const handleShow = () => setShowModal(true)
   const handleClose = () => setShowModal(false)
+
+  // Function to refresh current tab data
+  const handleRefresh = () => {
+    if (activeTab === 'paid') {
+      refetchPaid()
+    } else {
+      refetchUnpaid()
+    }
+  }
 
   // Listen for custom event to reopen modal when coming back from edit
   useEffect(() => {
@@ -364,6 +373,13 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
       window.removeEventListener('reopenViewOrders', handleReopenViewOrders)
     }
   }, [])
+
+  // Auto-refresh when switching tabs
+  useEffect(() => {
+    if (showModal) {
+      handleRefresh()
+    }
+  }, [activeTab, showModal])
 
   // Get current orders based on active tab
   const currentOrdersData = activeTab === 'paid' ? paidOrdersData : unpaidOrdersData
@@ -388,6 +404,9 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
       <Modal show={showModal} onHide={handleClose} centered size="xl">
         <Modal.Header closeButton>
           <Modal.Title>Orders</Modal.Title>
+          <Button variant="outline-primary" size="sm" onClick={handleRefresh} className="ms-2">
+            <IconifyIcon icon="mdi:refresh" />
+          </Button>
         </Modal.Header>
 
         <Modal.Body>
