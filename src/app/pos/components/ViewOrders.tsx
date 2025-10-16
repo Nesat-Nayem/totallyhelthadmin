@@ -404,9 +404,6 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
       <Modal show={showModal} onHide={handleClose} centered size="xl">
         <Modal.Header closeButton>
           <Modal.Title>Orders</Modal.Title>
-          <Button variant="outline-primary" size="sm" onClick={handleRefresh} className="ms-2">
-            <IconifyIcon icon="mdi:refresh" />
-          </Button>
         </Modal.Header>
 
         <Modal.Body>
@@ -505,7 +502,7 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
                           View Details
                         </Button>
 
-                        {onEditOrder && (
+                        {onEditOrder && activeTab !== 'paid' && (
                           <Button
                             size="sm"
                             variant="primary"

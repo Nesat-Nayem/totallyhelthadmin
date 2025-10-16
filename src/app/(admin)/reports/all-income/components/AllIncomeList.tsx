@@ -346,7 +346,7 @@ const AllIncomeList = () => {
                       <th style={{ textWrap: 'nowrap' }}>Invoice No</th>
                       <th style={{ textWrap: 'nowrap' }}>Total</th>
                       <th style={{ textWrap: 'nowrap' }}>Paid Status</th>
-                      <th style={{ textWrap: 'nowrap' }}>Payment Mode</th>
+                      {/* <th style={{ textWrap: 'nowrap' }}>Payment Mode</th> */}
                       <th style={{ textWrap: 'nowrap' }}>Action</th>
                     </tr>
                   </thead>
@@ -375,18 +375,20 @@ const AllIncomeList = () => {
                             {o.status === 'paid' ? 'PAID' : 'UNPAID'}
                           </span>
                         </td>
-                        <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || '-'}</td>
+                        {/* <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || '-'}</td> */}
                         <td>
                           <div className="d-flex gap-2">
-                            <Button
-                              variant="outline-primary"
-                              size="sm"
-                              onClick={() => handleEditOrder(o)}
-                              title="Edit Order"
-                              className="p-1"
-                            >
-                              <IconifyIcon icon="solar:pen-2-bold" className="align-middle fs-16" />
-                            </Button>
+                            {o.status !== 'paid' && (
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => handleEditOrder(o)}
+                                title="Edit Order"
+                                className="p-1"
+                              >
+                                <IconifyIcon icon="solar:pen-2-bold" className="align-middle fs-16" />
+                              </Button>
+                            )}
                             <Link href="#" className="btn btn-soft-danger btn-sm" title="Delete (coming soon)">
                               <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
                             </Link>

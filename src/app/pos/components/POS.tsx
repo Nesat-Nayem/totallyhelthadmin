@@ -40,7 +40,7 @@ import { useCreateCustomerMutation } from '@/services/customerApi'
 import { useGetCurrentShiftQuery, useStartShiftMutation, useCloseShiftMutation } from '@/services/shiftApi'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
-import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal, setEditMode, exitEditMode } from '@/store/slices/posSlice'
+import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal, setEditMode, exitEditMode, updateCurrentOrderData, clearCurrentOrderData } from '@/store/slices/posSlice'
 import { showCustomerRequiredAlert, showSuccess, showError } from '@/utils/sweetAlert'
 
 // Fallback images for menus
@@ -78,6 +78,64 @@ const POS = () => {
   const [orderNo, setOrderNo] = useState('#001')
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+
+  // Helper to generate a unique bill number
+  const generateUniqueBillNumber = () => {
+    const prefix = 'INV-';
+    const timestamp = new Date().getTime();
+    const random = Math.floor(Math.random() * 1000);
+    return `${prefix}${timestamp}-${random}`;
+  };
+
+  // Calculate totals first
+  const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
+  const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
+  
+  const discountAmountApplied = discount
+    ? (discount.type?.toLowerCase?.() === 'percent'
+        ? ((subTotal + moreOptionsTotal) * (discount.amount || 0)) / 100
+        : (discount.amount || 0))
+    : 0
+  
+  const totalBeforeRounding = subTotal + moreOptionsTotal + deliveryCharge - discountAmountApplied
+  const totalAmount = totalBeforeRounding + rounding
+  
+  const payableAmount = Math.max(0, totalAmount - cumulativePaid)
+  const changeAmount = Math.max(0, cumulativePaid - totalAmount)
+
+  // Function to sync current order data with Redux and localStorage
+  const syncOrderData = () => {
+    const orderData = {
+      selectedProducts,
+      moreOptions,
+      customer,
+      discount,
+      deliveryCharge,
+      rounding,
+      notes,
+      receiveAmount,
+      cumulativePaid,
+      payments,
+      selectedAggregator,
+      invoiceNo,
+      orderNo,
+      startDate,
+      endDate,
+      subTotal,
+      totalAmount,
+      payableAmount,
+      changeAmount,
+      discountAmountApplied,
+      selectedOrderType,
+      selectedPriceType,
+    }
+    
+    // Update Redux state
+    dispatch(updateCurrentOrderData(orderData))
+    
+    // Update localStorage for persistence
+    localStorage.setItem('currentOrderData', JSON.stringify(orderData))
+  }
   
   // Reset filters when switching between different order types
   useEffect(() => {
@@ -85,6 +143,71 @@ const POS = () => {
     setSelectedBrand('')
     setSelectedCategory('')
   }, [selectedOrderType])
+
+  // Sync order data whenever any order-related state changes
+  useEffect(() => {
+    syncOrderData()
+  }, [
+    selectedProducts,
+    moreOptions,
+    customer,
+    discount,
+    deliveryCharge,
+    rounding,
+    notes,
+    receiveAmount,
+    cumulativePaid,
+    payments,
+    selectedAggregator,
+    invoiceNo,
+    orderNo,
+    startDate,
+    endDate,
+    subTotal,
+    totalAmount,
+    payableAmount,
+    changeAmount,
+    discountAmountApplied,
+    selectedOrderType,
+    selectedPriceType,
+  ])
+
+  // Load order data from localStorage on component mount
+  useEffect(() => {
+    const savedOrderData = localStorage.getItem('currentOrderData')
+    if (savedOrderData && !isEditMode) {
+      try {
+        const parsedData = JSON.parse(savedOrderData)
+        // Only load if we're not in edit mode to avoid conflicts
+        if (parsedData && Object.keys(parsedData).length > 0) {
+          dispatch(updateCurrentOrderData(parsedData))
+          // Restore invoice number if it exists
+          if (parsedData.invoiceNo) {
+            setInvoiceNo(parsedData.invoiceNo)
+          } else {
+            // Generate new invoice number if none exists
+            setInvoiceNo(generateUniqueBillNumber())
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing saved order data:', error)
+        localStorage.removeItem('currentOrderData')
+        // Generate new invoice number on error
+        setInvoiceNo(generateUniqueBillNumber())
+      }
+    } else {
+      // Generate new invoice number for fresh order or when no saved data
+      setInvoiceNo(generateUniqueBillNumber())
+    }
+  }, [dispatch, isEditMode])
+
+  // Ensure we always have a unique invoice number on component mount
+  useEffect(() => {
+    // Generate invoice number if it's still the default 'S-001'
+    if (invoiceNo === 'S-001') {
+      setInvoiceNo(generateUniqueBillNumber())
+    }
+  }, [])
 
   // Handle edit mode - populate form with existing order data
   useEffect(() => {
@@ -336,29 +459,9 @@ const POS = () => {
     // Don't reset to 0 when payments array is empty - preserve manual input
   }, [payments, isEditMode, originalCumulativePaid])
 
-  // Calculate totals
-  const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
-  const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
-  
   // VAT% logic - COMMENTED OUT (VAT calculation disabled)
   // const vatPercent = 5
   // const vatAmount = ((subTotal + moreOptionsTotal) * vatPercent) / 100
-  
-  const discountAmountApplied = discount
-    ? (discount.type?.toLowerCase?.() === 'percent'
-        ? ((subTotal + moreOptionsTotal) * (discount.amount || 0)) / 100
-        : (discount.amount || 0))
-    : 0
-  
-  // Total calculation without VAT (VAT logic commented out above)
-  const totalBeforeRounding = subTotal + moreOptionsTotal + deliveryCharge - discountAmountApplied
-  // const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - discountAmountApplied // Original with VAT
-  const totalAmount = totalBeforeRounding + rounding
-  
-  // Calculate payable amount and change amount
-  // Note: Payment amount is calculated without VAT% - no VAT is included in the total
-  const payableAmount = Math.max(0, totalAmount - cumulativePaid) // Remaining amount to be paid
-  const changeAmount = Math.max(0, cumulativePaid - totalAmount) // Change to be given back
 
   const [showDefaultModal, setShowDefaultModal] = useState(false)
 
@@ -526,6 +629,10 @@ const POS = () => {
       setCumulativePaid(0)
       setOriginalCumulativePaid(0)
       setPayments([])
+      
+      // Clear Redux state and localStorage after successful save
+      dispatch(clearCurrentOrderData())
+      localStorage.removeItem('currentOrderData')
     } catch (error: any) {
       const action = isEditMode ? 'update' : 'create'
       showError(error?.data?.message || `Failed to ${action} order`)
@@ -565,6 +672,13 @@ const POS = () => {
     setShowAddPayment(false)
     setNewPaymentType('Cash')
     setNewPaymentAmount('')
+    
+    // Generate new invoice number for new order
+    setInvoiceNo(generateUniqueBillNumber())
+    
+    // Clear Redux state and localStorage
+    dispatch(clearCurrentOrderData())
+    localStorage.removeItem('currentOrderData')
     
     // Exit edit mode if in edit mode
     if (isEditMode) {

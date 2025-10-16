@@ -12,6 +12,30 @@ interface PosState {
   isLoading: boolean
   editingOrder: any | null
   isEditMode: boolean
+  currentOrderData: {
+    selectedProducts: { [key: string]: any }
+    moreOptions: any[]
+    customer: any | null
+    discount: { type: string; amount: number; reason: string } | null
+    deliveryCharge: number
+    rounding: number
+    notes: string
+    receiveAmount: number
+    cumulativePaid: number
+    payments: Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>
+    selectedAggregator: string
+    invoiceNo: string
+    orderNo: string
+    startDate: string
+    endDate: string
+    subTotal: number
+    totalAmount: number
+    payableAmount: number
+    changeAmount: number
+    discountAmountApplied: number
+    selectedOrderType: OrderType | null
+    selectedPriceType: PriceType | null
+  } | null
 }
 
 const initialState: PosState = {
@@ -21,6 +45,7 @@ const initialState: PosState = {
   isLoading: false,
   editingOrder: null,
   isEditMode: false,
+  currentOrderData: null,
 }
 
 const posSlice = createSlice({
@@ -61,6 +86,16 @@ const posSlice = createSlice({
       state.isEditMode = false
       state.showOrderTypeModal = true
     },
+    updateCurrentOrderData: (state, action: PayloadAction<Partial<PosState['currentOrderData']>>) => {
+      if (state.currentOrderData) {
+        state.currentOrderData = { ...state.currentOrderData, ...action.payload }
+      } else {
+        state.currentOrderData = action.payload as PosState['currentOrderData']
+      }
+    },
+    clearCurrentOrderData: (state) => {
+      state.currentOrderData = null
+    },
   },
 })
 
@@ -72,6 +107,8 @@ export const {
   resetPosState,
   setEditMode,
   exitEditMode,
+  updateCurrentOrderData,
+  clearCurrentOrderData,
 } = posSlice.actions
 
 export default posSlice.reducer

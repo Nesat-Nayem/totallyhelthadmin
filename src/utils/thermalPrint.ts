@@ -1,261 +1,126 @@
-/**
- * Thermal Receipt Printing Utility
- * Forces browser to print in narrow thermal receipt format
- */
+// Thermal Print Utility Functions
 
-export interface ThermalPrintOptions {
-  width?: number; // in mm
-  fontSize?: number;
-  lineHeight?: number;
-  autoPrint?: boolean;
-  closeAfterPrint?: boolean;
-}
+export const printThermalReceipt = (receiptType: 'customer' | 'kitchen') => {
+  const printSingleReceipt = (type: 'customer' | 'kitchen') => {
+    const receiptElement = document.getElementById(`thermal-receipt-${type}`)
+    if (!receiptElement) {
+      console.error(`Thermal receipt element not found: thermal-receipt-${type}`)
+      return
+    }
 
-export const printThermalReceipt = (
-  content: string,
-  options: ThermalPrintOptions = {}
-) => {
-  const {
-    width = 48, // 48mm standard thermal width
-    fontSize = 8,
-    lineHeight = 1.0,
-    autoPrint = true,
-    closeAfterPrint = true
-  } = options;
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank', 'width=400,height=600')
+    if (!printWindow) {
+      console.error('Failed to open print window')
+      return
+    }
 
-  // Create a new window for thermal printing with aggressive sizing
-  const printWindow = window.open(
-    '',
-    '_blank',
-    `width=200,height=800,scrollbars=no,resizable=no,status=no,location=no,toolbar=no,menubar=no`
-  );
+    // Get the receipt content
+    const receiptContent = receiptElement.innerHTML
 
-  if (!printWindow) {
-    console.error('Failed to open print window');
-    return;
-  }
-
-  const thermalHTML = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Thermal Receipt</title>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          /* Aggressive reset */
-          * {
-            margin: 0 !important;
-            padding: 0 !important;
-            box-sizing: border-box !important;
-          }
-          
-          html, body {
-            width: ${width}mm !important;
-            max-width: ${width}mm !important;
-            height: auto !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: hidden !important;
-          }
-          
-          body { 
-            font-family: 'Courier New', 'Courier', monospace !important;
-            font-size: ${fontSize}px !important; 
-            line-height: ${lineHeight} !important;
-            margin: 0 !important;
-            padding: 1mm !important;
-            white-space: pre-wrap !important;
-            background: white !important;
-            color: black !important;
-            width: ${width}mm !important;
-            max-width: ${width}mm !important;
-            overflow: hidden !important;
-          }
-          
-          .thermal-receipt {
-            width: ${width}mm !important;
-            max-width: ${width}mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-            font-size: ${fontSize}px !important;
-            line-height: ${lineHeight} !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-          }
-          
-          /* Force all content to fit in narrow width */
-          .thermal-receipt * {
-            max-width: ${width - 2}mm !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            white-space: pre-wrap !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          
-          /* Aggressive print media queries */
-          @media print {
-            @page {
-              size: ${width}mm auto !important;
-              margin: 0 !important;
-              padding: 0 !important;
+    // Write the thermal receipt HTML to the new window
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Thermal Receipt - ${type.toUpperCase()}</title>
+          <style>
+            @media print {
+              @page {
+                size: 80mm 200mm;
+                margin: 0;
+              }
+              body {
+                margin: 0;
+                padding: 0;
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                line-height: 1.0;
+                color: black;
+                background: white;
+              }
+              .thermal-receipt {
+                width: 100% !important;
+                max-width: 80mm !important;
+                margin: 0 !important;
+                padding: 2px !important;
+                border: none !important;
+                background: white !important;
+              }
+              .thermal-receipt * {
+                color: black !important;
+                background: white !important;
+                font-family: 'Courier New', monospace !important;
+              }
+              hr {
+                border: none !important;
+                border-top: 1px dashed #000 !important;
+                margin: 3px 0 !important;
+              }
+              .logo-circle {
+                border: 2px dashed #000 !important;
+                border-radius: 50% !important;
+                width: 60px !important;
+                height: 60px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 auto 3px auto !important;
+                padding: 3px !important;
+              }
             }
-            
-            html, body {
-              width: ${width}mm !important;
-              max-width: ${width}mm !important;
-              height: auto !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: visible !important;
+            body {
+              margin: 0;
+              padding: 2px;
+              font-family: 'Courier New', monospace;
+              font-size: 10px;
+              line-height: 1.0;
+              background: white;
+              color: black;
             }
-            
-            body { 
-              margin: 0 !important; 
-              padding: 1mm !important; 
-              width: ${width}mm !important;
-              max-width: ${width}mm !important;
-              font-size: ${fontSize}px !important;
-              line-height: ${lineHeight} !important;
-            }
-            
             .thermal-receipt {
-              width: ${width}mm !important;
-              max-width: ${width}mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              font-size: ${fontSize}px !important;
-              line-height: ${lineHeight} !important;
+              width: 300px;
+              margin: 0 auto;
+              background: white;
+              color: black;
             }
-            
-            .thermal-receipt * {
-              max-width: ${width - 2}mm !important;
-              word-wrap: break-word !important;
-              overflow-wrap: break-word !important;
-              white-space: pre-wrap !important;
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
+            hr {
+              border: none;
+              border-top: 1px dashed #000;
+              margin: 3px 0;
             }
-            
-            /* Force single page - prevent page breaks */
-            * {
-              overflow: visible !important;
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
-              page-break-before: avoid !important;
-              page-break-after: avoid !important;
+            .logo-circle {
+              border: 2px dashed #000;
+              border-radius: 50%;
+              width: 60px;
+              height: 60px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              margin: 0 auto 3px auto;
+              padding: 3px;
             }
-            
-            /* Force exact colors */
-            * {
-              -webkit-print-color-adjust: exact !important;
-              color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="thermal-receipt">
-          ${content}
-        </div>
-        <script>
-          // Force thermal format immediately
-          document.body.style.width = '${width}mm';
-          document.body.style.maxWidth = '${width}mm';
-          
-          // Force window size
-          window.resizeTo(200, 800);
-          
-          ${autoPrint ? `
-          // Auto print after content loads
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 100);
-          };
-          ` : ''}
-          
-          // Close after print
-          window.onafterprint = function() {
-            ${closeAfterPrint ? 'window.close();' : ''}
-          };
-        </script>
-      </body>
-    </html>
-  `;
+          </style>
+        </head>
+        <body>
+          ${receiptContent}
+        </body>
+      </html>
+    `)
 
-  printWindow.document.write(thermalHTML);
-  printWindow.document.close();
-  printWindow.focus();
+    printWindow.document.close()
 
-  return printWindow;
-};
-
-// Alternative method using iframe for better control
-export const printThermalReceiptIframe = (
-  content: string,
-  options: ThermalPrintOptions = {}
-) => {
-  const {
-    width = 48,
-    fontSize = 9,
-    lineHeight = 1.0
-  } = options;
-
-  // Create a hidden iframe
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'absolute';
-  iframe.style.left = '-9999px';
-  iframe.style.top = '-9999px';
-  iframe.style.width = '300px';
-  iframe.style.height = '600px';
-  document.body.appendChild(iframe);
-
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!iframeDoc) {
-    console.error('Failed to access iframe document');
-    return;
+    // Wait for content to load, then print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
+    }
   }
 
-  iframeDoc.open();
-  iframeDoc.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Thermal Receipt</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: 'Courier New', monospace; 
-            font-size: ${fontSize}px; 
-            line-height: ${lineHeight};
-            margin: 0;
-            padding: 1mm;
-            width: ${width}mm;
-            max-width: ${width}mm;
-            background: white;
-            color: black;
-          }
-          @media print {
-            @page { size: ${width}mm auto; margin: 0; }
-            body { width: ${width}mm; max-width: ${width}mm; }
-          }
-        </style>
-      </head>
-      <body>${content}</body>
-    </html>
-  `);
-  iframeDoc.close();
-
-  // Print the iframe content
-  iframe.contentWindow?.focus();
-  iframe.contentWindow?.print();
-
-  // Clean up after printing
-  setTimeout(() => {
-    document.body.removeChild(iframe);
-  }, 1000);
-};
+  // Print single receipt
+  printSingleReceipt(receiptType)
+}
