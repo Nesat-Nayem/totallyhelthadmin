@@ -22,7 +22,7 @@ interface PosState {
     notes: string
     receiveAmount: number
     cumulativePaid: number
-    payments: Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>
+    payments: Array<{ type: 'Cash' | 'Card' | 'Gateway'; methodType: 'direct' | 'split'; amount: number }>
     selectedAggregator: string
     invoiceNo: string
     orderNo: string

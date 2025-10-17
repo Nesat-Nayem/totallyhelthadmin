@@ -14,12 +14,22 @@ import {
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { useGetOrdersQuery } from '@/services/orderApi'
+import { useGetOrdersQuery, useUpdatePaymentModeMutation } from '@/services/orderApi'
 import { useSession } from 'next-auth/react'
+import PaymentModeChangeModal from '@/components/PaymentModeChangeModal'
 
 function formatDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d
   return date.toLocaleDateString()
+}
+
+function isCurrentDate(d: string | Date) {
+  const date = typeof d === 'string' ? new Date(d) : d
+  const today = new Date()
+  
+  return date.getDate() === today.getDate() &&
+         date.getMonth() === today.getMonth() &&
+         date.getFullYear() === today.getFullYear()
 }
 
 function firstDayOfMonthISO() {
@@ -69,6 +79,10 @@ const AllIncomeList = () => {
   const [endDate, setEndDate] = React.useState<string>('')
   const [page, setPage] = React.useState(1)
   const limit = 20
+  
+  // Payment mode change modal state
+  const [showPaymentModal, setShowPaymentModal] = React.useState(false)
+  const [selectedOrder, setSelectedOrder] = React.useState<any>(null)
 
   // Wait for session to be ready before making API calls
   const isSessionReady = status !== 'loading'
@@ -102,6 +116,9 @@ const AllIncomeList = () => {
     // Force fresh data on mount
     refetchOnMountOrArgChange: true
   })
+
+  // Payment mode update mutation
+  const [updatePaymentMode, { isLoading: isUpdatingPayment }] = useUpdatePaymentModeMutation()
 
   // this month
   const { data: monthResp } = useGetOrdersQuery({ startDate: firstDayOfMonthISO(), endDate: todayISO(), page: 1, limit: 1 }, {
@@ -148,6 +165,33 @@ const AllIncomeList = () => {
     sessionStorage.setItem('editOrderData', JSON.stringify(orderDataWithSource))
     // Navigate to POS page
     router.push('/pos')
+  }
+
+  const handleChangePaymentMode = (order: any) => {
+    setSelectedOrder(order)
+    setShowPaymentModal(true)
+  }
+
+  const handleConfirmPaymentModeChange = async (newPaymentMode: string) => {
+    if (!selectedOrder) return
+
+    try {
+      await updatePaymentMode({
+        id: selectedOrder._id,
+        paymentMode: newPaymentMode
+      }).unwrap()
+
+      // Show success message
+      alert(`Payment mode changed to ${newPaymentMode} successfully!`)
+      
+      // Close modal and refresh data
+      setShowPaymentModal(false)
+      setSelectedOrder(null)
+      refetch()
+    } catch (error) {
+      console.error('Failed to update payment mode:', error)
+      alert('Failed to update payment mode. Please try again.')
+    }
   }
 
 
@@ -345,8 +389,8 @@ const AllIncomeList = () => {
                       <th style={{ textWrap: 'nowrap' }}>Date</th>
                       <th style={{ textWrap: 'nowrap' }}>Invoice No</th>
                       <th style={{ textWrap: 'nowrap' }}>Total</th>
+                      <th style={{ textWrap: 'nowrap' }}>Payment Mode</th>
                       <th style={{ textWrap: 'nowrap' }}>Paid Status</th>
-                      {/* <th style={{ textWrap: 'nowrap' }}>Payment Mode</th> */}
                       <th style={{ textWrap: 'nowrap' }}>Action</th>
                     </tr>
                   </thead>
@@ -363,6 +407,20 @@ const AllIncomeList = () => {
                         <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo}</td>
                         <td style={{ textWrap: 'nowrap' }}>AED {o.total}</td>
                         <td style={{ textWrap: 'nowrap' }}>
+                          {o.payments?.length > 1 ? (
+                            <div>
+                              <span className="badge bg-warning me-1">Multiple</span>
+                              <span className="badge bg-info">
+                                {o.payments?.[0]?.type || 'Unknown'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="badge bg-info">
+                              {o.payments?.[0]?.type || 'Unknown'}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textWrap: 'nowrap' }}>
                           <span 
                             className={`badge ${o.status === 'paid' ? 'bg-success' : 'bg-warning'}`}
                             style={{ 
@@ -375,9 +433,9 @@ const AllIncomeList = () => {
                             {o.status === 'paid' ? 'PAID' : 'UNPAID'}
                           </span>
                         </td>
-                        {/* <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || '-'}</td> */}
                         <td>
                           <div className="d-flex gap-2">
+                            {/* Edit button for unpaid orders */}
                             {o.status !== 'paid' && (
                               <Button
                                 variant="outline-primary"
@@ -389,6 +447,23 @@ const AllIncomeList = () => {
                                 <IconifyIcon icon="solar:pen-2-bold" className="align-middle fs-16" />
                               </Button>
                             )}
+                            
+                            {/* Payment mode change button for paid orders on current date only */}
+                            {o.status === 'paid' && isCurrentDate(o.date) && (
+                              <Button
+                                variant="outline-warning"
+                                size="sm"
+                                onClick={() => handleChangePaymentMode(o)}
+                                title="Change Payment Mode (Current Date Only)"
+                                className="p-1"
+                              >
+                                <IconifyIcon 
+                                  icon="solar:bill-bold" 
+                                  className="align-middle fs-16" 
+                                />
+                              </Button>
+                            )}
+                            
                             <Link href="#" className="btn btn-soft-danger btn-sm" title="Delete (coming soon)">
                               <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
                             </Link>
@@ -428,6 +503,17 @@ const AllIncomeList = () => {
         </Col>
       </Row>
 
+      {/* Payment Mode Change Modal */}
+      <PaymentModeChangeModal
+        show={showPaymentModal}
+        onHide={() => {
+          setShowPaymentModal(false)
+          setSelectedOrder(null)
+        }}
+        order={selectedOrder}
+        onConfirm={handleConfirmPaymentModeChange}
+        isLoading={isUpdatingPayment}
+      />
 
     </>
   )

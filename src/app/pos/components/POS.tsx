@@ -63,11 +63,11 @@ const POS = () => {
   const [customer, setCustomer] = useState<any>(null)
   const [moreOptions, setMoreOptions] = useState<any[]>([])
   const [selectedAggregator, setSelectedAggregator] = useState('')
-  // const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash') // Commented out - using paymentType instead
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash')
   const [receiveAmount, setReceiveAmount] = useState(0)
   const [cumulativePaid, setCumulativePaid] = useState(0)
   const [originalCumulativePaid, setOriginalCumulativePaid] = useState(0) // Track original cumulative paid when editing
-  const [payments, setPayments] = useState<Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>>([])
+  const [payments, setPayments] = useState<Array<{ type: 'Cash' | 'Card' | 'Gateway'; methodType: 'direct' | 'split'; amount: number }>>([])
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [newPaymentType, setNewPaymentType] = useState<'Cash' | 'Card' | 'Gateway'>('Cash')
   const [newPaymentAmount, setNewPaymentAmount] = useState<string>('')
@@ -234,7 +234,7 @@ const POS = () => {
       
       // Set other form fields
       setCustomer(editingOrder.customer || null)
-      // setSelectedPaymentMode(editingOrder.paymentMode || 'Cash') // Commented out - using paymentType instead
+      setSelectedPaymentMode(editingOrder.paymentMode || 'Cash')
       setReceiveAmount(editingOrder.receiveAmount || 0)
       setCumulativePaid(editingOrder.cumulativePaid || 0)
       setOriginalCumulativePaid(editingOrder.cumulativePaid || 0) // Store original cumulative paid amount
@@ -427,7 +427,7 @@ const POS = () => {
   const handleAddPayment = () => {
     const amt = parseFloat(newPaymentAmount)
     if (isNaN(amt) || amt <= 0) return
-    setPayments((prev) => [...prev, { type: newPaymentType, amount: amt }])
+    setPayments((prev) => [...prev, { type: newPaymentType, methodType: 'split', amount: amt }])
     setNewPaymentAmount('')
     setShowAddPayment(false)
   }
@@ -582,8 +582,9 @@ const POS = () => {
         changeAmount,
         dueAmount: payableAmount,
         note: notes,  // Field is 'note' not 'notes'
-        // paymentMode: selectedPaymentMode, // Commented out - using paymentType instead
-        payments: payments,
+        payments: payments.length === 0 
+          ? [{ type: selectedPaymentMode as 'Cash' | 'Card' | 'Gateway', methodType: 'direct' as const, amount: receiveAmount }]
+          : payments,
         salesType: ((selectedOrderType === 'NewMembership' || selectedOrderType === 'MembershipMeal') ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
         orderType: selectedOrderType as 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal' | undefined,
         aggregatorId: selectedAggregator || undefined,
@@ -667,7 +668,7 @@ const POS = () => {
     setCumulativePaid(0)
     setOriginalCumulativePaid(0)
     setSelectedAggregator('')
-    // setSelectedPaymentMode('Cash') // Commented out - using paymentType instead
+    setSelectedPaymentMode('Cash')
     setPayments([])
     setShowAddPayment(false)
     setNewPaymentType('Cash')
@@ -1151,13 +1152,23 @@ const POS = () => {
                   />
 
                   <SplitBillModal show={showSplitModal} onClose={() => setShowSplitModal(false)} totalAmount={totalAmount} />
-                  {/* PaymentModeSelector commented out - using paymentType instead
-                  <PaymentModeSelector 
-                    selectedMode={selectedPaymentMode}
-                    onModeChange={setSelectedPaymentMode}
-                    paymentMethods={paymentMethods}
-                  />
-                  */}
+                  
+                  {/* Show split payments indicator when active */}
+                  {payments.length > 0 && (
+                    <div className="alert alert-info mb-3">
+                      <IconifyIcon icon="mdi:information" className="me-2" />
+                      <strong>Split Payments Active:</strong> Payment modes are managed through individual payment entries above.
+                    </div>
+                  )}
+                  
+                  {/* Only show Payment Mode when no split payments are active */}
+                  {payments.length === 0 && (
+                    <PaymentModeSelector 
+                      selectedMode={selectedPaymentMode}
+                      onModeChange={setSelectedPaymentMode}
+                      paymentMethods={paymentMethods}
+                    />
+                  )}
                 </Col>
 
                 {/* Right Side */}

@@ -54,11 +54,17 @@ const PaymentHistoryModal = ({ show, onHide, paymentHistory }: { show: boolean; 
         <div className="bg-light rounded p-3 mb-3">
           <div className="d-flex justify-content-between align-items-center">
             <h6 className="mb-0">Total Paid: <span className="text-success fw-bold">AED {paymentHistory.totalPaid}</span></h6>
-            <Badge bg="info">{paymentHistory.entries.length} entries</Badge>
+            <div className="d-flex gap-2">
+              <Badge bg="info">{paymentHistory.entries.length} entries</Badge>
+              {paymentHistory.changeSequence && paymentHistory.changeSequence.length > 0 && (
+                <Badge bg="warning">{paymentHistory.changeSequence.length} mode changes</Badge>
+              )}
+            </div>
           </div>
         </div>
         
         <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          {/* Payment History Entries */}
           {paymentHistory.entries.map((entry: any, index: number) => (
             <div key={index} className="border rounded p-3 mb-3">
               <div className="d-flex justify-content-between align-items-start mb-2">
@@ -126,6 +132,84 @@ const PaymentHistoryModal = ({ show, onHide, paymentHistory }: { show: boolean; 
               </div>
             </div>
           ))}
+
+          {/* Payment Mode Change Sequences */}
+          {paymentHistory.changeSequence && paymentHistory.changeSequence.length > 0 && (
+            <div className="mt-4">
+              <h6 className="text-warning mb-3">
+                <IconifyIcon icon="solar:refresh-bold" className="me-2" />
+                Payment Mode Changes
+              </h6>
+              {paymentHistory.changeSequence.map((change: any, index: number) => (
+                <div key={index} className="border border-warning rounded p-3 mb-3 bg-warning bg-opacity-10">
+                  <div className="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                      <Badge bg="warning" className="me-2">
+                        <IconifyIcon icon="solar:refresh-bold" className="me-1" />
+                        MODE CHANGED
+                      </Badge>
+                      <small className="text-muted">
+                        {new Date(change.timestamp).toLocaleString()}
+                      </small>
+                    </div>
+                    <div className="text-end">
+                      <small className="text-muted">Change #{index + 1}</small>
+                    </div>
+                  </div>
+                  
+                  <div className="row">
+                    <div className="col-6">
+                      <small className="text-muted">From:</small>
+                      <div className="d-flex gap-1 mt-1 flex-wrap">
+                        {change.from.map((mode: string, modeIndex: number) => (
+                          <Badge key={modeIndex} bg="danger" className="d-flex align-items-center gap-1">
+                            <IconifyIcon 
+                              icon={
+                                mode === 'Cash' ? 'solar:wallet-money-bold' : 
+                                mode === 'Card' ? 'solar:card-bold' : 
+                                mode === 'Gateway' ? 'solar:smartphone-2-bold' :
+                                mode === 'Online Transfer' ? 'solar:transfer-horizontal-bold' :
+                                'solar:link-bold'
+                              } 
+                              style={{ fontSize: '10px' }}
+                            />
+                            {mode}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <small className="text-muted">To:</small>
+                      <div className="d-flex gap-1 mt-1 flex-wrap">
+                        {change.to.map((mode: string, modeIndex: number) => (
+                          <Badge key={modeIndex} bg="success" className="d-flex align-items-center gap-1">
+                            <IconifyIcon 
+                              icon={
+                                mode === 'Cash' ? 'solar:wallet-money-bold' : 
+                                mode === 'Card' ? 'solar:card-bold' : 
+                                mode === 'Gateway' ? 'solar:smartphone-2-bold' :
+                                mode === 'Online Transfer' ? 'solar:transfer-horizontal-bold' :
+                                'solar:link-bold'
+                              } 
+                              style={{ fontSize: '10px' }}
+                            />
+                            {mode}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2">
+                    <small className="text-muted">
+                      <IconifyIcon icon="solar:clock-circle-bold" className="me-1" />
+                      Changed at: {new Date(change.timestamp).toLocaleString()}
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Modal.Body>
       <Modal.Footer>

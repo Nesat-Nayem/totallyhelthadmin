@@ -77,8 +77,17 @@ export const orderApi = baseApi.injectEndpoints({
       query: (params) => ({ url: '/orders/today/unpaid', method: 'GET', params: params ?? {} }),
       providesTags: [{ type: 'Order', id: 'UNPAID_TODAY' }],
     }),
+    updatePaymentMode: build.mutation<Order, { id: string; paymentMode: string }>({
+      query: ({ id, paymentMode }) => ({ 
+        url: `/orders/${id}/payment-mode-simple`, 
+        method: 'PATCH', 
+        body: { paymentMode } 
+      }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }, { type: 'Order', id: 'PAID_TODAY' }],
+    }),
   }),
   overrideExisting: true,
 })
 
-export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation, useUpdateOrderMutation, useGetPaidOrdersTodayQuery, useGetUnpaidOrdersTodayQuery } = orderApi
+export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation, useUpdateOrderMutation, useGetPaidOrdersTodayQuery, useGetUnpaidOrdersTodayQuery, useUpdatePaymentModeMutation } = orderApi
