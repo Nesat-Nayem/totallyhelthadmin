@@ -18,7 +18,7 @@ import product2 from '@/assets/images/order-view/2.webp'
 import product3 from '@/assets/images/order-view/3.webp'
 import product4 from '@/assets/images/order-view/4.webp'
 import DefaultModaal from './DefaultModaal'
-import MoreOptions from './MoreOptions'
+import ItemMoreOptions from './ItemMoreOptions'
 import SplitBillModal from './SplitBillModal'
 import PaymentModeSelector from './PaymentModeSelector'
 import DiscountModal from './DiscountModal'
@@ -61,7 +61,7 @@ const POS = () => {
   const [selectedBrand, setSelectedBrand] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [customer, setCustomer] = useState<any>(null)
-  const [moreOptions, setMoreOptions] = useState<any[]>([])
+  const [itemOptions, setItemOptions] = useState<{ [itemId: string]: string[] }>({})
   const [selectedAggregator, setSelectedAggregator] = useState('')
   const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash')
   const [receiveAmount, setReceiveAmount] = useState(0)
@@ -89,15 +89,14 @@ const POS = () => {
 
   // Calculate totals first
   const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
-  const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
   
   const discountAmountApplied = discount
     ? (discount.type?.toLowerCase?.() === 'percent'
-        ? ((subTotal + moreOptionsTotal) * (discount.amount || 0)) / 100
+        ? (subTotal * (discount.amount || 0)) / 100
         : (discount.amount || 0))
     : 0
   
-  const totalBeforeRounding = subTotal + moreOptionsTotal + deliveryCharge - discountAmountApplied
+  const totalBeforeRounding = subTotal + deliveryCharge - discountAmountApplied
   const totalAmount = totalBeforeRounding + rounding
   
   const payableAmount = Math.max(0, totalAmount - cumulativePaid)
@@ -107,7 +106,7 @@ const POS = () => {
   const syncOrderData = () => {
     const orderData = {
       selectedProducts,
-      moreOptions,
+      itemOptions,
       customer,
       discount,
       deliveryCharge,
@@ -149,7 +148,7 @@ const POS = () => {
     syncOrderData()
   }, [
     selectedProducts,
-    moreOptions,
+    itemOptions,
     customer,
     discount,
     deliveryCharge,
@@ -217,8 +216,10 @@ const POS = () => {
       const priceType = editingOrder.salesType === 'membership' ? 'membership' : 
                        editingOrder.salesType === 'restaurant' ? 'restaurant' : 'online'
       
-      // Populate selected products
+      // Populate selected products and item options
       const products: { [key: string]: any } = {}
+      const options: { [itemId: string]: string[] } = {}
+      
       if (editingOrder.items && editingOrder.items.length > 0) {
         editingOrder.items.forEach((item: any, index: number) => {
           const uniqueId = `${item.productId}_${Date.now()}_${index}`
@@ -228,9 +229,16 @@ const POS = () => {
             price: item.price,
             qty: item.qty,
           }
+          
+          // Load existing more options for this item
+          if (item.moreOptions && item.moreOptions.length > 0) {
+            options[uniqueId] = item.moreOptions.map((option: any) => option.name)
+          }
         })
       }
+      
       setSelectedProducts(products)
+      setItemOptions(options) // Set the existing more options
       
       // Set other form fields
       setCustomer(editingOrder.customer || null)
@@ -421,6 +429,19 @@ const POS = () => {
       delete updated[id]
       return updated
     })
+    // Also remove item options when item is deleted
+    setItemOptions((prev) => {
+      const updated = { ...prev }
+      delete updated[id]
+      return updated
+    })
+  }
+
+  const handleItemOptionsChange = (itemId: string, options: string[]) => {
+    setItemOptions((prev) => ({
+      ...prev,
+      [itemId]: options
+    }))
   }
 
   // Payment split handlers
@@ -555,16 +576,12 @@ const POS = () => {
           name: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
           phone: customer.phone || customer.mobile || '',
         } : undefined,
-        items: Object.values(selectedProducts).map((p: any) => ({
+        items: Object.entries(selectedProducts).map(([uniqueId, p]: [string, any]) => ({
           productId: p._id || p.id,
           title: p.title || p.name,
           price: p.price,
-          qty: p.qty
-        })),
-        extraItems: moreOptions.map((opt: any) => ({
-          name: opt.name,
-          price: opt.price,
-          qty: opt.qty || 1
+          qty: p.qty,
+          moreOptions: (itemOptions[uniqueId] || []).map(optionName => ({ name: optionName }))
         })),
         date: startDate,  // Required field
         subTotal,
@@ -620,7 +637,7 @@ const POS = () => {
       
       // Reset form
       setSelectedProducts({})
-      setMoreOptions([])
+      setItemOptions({})
       setCustomer(null)
       setDiscount(null)
       setDeliveryCharge(0)
@@ -658,7 +675,7 @@ const POS = () => {
   
   const handleReset = () => {
     setSelectedProducts({})
-    setMoreOptions([])
+    setItemOptions({})
     setCustomer(null)
     setDiscount(null)
     setDeliveryCharge(0)
@@ -970,18 +987,23 @@ const POS = () => {
                           {/* <td>AED {itemVAT.toFixed(2)}</td> */}
                           {/* <td>AED {itemTotalWithVAT.toFixed(2)}</td> */}
                           <td>
-                            <Button size="sm" variant="danger" onClick={() => handleDelete(uniqueId)}>
-                              <IconifyIcon icon="mdi:delete" />
-                            </Button>
+                            <div className="d-flex gap-1 align-items-center">
+                              <ItemMoreOptions
+                                itemId={uniqueId}
+                                itemName={product.title || product.name}
+                                onOptionsChange={handleItemOptionsChange}
+                                currentOptions={itemOptions[uniqueId] || []}
+                              />
+                              <Button size="sm" variant="danger" onClick={() => handleDelete(uniqueId)}>
+                                <IconifyIcon icon="mdi:delete" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
-                <div className="text-end">
-                  <MoreOptions onOptionsChange={setMoreOptions} />
-                </div>
               </div>
 
               <Row className="g-3">

@@ -17,6 +17,7 @@ import {
 import { useGetOrdersQuery, useUpdatePaymentModeMutation } from '@/services/orderApi'
 import { useSession } from 'next-auth/react'
 import PaymentModeChangeModal from '@/components/PaymentModeChangeModal'
+import OrderDetailsModal from '@/components/OrderDetailsModal'
 
 function formatDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d
@@ -83,6 +84,10 @@ const AllIncomeList = () => {
   // Payment mode change modal state
   const [showPaymentModal, setShowPaymentModal] = React.useState(false)
   const [selectedOrder, setSelectedOrder] = React.useState<any>(null)
+  
+  // Order details modal state
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = React.useState(false)
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = React.useState<any>(null)
 
   // Wait for session to be ready before making API calls
   const isSessionReady = status !== 'loading'
@@ -170,6 +175,11 @@ const AllIncomeList = () => {
   const handleChangePaymentMode = (order: any) => {
     setSelectedOrder(order)
     setShowPaymentModal(true)
+  }
+
+  const handleViewOrderDetails = (order: any) => {
+    setSelectedOrderForDetails(order)
+    setShowOrderDetailsModal(true)
   }
 
   const handleConfirmPaymentModeChange = async (newPaymentMode: string) => {
@@ -435,6 +445,17 @@ const AllIncomeList = () => {
                         </td>
                         <td>
                           <div className="d-flex gap-2">
+                            {/* View button - always available */}
+                            <Button
+                              variant="outline-info"
+                              size="sm"
+                              onClick={() => handleViewOrderDetails(o)}
+                              title="View Order Details"
+                              className="p-1"
+                            >
+                              <IconifyIcon icon="solar:eye-bold" className="align-middle fs-16" />
+                            </Button>
+                            
                             {/* Edit button for unpaid orders */}
                             {o.status !== 'paid' && (
                               <Button
@@ -513,6 +534,16 @@ const AllIncomeList = () => {
         order={selectedOrder}
         onConfirm={handleConfirmPaymentModeChange}
         isLoading={isUpdatingPayment}
+      />
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        show={showOrderDetailsModal}
+        onHide={() => {
+          setShowOrderDetailsModal(false)
+          setSelectedOrderForDetails(null)
+        }}
+        order={selectedOrderForDetails}
       />
 
     </>

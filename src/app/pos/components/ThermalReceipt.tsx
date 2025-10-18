@@ -152,26 +152,37 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
       </div>
 
       {/* Items */}
-      {orderData?.selectedProducts && Object.values(orderData.selectedProducts).map((product: any, index: number) => (
-        <div key={index} style={{ marginBottom: '2px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: '50%' }}>{product.title || product.name}</div>
-            <div style={{ width: '15%', textAlign: 'center' }}>{product.qty}</div>
-            <div style={{ width: '35%', textAlign: 'right' }}>{(product.price * product.qty).toFixed(2)}</div>
+      {orderData?.selectedProducts && Object.entries(orderData.selectedProducts).map(([uniqueId, product]: [string, any], index: number) => {
+        // Handle both formats: itemOptions (from Redux) and moreOptions (from database)
+        const itemOptions = orderData?.itemOptions?.[uniqueId] || []
+        const moreOptions = product.moreOptions || []
+        
+        // Get option names from either format
+        const optionNames = itemOptions.length > 0 
+          ? itemOptions 
+          : moreOptions.map((opt: any) => typeof opt === 'string' ? opt : opt.name)
+        
+        return (
+          <div key={index} style={{ marginBottom: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ width: '50%' }}>{product.title || product.name}</div>
+              <div style={{ width: '15%', textAlign: 'center' }}>{product.qty}</div>
+              <div style={{ width: '35%', textAlign: 'right' }}>{(product.price * product.qty).toFixed(2)}</div>
+            </div>
+            {/* Item-specific options */}
+            {optionNames.length > 0 && (
+              <div style={{ marginLeft: '10px', fontSize: '9px', color: '#666' }}>
+                {optionNames.map((optionName: string, optIndex: number) => (
+                  <div key={optIndex} style={{ marginBottom: '1px' }}>
+                    + {optionName}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
 
-      {/* More Options Items */}
-      {orderData?.moreOptions && orderData.moreOptions.map((option: any, index: number) => (
-        <div key={`option-${index}`} style={{ marginBottom: '2px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: '50%' }}>{option.name}</div>
-            <div style={{ width: '15%', textAlign: 'center' }}>{option.qty || 1}</div>
-            <div style={{ width: '35%', textAlign: 'right' }}>{(option.price * (option.qty || 1)).toFixed(2)}</div>
-          </div>
-        </div>
-      ))}
 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
 
@@ -192,6 +203,24 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
       </div>
 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
+
+      {/* Order Notes Section - Only show if notes exist */}
+      {orderData?.notes && orderData.notes.trim() && (
+        <>
+          <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>ORDER NOTES:</div>
+            <div style={{ 
+              fontSize: '10px', 
+              lineHeight: '1.2',
+              wordWrap: 'break-word',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {orderData.notes}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Customer Info */}
       {orderData?.customer && (
@@ -261,24 +290,54 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
       </div>
 
       {/* Items */}
-      {orderData?.selectedProducts && Object.values(orderData.selectedProducts).map((product: any, index: number) => (
-        <div key={index} style={{ marginBottom: '2px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: '20%' }}>{product.qty}</div>
-            <div style={{ width: '80%' }}>{product.title || product.name}</div>
+      {orderData?.selectedProducts && Object.entries(orderData.selectedProducts).map(([uniqueId, product]: [string, any], index: number) => {
+        // Handle both formats: itemOptions (from Redux) and moreOptions (from database)
+        const itemOptions = orderData?.itemOptions?.[uniqueId] || []
+        const moreOptions = product.moreOptions || []
+        
+        // Get option names from either format
+        const optionNames = itemOptions.length > 0 
+          ? itemOptions 
+          : moreOptions.map((opt: any) => typeof opt === 'string' ? opt : opt.name)
+        
+        return (
+          <div key={index} style={{ marginBottom: '2px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ width: '20%' }}>{product.qty}</div>
+              <div style={{ width: '80%' }}>{product.title || product.name}</div>
+            </div>
+            {/* Item-specific options */}
+            {optionNames.length > 0 && (
+              <div style={{ marginLeft: '10px', fontSize: '9px', color: '#666' }}>
+                {optionNames.map((optionName: string, optIndex: number) => (
+                  <div key={optIndex} style={{ marginBottom: '1px' }}>
+                    + {optionName}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
 
-      {/* More Options Items */}
-      {orderData?.moreOptions && orderData.moreOptions.map((option: any, index: number) => (
-        <div key={`option-${index}`} style={{ marginBottom: '2px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: '20%' }}>{option.qty || 1}</div>
-            <div style={{ width: '80%' }}>{option.name}</div>
+
+      {/* Order Notes Section - Only show if notes exist */}
+      {orderData?.notes && orderData.notes.trim() && (
+        <>
+          <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>ORDER NOTES:</div>
+            <div style={{ 
+              fontSize: '10px', 
+              lineHeight: '1.2',
+              wordWrap: 'break-word',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {orderData.notes}
+            </div>
           </div>
-        </div>
-      ))}
+        </>
+      )}
 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
 

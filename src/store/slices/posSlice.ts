@@ -14,7 +14,7 @@ interface PosState {
   isEditMode: boolean
   currentOrderData: {
     selectedProducts: { [key: string]: any }
-    moreOptions: any[]
+    itemOptions: { [itemId: string]: string[] }
     customer: any | null
     discount: { type: string; amount: number; reason: string } | null
     deliveryCharge: number
