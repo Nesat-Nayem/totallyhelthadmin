@@ -1,97 +1,12 @@
-import { use } from 'react'
 import { MenuItemType } from '@/types/menu'
 
-export const MENU_ITEMS: MenuItemType[] = [
-  {
-    key: 'pos',
-    label: 'POS',
-    isTitle: true,
-  },
+export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
   {
     key: 'dashboard',
     label: 'Dashboard',
     icon: 'solar:widget-5-bold-duotone',
     url: '/dashboard',
   },
-  // {
-  //   key: 'pos-module',
-  //   label: 'POS Module',
-  //   icon: 'solar:cart-5-bold-duotone',
-  //   children: [
-  //     {
-  //       key: 'pos-main',
-  //       label: 'POS Main',
-  //       url: '/pos',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'settle-bill',
-  //       label: 'Settle Bill',
-  //       url: '/pos/settle-bill',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'print-order',
-  //       label: 'Print Order',
-  //       url: '/pos/print-order',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'pos-reports',
-  //       label: 'POS Reports',
-  //       url: '/pos/reports',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'view-orders',
-  //       label: 'View Orders',
-  //       url: '/pos/view-orders',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'transaction-history',
-  //       label: 'Transaction History',
-  //       url: '/pos/transaction-history',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'split-bill',
-  //       label: 'Split Bill',
-  //       url: '/pos/split-bill',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'apply-discount',
-  //       label: 'Apply Discount',
-  //       url: '/pos/apply-discount',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'meal-plan-list',
-  //       label: 'Meal Plan List',
-  //       url: '/pos/meal-plan-list',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'sales-list',
-  //       label: 'Sales List',
-  //       url: '/pos/sales-list',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'calculator',
-  //       label: 'Calculator',
-  //       url: '/pos/calculator',
-  //       parentKey: 'pos-module',
-  //     },
-  //     {
-  //       key: 'start-shift',
-  //       label: 'Start Shift',
-  //       url: '/pos/start-shift',
-  //       parentKey: 'pos-module',
-  //     },
-  //   ],
-  // },
   {
     key: 'sales',
     label: 'Sales',
@@ -111,7 +26,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'menu-master',
     label: 'Menu Master',
@@ -149,7 +63,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'paymeny-method',
     label: 'Payment Method',
@@ -169,7 +82,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'branches',
     label: 'Branches',
@@ -208,7 +120,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'meal-plan',
     label: 'Meal Plan',
@@ -234,7 +145,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'aggregators',
     label: 'Aggregators',
@@ -252,15 +162,8 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/aggregators/aggregators-list',
         parentKey: 'aggregators',
       },
-      // {
-      //   key: 'aggregators-menu-linking',
-      //   label: 'Menu linking for aggregator',
-      //   url: '/aggregators/aggregators-menu-linking',
-      //   parentKey: 'aggregators',
-      // },
     ],
   },
-
   {
     key: 'inventory',
     label: 'Inventory',
@@ -286,7 +189,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'expenses',
     label: 'Expenses',
@@ -312,7 +214,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'customer',
     label: 'Customers Master',
@@ -338,7 +239,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'staff',
     label: 'Staff Master',
@@ -370,7 +270,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'Shift-master',
     icon: 'solar:calendar-bold-duotone',
@@ -444,18 +343,11 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
   {
     key: 'more-options',
     icon: 'solar:cup-hot-broken',
     label: 'More Options',
     url: '/more-options',
-  },
-
-  {
-    key: 'enquiry',
-    label: 'Enquiries',
-    isTitle: true,
   },
   {
     key: 'contact-us',
@@ -468,11 +360,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Meal Plan Order History',
     icon: 'solar:cart-5-bold-duotone',
     url: '/menu-plan-order-history',
-  },
-  {
-    key: 'web-pages',
-    label: 'Web Pages',
-    isTitle: true,
   },
   {
     key: 'pages',
@@ -584,12 +471,6 @@ export const MENU_ITEMS: MenuItemType[] = [
       },
     ],
   },
-
-  {
-    key: 'support',
-    label: 'SUPPORT',
-    isTitle: true,
-  },
   {
     key: 'faqs',
     label: 'FAQs',
@@ -609,11 +490,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/support/terms-conditions',
   },
   {
-    key: 'custom',
-    label: 'CUSTOM',
-    isTitle: true,
-  },
-  {
     key: 'role-management',
     label: 'Role Management',
     icon: 'solar:users-group-two-rounded-bold-duotone',
@@ -630,5 +506,85 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Settings',
     icon: 'solar:settings-bold-duotone',
     url: '/settings',
+  },
+  // POS Module - Added at the end as requested
+  {
+    key: 'pos-module',
+    label: 'POS Module',
+    icon: 'solar:cart-5-bold-duotone',
+    children: [
+      {
+        key: 'pos-main',
+        label: 'POS Main',
+        url: '/pos',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'settle-bill',
+        label: 'Settle Bill',
+        url: '/pos/settle-bill',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'print-order',
+        label: 'Print Order',
+        url: '/pos/print-order',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'pos-reports',
+        label: 'POS Reports',
+        url: '/pos/reports',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'view-orders',
+        label: 'View Orders',
+        url: '/pos/view-orders',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'transaction-history',
+        label: 'Transaction History',
+        url: '/pos/transaction-history',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'split-bill',
+        label: 'Split Bill',
+        url: '/pos/split-bill',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'apply-discount',
+        label: 'Apply Discount',
+        url: '/pos/apply-discount',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'meal-plan-list',
+        label: 'Meal Plan List',
+        url: '/pos/meal-plan-list',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'sales-list',
+        label: 'Sales List',
+        url: '/pos/sales-list',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'calculator',
+        label: 'Calculator',
+        url: '/pos/calculator',
+        parentKey: 'pos-module',
+      },
+      {
+        key: 'start-shift',
+        label: 'Start Shift',
+        url: '/pos/start-shift',
+        parentKey: 'pos-module',
+      },
+    ],
   },
 ]
