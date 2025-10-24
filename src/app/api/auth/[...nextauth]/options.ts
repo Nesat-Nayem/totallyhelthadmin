@@ -51,6 +51,7 @@ export const options: NextAuthOptions = {
             name: data.data?.name,
             role: data.data?.role,
             branchId: data.data?.branchId,
+            menuAccess: data.data?.menuAccess,
             token: data.token,
           } as any
         }
@@ -74,6 +75,7 @@ export const options: NextAuthOptions = {
           name: (user as any).name,
           role: (user as any).role,
           branchId: (user as any).branchId,
+          menuAccess: (user as any).menuAccess,
         }
       }
       return token
@@ -83,6 +85,9 @@ export const options: NextAuthOptions = {
       session.user = {
         email: (token as any).user?.email,
         name: (token as any).user?.name,
+        role: (token as any).user?.role,
+        branchId: (token as any).user?.branchId,
+        menuAccess: (token as any).user?.menuAccess,
       } as any
       return Promise.resolve(session)
     },

@@ -1,8 +1,18 @@
 import { MENU_ITEMS } from '@/assets/data/menu-items'
 import type { MenuItemType } from '@/types/menu'
+import { getAccessibleMenuItems, UserSession } from '@/utils/accessControl'
 
 export const getMenuItems = (): MenuItemType[] => {
   return MENU_ITEMS
+}
+
+/**
+ * Gets menu items filtered by user access permissions
+ * @param userSession - User session data containing role and menu access
+ * @returns Filtered array of menu items that user has access to
+ */
+export const getMenuItemsByAccess = (userSession: UserSession | null): MenuItemType[] => {
+  return getAccessibleMenuItems(userSession)
 }
 
 export const findAllParent = (menuItems: MenuItemType[], menuItem: MenuItemType): string[] => {

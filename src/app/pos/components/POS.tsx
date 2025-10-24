@@ -42,6 +42,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
 import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal, setEditMode, exitEditMode, updateCurrentOrderData, clearCurrentOrderData } from '@/store/slices/posSlice'
 import { showCustomerRequiredAlert, showSuccess, showError } from '@/utils/sweetAlert'
+import { useAccessControl } from '@/hooks/useAccessControl'
 
 // Fallback images for menus
 const fallbackImages = [product1, product2, product3, product4]
@@ -52,6 +53,7 @@ const POS = () => {
   const rtkDispatch = useRTKDispatch()
   const router = useRouter()
   const { selectedOrderType, selectedPriceType, showOrderTypeModal, editingOrder, isEditMode } = useSelector((state: RootState) => state.pos)
+  const { hasAccessToPOSButton } = useAccessControl()
   
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: any }>({})
   const [showSplitModal, setShowSplitModal] = useState(false)
@@ -870,13 +872,17 @@ const POS = () => {
               <CardTitle as="h4" className="flex-grow-1 mb-0 text-primary">
                 Quick Action
               </CardTitle>
-              <Link href="/meal-plan/meal-plan-list" className="btn btn-lg btn-success">
-                <IconifyIcon icon="mdi:food-variant" /> Meal Plan List
-              </Link>
-              <Link href="/sales/sales-list" className="btn btn-lg btn-warning">
-                <IconifyIcon icon="mdi:cash-register" /> Sales List
-              </Link>
-              <Calculator />
+              {hasAccessToPOSButton('meal-plan-list') && (
+                <Link href="/meal-plan/meal-plan-list" className="btn btn-lg btn-success">
+                  <IconifyIcon icon="mdi:food-variant" /> Meal Plan List
+                </Link>
+              )}
+              {hasAccessToPOSButton('sales-list') && (
+                <Link href="/sales/sales-list" className="btn btn-lg btn-warning">
+                  <IconifyIcon icon="mdi:cash-register" /> Sales List
+                </Link>
+              )}
+              {hasAccessToPOSButton('calculator') && <Calculator />}
               <Link href="/dashboard" className="btn btn-lg btn-dark">
                 <IconifyIcon icon="mdi:view-dashboard-outline" /> Dashboard
               </Link>
@@ -884,14 +890,16 @@ const POS = () => {
                 {/* <span className="badge bg-secondary">
                   Day Status: {openDay ? 'Open' : 'Closed'}
                 </span> */}
-                <Button 
-                  variant={currentShift ? "danger" : "success"}
-                  className="btn" 
-                  onClick={currentShift ? handleCloseShift : handleStartShift}
-                >
-                  <IconifyIcon icon={currentShift ? "mdi:clock-out" : "mdi:clock-in"} /> 
-                  {currentShift ? "Close Shift" : "Start Shift"}
-                </Button>
+                {hasAccessToPOSButton('start-shift') && (
+                  <Button 
+                    variant={currentShift ? "danger" : "success"}
+                    className="btn" 
+                    onClick={currentShift ? handleCloseShift : handleStartShift}
+                  >
+                    <IconifyIcon icon={currentShift ? "mdi:clock-out" : "mdi:clock-in"} /> 
+                    {currentShift ? "Close Shift" : "Start Shift"}
+                  </Button>
+                )}
                 {openDay && (
                   <Button variant="warning" className="btn" onClick={handleCloseDay}>
                     <IconifyIcon icon="mdi:calendar-check" /> Close Day
@@ -1160,12 +1168,16 @@ const POS = () => {
                   </Form.Group>
 
                   {/* Split Bill Button */}
-                  <Button variant="info" size="lg" onClick={() => setShowSplitModal(true)}>
-                    <IconifyIcon icon="mdi:account-multiple-outline" /> Split Bill
-                  </Button>
-                  <Button variant="success" size="lg" onClick={() => setShowDiscountModal(true)} className="mx-3">
-                    <IconifyIcon icon="mdi:ticket-percent-outline" /> Apply Discount
-                  </Button>
+                  {hasAccessToPOSButton('split-bill') && (
+                    <Button variant="info" size="lg" onClick={() => setShowSplitModal(true)}>
+                      <IconifyIcon icon="mdi:account-multiple-outline" /> Split Bill
+                    </Button>
+                  )}
+                  {hasAccessToPOSButton('apply-discount') && (
+                    <Button variant="success" size="lg" onClick={() => setShowDiscountModal(true)} className="mx-3">
+                      <IconifyIcon icon="mdi:ticket-percent-outline" /> Apply Discount
+                    </Button>
+                  )}
 
                   <DiscountModal
                     show={showDiscountModal}
@@ -1269,23 +1281,29 @@ const POS = () => {
               <Button variant="warning" size="lg" onClick={handleReset}>
                 <IconifyIcon icon="mdi:restart" /> Reset
               </Button>
-              <Button 
-                variant="info" 
-                size="lg"
-                onClick={isEditMode ? handleSaveOrder : undefined}
-                disabled={!isEditMode}
-                style={{ opacity: !isEditMode ? 0.5 : 1 }}
-              >
-                <IconifyIcon icon="mdi:restart" /> Settle Bill
-              </Button>
-              <PrintOrder />
-              <ViewOrder onEditOrder={handleEditOrder} />
-              <Link href="/reports/all-income" className="btn btn-lg btn-dark">
-                <IconifyIcon icon="mdi:document" /> Reports
-              </Link>
-              <Link href="/reports/transactions" className="btn btn-lg btn-light">
-                <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
-              </Link>
+              {hasAccessToPOSButton('settle-bill') && (
+                <Button 
+                  variant="info" 
+                  size="lg"
+                  onClick={isEditMode ? handleSaveOrder : undefined}
+                  disabled={!isEditMode}
+                  style={{ opacity: !isEditMode ? 0.5 : 1 }}
+                >
+                  <IconifyIcon icon="mdi:restart" /> Settle Bill
+                </Button>
+              )}
+              {hasAccessToPOSButton('print-order') && <PrintOrder />}
+              {hasAccessToPOSButton('view-orders') && <ViewOrder onEditOrder={handleEditOrder} />}
+              {hasAccessToPOSButton('pos-reports') && (
+                <Link href="/reports/all-income" className="btn btn-lg btn-dark">
+                  <IconifyIcon icon="mdi:document" /> Reports
+                </Link>
+              )}
+              {hasAccessToPOSButton('transaction-history') && (
+                <Link href="/reports/transactions" className="btn btn-lg btn-light">
+                  <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
+                </Link>
+              )}
               <Button 
                 variant="primary" 
                 size="lg" 

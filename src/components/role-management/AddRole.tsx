@@ -41,7 +41,7 @@ const AddRole: React.FC<AddRoleProps> = ({
   const [menuAccess, setMenuAccess] = useState<MenuAccess>({})
   
   // Fixed roles as per backend enum
-  const availableRoles = ['Super Admin', 'Admin', 'Manager', 'Supervisor', 'Cashier', 'Waiter', 'Staff']
+  const availableRoles = ['superadmin', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff']
   
   // API mutation
   const [createRole, { isLoading: isCreating }] = useCreateRoleMutation()
@@ -68,7 +68,6 @@ const AddRole: React.FC<AddRoleProps> = ({
 
   const handleFormSubmit = async (data: any) => {
     try {
-      console.log('AddRole - Form submitted with data:', data)
       
       const createData = {
         name: data.staffName,
@@ -79,11 +78,9 @@ const AddRole: React.FC<AddRoleProps> = ({
         menuAccess: menuAccess
       }
       
-      console.log('AddRole - Create payload:', createData)
       
       const result = await createRole(createData).unwrap()
       
-      console.log('AddRole - Create result:', result)
       
       // Show success message
       Swal.fire({

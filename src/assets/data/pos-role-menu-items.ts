@@ -64,7 +64,7 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
     ],
   },
   {
-    key: 'paymeny-method',
+    key: 'payment-method',
     label: 'Payment Method',
     icon: 'solar:dollar-bold',
     children: [
@@ -513,12 +513,6 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
     label: 'POS Module',
     icon: 'solar:cart-5-bold-duotone',
     children: [
-      {
-        key: 'pos-main',
-        label: 'POS Main',
-        url: '/pos',
-        parentKey: 'pos-module',
-      },
       {
         key: 'settle-bill',
         label: 'Settle Bill',

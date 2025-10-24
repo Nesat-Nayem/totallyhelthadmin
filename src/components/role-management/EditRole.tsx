@@ -42,7 +42,7 @@ const EditRole: React.FC<EditRoleProps> = ({
   const [menuAccess, setMenuAccess] = useState<MenuAccess>(initialData?.menuAccess || {})
   
   // Fixed roles as per backend enum
-  const availableRoles = ['Super Admin', 'Admin', 'Manager', 'Supervisor', 'Cashier', 'Waiter', 'Staff']
+  const availableRoles = ['superadmin', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff']
   
   // API hooks
   const { updateRole, isUpdating } = useRoleApi()
@@ -66,22 +66,13 @@ const EditRole: React.FC<EditRoleProps> = ({
   
   // Watch form values for debugging
   const formValues = watch()
-  console.log('EditRole - Current form values:', formValues)
-  console.log('EditRole - Initial data received:', initialData)
 
   // Update form when initialData changes
   useEffect(() => {
     if (initialData) {
-      console.log('EditRole - Updating form with initialData:', initialData)
       
       // Always reset if we have initialData
       if (initialData.staffName || initialData.email) {
-        console.log('EditRole - Resetting form with data:', {
-          staffName: initialData.staffName,
-          role: initialData.role,
-          email: initialData.email,
-          phone: initialData.phone
-        })
         
         // Force reset with new data
         reset({
@@ -100,14 +91,12 @@ const EditRole: React.FC<EditRoleProps> = ({
         setValue('phone', initialData.phone || '')
         
         setMenuAccess(initialData.menuAccess || {})
-        console.log('EditRole - Form reset completed with data')
       }
     }
   }, [initialData, reset, setValue])
 
   // Watch for form value changes
   useEffect(() => {
-    console.log('EditRole - Form values changed:', formValues)
   }, [formValues])
 
   const handleMenuAccessChange = (access: MenuAccess) => {
@@ -116,8 +105,6 @@ const EditRole: React.FC<EditRoleProps> = ({
 
   const handleFormSubmit = async (data: any) => {
     try {
-      console.log('EditRole - Form submitted with data:', data)
-      console.log('Role ID:', roleId)
       
       const updateData: any = {
         name: data.staffName,
@@ -127,7 +114,6 @@ const EditRole: React.FC<EditRoleProps> = ({
         menuAccess: menuAccess
       }
       
-      console.log('EditRole - Update payload:', updateData)
       
       await updateRole(roleId, updateData)
       

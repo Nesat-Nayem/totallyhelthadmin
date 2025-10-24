@@ -33,10 +33,7 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
   }, [selectedAccess])
 
   const handleModuleChange = (moduleKey: string, checked: boolean) => {
-    console.log('MenuAccessCheckbox - handleModuleChange called:', { moduleKey, checked, disabled })
-    
     if (disabled) {
-      console.log('MenuAccessCheckbox - Component is disabled, ignoring change')
       return
     }
     
@@ -57,6 +54,7 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
           newAccess[moduleKey].children![child.key] = true
         })
       }
+      
     } else {
       // If module is unchecked, uncheck all its children
       newAccess[moduleKey] = { checked: false }
@@ -65,18 +63,15 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
           newAccess[moduleKey].children![childKey] = false
         })
       }
+      
     }
     
-    console.log('MenuAccessCheckbox - New access state:', newAccess)
     setAccess(newAccess)
     onAccessChange(newAccess)
   }
 
   const handleSubModuleChange = (moduleKey: string, subModuleKey: string, checked: boolean) => {
-    console.log('MenuAccessCheckbox - handleSubModuleChange called:', { moduleKey, subModuleKey, checked, disabled })
-    
     if (disabled) {
-      console.log('MenuAccessCheckbox - Component is disabled, ignoring change')
       return
     }
     
@@ -106,7 +101,6 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
       newAccess[moduleKey].checked = allChildrenSelected
     }
     
-    console.log('MenuAccessCheckbox - New sub-module access state:', newAccess)
     setAccess(newAccess)
     onAccessChange(newAccess)
   }
@@ -141,12 +135,20 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
     if (!access) return 0
     
     let count = 0
-    Object.values(access).forEach(module => {
-      if (module && module.checked) count++
-      if (module && module.children) {
-        Object.values(module.children).forEach(child => {
-          if (child) count++
-        })
+    POS_ROLE_MENU_ITEMS.forEach(item => {
+      if (!item.isTitle) {
+        const moduleAccess = access[item.key]
+        if (moduleAccess) {
+          // Count main module if checked
+          if (moduleAccess.checked) count++
+          
+          // Count children if they exist and are checked
+          if (moduleAccess.children && item.children) {
+            item.children.forEach(child => {
+              if (moduleAccess.children![child.key]) count++
+            })
+          }
+        }
       }
     })
     return count
@@ -165,6 +167,85 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
     return count
   }
 
+  const isAllSelected = (): boolean => {
+    if (!access) return false
+    
+    // Check if all modules and their children are selected
+    return POS_ROLE_MENU_ITEMS.every(item => {
+      if (item.isTitle) return true // Skip title items
+      
+      const moduleAccess = access[item.key]
+      if (!moduleAccess) return false
+      
+      // Check if main module is selected
+      if (!moduleAccess.checked) return false
+      
+      // Check if all children are selected (if they exist)
+      if (item.children && moduleAccess.children) {
+        return item.children.every(child => moduleAccess.children![child.key] === true)
+      }
+      
+      return true
+    })
+  }
+
+  const isIndeterminate = (): boolean => {
+    if (!access) return false
+    
+    const totalCount = getTotalCount()
+    const selectedCount = getSelectedCount()
+    
+    // If nothing is selected, not indeterminate
+    if (selectedCount === 0) return false
+    
+    // If everything is selected, not indeterminate
+    if (selectedCount === totalCount) return false
+    
+    // If some but not all are selected, it's indeterminate
+    return selectedCount > 0 && selectedCount < totalCount
+  }
+
+  const handleSelectAllChange = (checked: boolean) => {
+    if (disabled) {
+      return
+    }
+    
+    const newAccess: MenuAccess = {}
+    
+    if (checked) {
+      // Select all modules and their children
+      POS_ROLE_MENU_ITEMS.forEach(item => {
+        if (!item.isTitle) {
+          newAccess[item.key] = { checked: true }
+          if (item.children) {
+            newAccess[item.key].children = {}
+            item.children.forEach(child => {
+              newAccess[item.key].children![child.key] = true
+            })
+          }
+          
+        }
+      })
+    } else {
+      // Deselect all modules and their children
+      POS_ROLE_MENU_ITEMS.forEach(item => {
+        if (!item.isTitle) {
+          newAccess[item.key] = { checked: false }
+          if (item.children) {
+            newAccess[item.key].children = {}
+            item.children.forEach(child => {
+              newAccess[item.key].children![child.key] = false
+            })
+          }
+          
+        }
+      })
+    }
+    
+    setAccess(newAccess)
+    onAccessChange(newAccess)
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -174,10 +255,34 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
             ({getSelectedCount()} of {getTotalCount()} selected)
           </small>
         </CardTitle>
+        <div className="form-check mt-2">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            id="select-all-permissions"
+            checked={isAllSelected()}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate = isIndeterminate()
+              }
+            }}
+            onChange={(e) => handleSelectAllChange(e.target.checked)}
+            disabled={disabled}
+          />
+          <label className="form-check-label fw-bold text-primary" htmlFor="select-all-permissions">
+            Select All Permissions
+          </label>
+        </div>
       </CardHeader>
       <CardBody>
         <div className="menu-access-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
           {POS_ROLE_MENU_ITEMS.map((item) => {
+            // Debug logging for sales section
+            if (item.key === 'sales') {
+              console.log('Sales section found:', item);
+              console.log('Sales children:', item.children);
+            }
+            
             if (item.isTitle) {
               return (
                 <div key={item.key} className="mb-3">
@@ -187,6 +292,7 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
                 </div>
               )
             }
+
 
             return (
               <div key={item.key} className="mb-3">
@@ -213,21 +319,27 @@ const MenuAccessCheckbox: React.FC<MenuAccessCheckboxProps> = ({
                 {/* Sub-modules */}
                 {item.children && item.children.length > 0 && (
                   <div className="ms-4">
-                    {item.children.map((child) => (
-                      <div key={child.key} className="form-check mb-1">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id={`submodule-${child.key}`}
-                          checked={isSubModuleChecked(item.key, child.key)}
-                          onChange={(e) => handleSubModuleChange(item.key, child.key, e.target.checked)}
-                          disabled={disabled}
-                        />
-                        <label className="form-check-label" htmlFor={`submodule-${child.key}`}>
-                          {child.label}
-                        </label>
-                      </div>
-                    ))}
+                    {item.children.map((child, index) => {
+                      // Debug logging for sales section
+                      if (item.key === 'sales') {
+                        console.log('Sales child:', child.key, child.label, 'Index:', index);
+                      }
+                      return (
+                        <div key={child.key} className="form-check mb-1" style={{ display: 'block', minHeight: '30px' }}>
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`submodule-${child.key}`}
+                            checked={isSubModuleChecked(item.key, child.key)}
+                            onChange={(e) => handleSubModuleChange(item.key, child.key, e.target.checked)}
+                            disabled={disabled}
+                          />
+                          <label className="form-check-label" htmlFor={`submodule-${child.key}`} style={{ display: 'block', minHeight: '20px' }}>
+                            {child.label}
+                          </label>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

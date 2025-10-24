@@ -11,7 +11,7 @@ export interface Role {
   name: string
   email: string
   phone: string
-  role: 'Super Admin' | 'Admin' | 'Manager' | 'Supervisor' | 'Cashier' | 'Waiter' | 'Staff'
+  role: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff'
   menuAccess: MenuAccess
   status: 'active' | 'inactive'
   createdAt: string
@@ -45,6 +45,6 @@ export interface RoleFormData {
   email: string
   password?: string // Optional for edit mode
   phone: string
-  role: 'Super Admin' | 'Admin' | 'Manager' | 'Supervisor' | 'Cashier' | 'Waiter' | 'Staff'
+  role: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff'
   menuAccess: MenuAccess
 }

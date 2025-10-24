@@ -288,7 +288,6 @@ const RoleList: React.FC<RoleListProps> = ({
                   placeholder="Search..." 
                   value={searchTerm}
                   onChange={(e) => {
-                    console.log('RoleList - Search input changed:', e.target.value)
                     setSearchTerm(e.target.value)
                   }}
                 />
@@ -306,13 +305,13 @@ const RoleList: React.FC<RoleListProps> = ({
                   onChange={(e) => setRoleFilter(e.target.value)}
                 >
                   <option value="">All Roles</option>
-                  <option value="Super Admin">Super Admin</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Supervisor">Supervisor</option>
-                  <option value="Cashier">Cashier</option>
-                  <option value="Waiter">Waiter</option>
-                  <option value="Staff">Staff</option>
+                  <option value="superadmin">Super Admin</option>
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="cashier">Cashier</option>
+                  <option value="waiter">Waiter</option>
+                  <option value="staff">Staff</option>
                 </select>
               )}
 

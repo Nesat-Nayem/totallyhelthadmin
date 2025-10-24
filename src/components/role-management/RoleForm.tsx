@@ -52,7 +52,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
   const [menuAccess, setMenuAccess] = useState<MenuAccess>(initialData?.menuAccess || {})
   
   // Fixed roles as per backend enum - no dynamic creation
-  const availableRoles = ['Super Admin', 'Admin', 'Manager', 'Supervisor', 'Cashier', 'Waiter', 'Staff']
+  const availableRoles = ['superadmin', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff']
   
   // API mutation
   const [createRole, { isLoading: isCreating }] = useCreateRoleMutation()
@@ -80,39 +80,15 @@ const RoleForm: React.FC<RoleFormProps> = ({
     }
   })
   
-  // Watch form values for debugging
+  // Watch form values
   const formValues = watch()
-  console.log('RoleForm - Current form values:', formValues)
-  console.log('RoleForm - Initial data received:', initialData)
-  console.log('RoleForm - Mode:', mode)
-  console.log('RoleForm - Has initialData:', !!initialData)
-  console.log('RoleForm - InitialData keys:', initialData ? Object.keys(initialData) : 'No initialData')
-  console.log('RoleForm - InitialData values:', initialData ? {
-    staffName: initialData.staffName,
-    email: initialData.email,
-    role: initialData.role,
-    phone: initialData.phone
-  } : 'No initialData')
 
   // Update form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData && mode === 'edit') {
-      console.log('RoleForm - Updating form with initialData:', initialData)
-      console.log('RoleForm - Current form values before reset:', {
-        staffName: initialData.staffName,
-        role: initialData.role,
-        email: initialData.email,
-        phone: initialData.phone
-      })
       
       // Always reset if we have initialData in edit mode
       if (initialData.staffName || initialData.email) {
-        console.log('RoleForm - Resetting form with data:', {
-          staffName: initialData.staffName,
-          role: initialData.role,
-          email: initialData.email,
-          phone: initialData.phone
-        })
         
         // Force reset with new data
         if (mode === 'edit') {
@@ -143,15 +119,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
         setValue('phone', initialData.phone || '')
         
         setMenuAccess(initialData.menuAccess || {})
-        console.log('RoleForm - Form reset completed with data')
       } else {
-        console.log('RoleForm - Skipping reset - no valid data yet')
-        console.log('RoleForm - InitialData check:', {
-          hasStaffName: !!initialData.staffName,
-          hasEmail: !!initialData.email,
-          staffName: initialData.staffName,
-          email: initialData.email
-        })
       }
     }
   }, [initialData, mode, reset])
@@ -159,7 +127,6 @@ const RoleForm: React.FC<RoleFormProps> = ({
   // Watch for form value changes
   useEffect(() => {
     if (mode === 'edit') {
-      console.log('RoleForm - Form values changed:', formValues)
     }
   }, [formValues, mode])
 
@@ -172,10 +139,9 @@ const RoleForm: React.FC<RoleFormProps> = ({
             staffName: data.staffName,
             email: data.email,
             phone: data.phone,
-            role: data.role as 'Super Admin' | 'Admin' | 'Manager' | 'Supervisor' | 'Cashier' | 'Waiter' | 'Staff',
+            role: data.role as 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
             menuAccess: menuAccess
           }
-          console.log('RoleForm edit mode - calling onSubmit with:', formData)
           onSubmit(formData)
         }
       } else {
@@ -185,12 +151,11 @@ const RoleForm: React.FC<RoleFormProps> = ({
           email: data.email,
           password: data.password,
           phone: data.phone,
-          role: data.role as 'Super Admin' | 'Admin' | 'Manager' | 'Supervisor' | 'Cashier' | 'Waiter' | 'Staff',
+          role: data.role as 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
           menuAccess: menuAccess
         }
         
         // Log the form data to console
-        console.log('Form submitted with data:', apiPayload)
         
         // Call the API
         const result = await createRole(apiPayload).unwrap()
@@ -210,7 +175,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
             email: result.data.email,
             password: '', // Don't pass password back
             phone: result.data.phone,
-            role: result.data.role as 'Admin' | 'Manager' | 'Cashier' | 'Waiter' | 'Staff',
+            role: result.data.role as 'admin' | 'manager' | 'cashier' | 'waiter' | 'staff',
             menuAccess: result.data.menuAccess
           }
           onSubmit(formData)
