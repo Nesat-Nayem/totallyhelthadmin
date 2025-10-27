@@ -38,6 +38,18 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
   const handleOrderTypeSelect = async (orderType: OrderType, priceType: PriceType) => {
     dispatch(setLoading(true))
     
+    // Special handling for New Membership - redirect to customer management with add modal
+    if (orderType === 'NewMembership') {
+      // Simulate loading for better UX
+      setTimeout(() => {
+        dispatch(setLoading(false))
+        onClose()
+        // Redirect to customer management with query parameter to open add customer modal
+        router.push('/membership/customers?openAddCustomerModal=true')
+      }, 500)
+      return
+    }
+    
     // Simulate loading for better UX
     setTimeout(() => {
       dispatch(setOrderType({ orderType, priceType }))

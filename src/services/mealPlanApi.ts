@@ -17,48 +17,58 @@ export type MealPlan = {
   weeksOffers?: { week: string; offer: string }[]
   images?: string[]
   thumbnail?: string
+  totalMeals?: number
+  durationDays?: number
   status: 'active' | 'inactive'
   isDeleted?: boolean
-  createdAt?: string
-  updatedAt?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export const mealPlanApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getMealPlans: build.query<{ data: MealPlan[]; meta?: any }, { q?: string; brand?: string; category?: string; page?: number; limit?: number; fields?: string } | void>({
+    getMealPlans: build.query<{ data: MealPlan[]; meta?: any }, { 
+      q?: string; 
+      page?: number; 
+      limit?: number; 
+      status?: string;
+      brand?: string;
+      category?: string;
+      fields?: string;
+    } | void>({
       query: (params) => ({ url: '/meal-plans', method: 'GET', params: params ?? {} }),
-      transformResponse: (res: any) => ({ data: res?.data ?? [], meta: res?.meta }),
-      providesTags: [{ type: 'MealPlan', id: 'LIST' }],
     }),
     getMealPlanById: build.query<MealPlan, string>({
       query: (id) => ({ url: `/meal-plans/${id}`, method: 'GET' }),
       transformResponse: (res: any) => res?.data,
       providesTags: (_r, _e, id) => [{ type: 'MealPlan' as const, id }],
     }),
-    createMealPlan: build.mutation<MealPlan, FormData>({
-      query: (formData) => ({ 
+    createMealPlan: build.mutation<MealPlan, FormData | Partial<MealPlan>>({
+      query: (body) => ({ 
         url: '/meal-plans', 
         method: 'POST', 
-        body: formData,
-        formData: true
+        body,
+        // Don't set Content-Type for FormData, let browser set it with boundary
+        ...(body instanceof FormData ? {} : {})
       }),
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'MealPlan', id: 'LIST' }],
     }),
-    updateMealPlan: build.mutation<MealPlan, { id: string; data: FormData }>({
+    updateMealPlan: build.mutation<MealPlan, { id: string; data: FormData | Partial<MealPlan> }>({
       query: ({ id, data }) => ({ 
         url: `/meal-plans/${id}`, 
         method: 'PUT', 
         body: data,
-        formData: true
+        // Don't set Content-Type for FormData, let browser set it with boundary
+        ...(data instanceof FormData ? {} : {})
       }),
       transformResponse: (res: any) => res?.data,
-      invalidatesTags: (_r, _e, { id }) => [{ type: 'MealPlan', id }, { type: 'MealPlan', id: 'LIST' }],
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'MealPlan', id }],
     }),
-    deleteMealPlan: build.mutation<{ success: boolean }, string>({
+    deleteMealPlan: build.mutation<MealPlan, string>({
       query: (id) => ({ url: `/meal-plans/${id}`, method: 'DELETE' }),
-      transformResponse: (res: any) => ({ success: !!res }),
-      invalidatesTags: (_r, _e, id) => [{ type: 'MealPlan', id }, { type: 'MealPlan', id: 'LIST' }],
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: (_r, _e, id) => [{ type: 'MealPlan', id }],
     }),
   }),
   overrideExisting: true,
@@ -66,8 +76,9 @@ export const mealPlanApi = baseApi.injectEndpoints({
 
 export const { 
   useGetMealPlansQuery, 
-  useGetMealPlanByIdQuery,
+  useLazyGetMealPlansQuery, 
+  useGetMealPlanByIdQuery, 
   useCreateMealPlanMutation,
   useUpdateMealPlanMutation,
-  useDeleteMealPlanMutation 
+  useDeleteMealPlanMutation
 } = mealPlanApi

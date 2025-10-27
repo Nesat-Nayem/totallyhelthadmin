@@ -236,6 +236,32 @@ export const MENU_ITEMS: MenuItemType[] = [
   },
 
   {
+    key: 'membership',
+    label: 'Membership Management',
+    icon: 'solar:user-id-bold-duotone',
+    children: [
+      {
+        key: 'membership-customers',
+        label: 'Customers',
+        url: '/membership/customers',
+        parentKey: 'membership',
+      },
+      {
+        key: 'membership-list',
+        label: 'Meal Plans',
+        url: '/meal-plan/meal-plan-list',
+        parentKey: 'membership',
+      },
+      {
+        key: 'user-membership',
+        label: 'User Memberships',
+        url: '/membership/user-membership',
+        parentKey: 'membership',
+      },
+    ],
+  },
+
+  {
     key: 'aggregators',
     label: 'Aggregators',
     icon: 'solar:gift-bold-duotone',
