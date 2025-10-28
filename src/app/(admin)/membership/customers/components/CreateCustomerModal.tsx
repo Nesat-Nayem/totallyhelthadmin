@@ -17,7 +17,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ show, onHide,
     phone: '',
     email: '',
     address: '',
-    status: 'active'
+    status: 'active' as 'active' | 'inactive'
   })
   const [errors, setErrors] = useState<any>({})
 
@@ -26,7 +26,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ show, onHide,
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
+      setErrors((prev: any) => ({ ...prev, [field]: '' }))
     }
   }
 

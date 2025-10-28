@@ -1,7 +1,8 @@
 'use client'
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import RoleForm, { RoleFormData } from '@/components/role-management/RoleForm'
+import RoleForm from '@/components/role-management/RoleForm'
+import { RoleFormData } from '@/types/role'
 // import { toast } from 'react-toastify'
 
 const AddRolePage: React.FC = () => {

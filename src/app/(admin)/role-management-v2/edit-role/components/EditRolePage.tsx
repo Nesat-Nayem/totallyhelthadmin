@@ -1,7 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import RoleForm, { RoleFormData } from '@/components/role-management/RoleForm'
+import RoleForm from '@/components/role-management/RoleForm'
+import { RoleFormData } from '@/types/role'
 // import { toast } from 'react-toastify'
 
 const EditRolePage: React.FC = () => {
@@ -17,7 +18,7 @@ const EditRolePage: React.FC = () => {
       // Replace with actual API call to fetch role data
       const mockRoleData: Partial<RoleFormData> = {
         staffName: 'Suraj Jamdade',
-        role: 'Cashier',
+        role: 'cashier',
         email: 'suraj@example.com',
         password: 'cashier1234',
         menuAccess: {
