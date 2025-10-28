@@ -7,7 +7,7 @@ export const useFetchData = <DataType>(fn: () => Promise<DataType>) => {
       setData(fetchedData)
     }
     fetchData()
-  }, [])
+  }, [fn])
 
   return data
 }

@@ -150,7 +150,7 @@ const MembershipSalesList = () => {
                     {!isLoading && !error && orders.map((order, idx) => {
                       const paymentText = (order.payments && order.payments.length > 0)
                         ? order.payments.map(p => `${p.type} AED ${p.amount.toFixed(2)}`).join(', ')
-                        : order.paymentMode || '-'
+                        : (order as any).paymentMode || '-'
                       const selectedPlans = Array.isArray(order.items) && order.items.length > 0
                         ? order.items.map((i) => i.title).join(', ')
                         : '-'

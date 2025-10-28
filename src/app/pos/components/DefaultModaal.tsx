@@ -38,6 +38,18 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
   const handleOrderTypeSelect = async (orderType: OrderType, priceType: PriceType) => {
     dispatch(setLoading(true))
     
+    // Special handling for New Membership - redirect to customer management with add modal
+    if (orderType === 'NewMembership') {
+      // Simulate loading for better UX
+      setTimeout(() => {
+        dispatch(setLoading(false))
+        onClose()
+        // Redirect to user membership management with query parameter to open create modal
+        router.push('/membership/user-membership?openCreateModal=true')
+      }, 500)
+      return
+    }
+    
     // Simulate loading for better UX
     setTimeout(() => {
       dispatch(setOrderType({ orderType, priceType }))
@@ -114,21 +126,21 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('membership', 'membership')}
+                onClick={() => handleOrderTypeSelect('NewMembership', 'membership')}
                 disabled={isLoading}
               >
                 <FaUserPlus /> New Membership
-                <small className="d-block">Membership Menu</small>
+                <small className="d-block">Meal Plan Menu</small>
               </Button>
               
               <Button 
                 className="btn-custom" 
                 size="lg"
-                onClick={() => handleOrderTypeSelect('membership', 'membership')}
+                onClick={() => handleOrderTypeSelect('MembershipMeal', 'membership')}
                 disabled={isLoading}
               >
                 <FaIdBadge /> Membership Meal
-                <small className="d-block">Membership Menu</small>
+                <small className="d-block">Master Menu</small>
               </Button>
             </Col>
 

@@ -133,7 +133,7 @@ const BrandsMenu = () => {
                         <div className="d-flex align-items-center gap-2">
                           <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
                             {item.image ? (
-                              <img src={item.image} alt={item.title || item.name} className="avatar-md" width={60} height={60} style={{ objectFit: 'cover' }} />
+                              <Image src={item.image} alt={item.title || item.name} className="avatar-md" width={60} height={60} style={{ objectFit: 'cover' }} />
                             ) : (
                               <Image src={banner1} alt="product" className="avatar-md" />
                             )}

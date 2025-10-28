@@ -13,8 +13,8 @@ export type OrderCreateDto = {
   total: number
   startDate?: string
   endDate?: string
-  paymentMode?: string
-  orderType?: 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'membership'
+  // paymentMode?: string // Commented out - using paymentType instead
+  orderType?: 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal'
   branchId?: string
   brand?: string
   aggregatorId?: string
@@ -30,6 +30,7 @@ export type OrderCreateDto = {
   rounding?: number
   payableAmount?: number
   receiveAmount?: number
+  cumulativePaid?: number
   changeAmount?: number
   dueAmount?: number
   note?: string
@@ -63,8 +64,30 @@ export const orderApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Order', id: 'LIST' }],
     }),
+    updateOrder: build.mutation<Order, { id: string; data: Partial<OrderCreateDto> }>({
+      query: ({ id, data }) => ({ url: `/orders/${id}`, method: 'PUT', body: data }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }],
+    }),
+    getPaidOrdersToday: build.query<{ data: Order[]; summary: any; date: string }, { branchId?: string } | void>({
+      query: (params) => ({ url: '/orders/today/paid', method: 'GET', params: params ?? {} }),
+      providesTags: [{ type: 'Order', id: 'PAID_TODAY' }],
+    }),
+    getUnpaidOrdersToday: build.query<{ data: Order[]; summary: any; date: string }, { branchId?: string } | void>({
+      query: (params) => ({ url: '/orders/today/unpaid', method: 'GET', params: params ?? {} }),
+      providesTags: [{ type: 'Order', id: 'UNPAID_TODAY' }],
+    }),
+    updatePaymentMode: build.mutation<Order, { id: string; paymentMode: string }>({
+      query: ({ id, paymentMode }) => ({ 
+        url: `/orders/${id}/payment-mode-simple`, 
+        method: 'PATCH', 
+        body: { paymentMode } 
+      }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }, { type: 'Order', id: 'PAID_TODAY' }],
+    }),
   }),
   overrideExisting: true,
 })
 
-export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation } = orderApi
+export const { useCreateOrderMutation, useGetOrdersQuery, useHoldMembershipMutation, useUnholdMembershipMutation, useCancelOrderMutation, useUpdateOrderMutation, useGetPaidOrdersTodayQuery, useGetUnpaidOrdersTodayQuery, useUpdatePaymentModeMutation } = orderApi

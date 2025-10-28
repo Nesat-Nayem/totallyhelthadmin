@@ -5,6 +5,7 @@ import { Card, CardBody, CardFooter, CardHeader, CardTitle, Col, Row, Form, Butt
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import CustomerModal from './CustomerModal'
 import Calculator from './Calculator'
 import PrintOrder from './PrintOrder'
@@ -17,23 +18,31 @@ import product2 from '@/assets/images/order-view/2.webp'
 import product3 from '@/assets/images/order-view/3.webp'
 import product4 from '@/assets/images/order-view/4.webp'
 import DefaultModaal from './DefaultModaal'
-import MoreOptions from './MoreOptions'
+import ItemMoreOptions from './ItemMoreOptions'
 import SplitBillModal from './SplitBillModal'
 import PaymentModeSelector from './PaymentModeSelector'
 import DiscountModal from './DiscountModal'
+import ShiftStartModal from './ShiftStartModal'
+import ShiftCloseModal from './ShiftCloseModal'
 
 // Import API services
 import { useGetMenusQuery } from '@/services/menuApi'
+import { useGetMealPlansQuery } from '@/services/mealPlanApi'
 import { useGetBrandsQuery } from '@/services/brandApi'
 import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetAggregatorsQuery } from '@/services/aggregatorApi'
 import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
-import { useCreateOrderMutation } from '@/services/orderApi'
+import { useCreateOrderMutation, useUpdateOrderMutation } from '@/services/orderApi'
+import { useDispatch as useRTKDispatch } from 'react-redux'
+import { orderApi } from '@/services/orderApi'
 import { useGetOpenDayCloseQuery, useStartDayCloseMutation, useCloseDayCloseMutation } from '@/services/dayCloseApi'
 import { useCreateCustomerMutation } from '@/services/customerApi'
+import { useGetCurrentShiftQuery, useStartShiftMutation, useCloseShiftMutation } from '@/services/shiftApi'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '@/store'
-import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal } from '@/store/slices/posSlice'
+import { showOrderTypeModal as showOrderTypeModalAction, hideOrderTypeModal, setEditMode, exitEditMode, updateCurrentOrderData, clearCurrentOrderData } from '@/store/slices/posSlice'
+import { showCustomerRequiredAlert, showSuccess, showError } from '@/utils/sweetAlert'
+import { useAccessControl } from '@/hooks/useAccessControl'
 
 // Fallback images for menus
 const fallbackImages = [product1, product2, product3, product4]
@@ -41,7 +50,10 @@ const fallbackImages = [product1, product2, product3, product4]
 const orderTypes = ['DineIn', 'TakeAway', 'Delivery']
 const POS = () => {
   const dispatch = useDispatch()
-  const { selectedOrderType, selectedPriceType, showOrderTypeModal } = useSelector((state: RootState) => state.pos)
+  const rtkDispatch = useRTKDispatch()
+  const router = useRouter()
+  const { selectedOrderType, selectedPriceType, showOrderTypeModal, editingOrder, isEditMode } = useSelector((state: RootState) => state.pos)
+  const { hasAccessToPOSButton } = useAccessControl()
   
   const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: any }>({})
   const [showSplitModal, setShowSplitModal] = useState(false)
@@ -51,11 +63,13 @@ const POS = () => {
   const [selectedBrand, setSelectedBrand] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [customer, setCustomer] = useState<any>(null)
-  const [moreOptions, setMoreOptions] = useState<any[]>([])
+  const [itemOptions, setItemOptions] = useState<{ [itemId: string]: string[] }>({})
   const [selectedAggregator, setSelectedAggregator] = useState('')
   const [selectedPaymentMode, setSelectedPaymentMode] = useState('Cash')
   const [receiveAmount, setReceiveAmount] = useState(0)
-  const [payments, setPayments] = useState<Array<{ type: 'Cash' | 'Card' | 'Gateway'; amount: number }>>([])
+  const [cumulativePaid, setCumulativePaid] = useState(0)
+  const [originalCumulativePaid, setOriginalCumulativePaid] = useState(0) // Track original cumulative paid when editing
+  const [payments, setPayments] = useState<Array<{ type: 'Cash' | 'Card' | 'Gateway'; methodType: 'direct' | 'split'; amount: number }>>([])
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [newPaymentType, setNewPaymentType] = useState<'Cash' | 'Card' | 'Gateway'>('Cash')
   const [newPaymentAmount, setNewPaymentAmount] = useState<string>('')
@@ -66,6 +80,221 @@ const POS = () => {
   const [orderNo, setOrderNo] = useState('#001')
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+
+  // Helper to generate a unique bill number
+  const generateUniqueBillNumber = () => {
+    const prefix = 'INV-';
+    const timestamp = new Date().getTime();
+    const random = Math.floor(Math.random() * 1000);
+    return `${prefix}${timestamp}-${random}`;
+  };
+
+  // Calculate totals first
+  const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
+  
+  const discountAmountApplied = discount
+    ? (discount.type?.toLowerCase?.() === 'percent'
+        ? (subTotal * (discount.amount || 0)) / 100
+        : (discount.amount || 0))
+    : 0
+  
+  const totalBeforeRounding = subTotal + deliveryCharge - discountAmountApplied
+  const totalAmount = totalBeforeRounding + rounding
+  
+  const payableAmount = Math.max(0, totalAmount - cumulativePaid)
+  const changeAmount = Math.max(0, cumulativePaid - totalAmount)
+
+  // Function to sync current order data with Redux and localStorage
+  const syncOrderData = () => {
+    const orderData = {
+      selectedProducts,
+      itemOptions,
+      customer,
+      discount,
+      deliveryCharge,
+      rounding,
+      notes,
+      receiveAmount,
+      cumulativePaid,
+      payments,
+      selectedAggregator,
+      invoiceNo,
+      orderNo,
+      startDate,
+      endDate,
+      subTotal,
+      totalAmount,
+      payableAmount,
+      changeAmount,
+      discountAmountApplied,
+      selectedOrderType,
+      selectedPriceType,
+    }
+    
+    // Update Redux state
+    dispatch(updateCurrentOrderData(orderData))
+    
+    // Update localStorage for persistence
+    localStorage.setItem('currentOrderData', JSON.stringify(orderData))
+  }
+  
+  // Reset filters when switching between different order types
+  useEffect(() => {
+    // Reset to default values when switching order types
+    setSelectedBrand('')
+    setSelectedCategory('')
+  }, [selectedOrderType])
+
+  // Sync order data whenever any order-related state changes
+  useEffect(() => {
+    syncOrderData()
+  }, [
+    selectedProducts,
+    itemOptions,
+    customer,
+    discount,
+    deliveryCharge,
+    rounding,
+    notes,
+    receiveAmount,
+    cumulativePaid,
+    payments,
+    selectedAggregator,
+    invoiceNo,
+    orderNo,
+    startDate,
+    endDate,
+    subTotal,
+    totalAmount,
+    payableAmount,
+    changeAmount,
+    discountAmountApplied,
+    selectedOrderType,
+    selectedPriceType,
+  ])
+
+  // Load order data from localStorage on component mount
+  useEffect(() => {
+    const savedOrderData = localStorage.getItem('currentOrderData')
+    if (savedOrderData && !isEditMode) {
+      try {
+        const parsedData = JSON.parse(savedOrderData)
+        // Only load if we're not in edit mode to avoid conflicts
+        if (parsedData && Object.keys(parsedData).length > 0) {
+          dispatch(updateCurrentOrderData(parsedData))
+          // Restore invoice number if it exists
+          if (parsedData.invoiceNo) {
+            setInvoiceNo(parsedData.invoiceNo)
+          } else {
+            // Generate new invoice number if none exists
+            setInvoiceNo(generateUniqueBillNumber())
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing saved order data:', error)
+        localStorage.removeItem('currentOrderData')
+        // Generate new invoice number on error
+        setInvoiceNo(generateUniqueBillNumber())
+      }
+    } else {
+      // Generate new invoice number for fresh order or when no saved data
+      setInvoiceNo(generateUniqueBillNumber())
+    }
+  }, [dispatch, isEditMode])
+
+  // Ensure we always have a unique invoice number on component mount
+  useEffect(() => {
+    // Generate invoice number if it's still the default 'S-001'
+    if (invoiceNo === 'S-001') {
+      setInvoiceNo(generateUniqueBillNumber())
+    }
+  }, [])
+
+  // Handle edit mode - populate form with existing order data
+  useEffect(() => {
+    if (isEditMode && editingOrder) {
+      // Set order type and price type
+      const orderType = editingOrder.orderType || 'DineIn'
+      const priceType = editingOrder.salesType === 'membership' ? 'membership' : 
+                       editingOrder.salesType === 'restaurant' ? 'restaurant' : 'online'
+      
+      // Populate selected products and item options
+      const products: { [key: string]: any } = {}
+      const options: { [itemId: string]: string[] } = {}
+      
+      if (editingOrder.items && editingOrder.items.length > 0) {
+        editingOrder.items.forEach((item: any, index: number) => {
+          const uniqueId = `${item.productId}_${Date.now()}_${index}`
+          products[uniqueId] = {
+            _id: item.productId,
+            title: item.title,
+            price: item.price,
+            qty: item.qty,
+          }
+          
+          // Load existing more options for this item
+          if (item.moreOptions && item.moreOptions.length > 0) {
+            options[uniqueId] = item.moreOptions.map((option: any) => option.name)
+          }
+        })
+      }
+      
+      setSelectedProducts(products)
+      setItemOptions(options) // Set the existing more options
+      
+      // Set other form fields
+      setCustomer(editingOrder.customer || null)
+      setSelectedPaymentMode(editingOrder.paymentMode || 'Cash')
+      setReceiveAmount(editingOrder.receiveAmount || 0)
+      setCumulativePaid(editingOrder.cumulativePaid || 0)
+      setOriginalCumulativePaid(editingOrder.cumulativePaid || 0) // Store original cumulative paid amount
+      setDeliveryCharge(editingOrder.shippingCharge || 0)
+      setRounding(editingOrder.rounding || 0)
+      setNotes(editingOrder.note || '')
+      setInvoiceNo(editingOrder.invoiceNo || 'S-001')
+      setOrderNo(editingOrder.orderNo || '#001')
+      setStartDate(editingOrder.startDate || new Date().toISOString().split('T')[0])
+      setEndDate(editingOrder.endDate || new Date().toISOString().split('T')[0])
+      
+      // Set discount if exists
+      if (editingOrder.discountAmount && editingOrder.discountAmount > 0) {
+        setDiscount({
+          type: 'amount',
+          amount: editingOrder.discountAmount,
+          reason: 'Edit mode discount'
+        })
+      }
+    }
+  }, [isEditMode, editingOrder])
+
+  // Handle order data from sessionStorage (when navigating from reports)
+  useEffect(() => {
+    const checkForEditOrderData = () => {
+      try {
+        const editOrderData = sessionStorage.getItem('editOrderData')
+        if (editOrderData) {
+          const orderData = JSON.parse(editOrderData)
+          
+          // Determine order type and price type from the order data
+          const orderType = orderData.orderType || 'DineIn'
+          const priceType = orderData.salesType === 'membership' ? 'membership' : 
+                           orderData.salesType === 'restaurant' ? 'restaurant' : 'online'
+          
+          // Set edit mode in Redux
+          dispatch(setEditMode({ orderData, orderType, priceType }))
+          
+          // Clear the sessionStorage data
+          sessionStorage.removeItem('editOrderData')
+        }
+      } catch (error) {
+        console.error('Error parsing edit order data:', error)
+        sessionStorage.removeItem('editOrderData')
+      }
+    }
+
+    // Check for edit order data on component mount
+    checkForEditOrderData()
+  }, [dispatch])
   
   // Fetch data from APIs
   const { data: brandsData } = useGetBrandsQuery()
@@ -73,16 +302,26 @@ const POS = () => {
   const { data: aggregatorsData } = useGetAggregatorsQuery()
   const { data: paymentMethodsData } = useGetPaymentMethodsQuery()
   const [createOrder] = useCreateOrderMutation()
+  const [updateOrder] = useUpdateOrderMutation()
   const { data: openDayRes, refetch: refetchOpenDay } = useGetOpenDayCloseQuery()
-  const [startDayClose] = useStartDayCloseMutation()
+  const [startDayClose, { isLoading: isStartingDay }] = useStartDayCloseMutation()
   const [closeDayClose] = useCloseDayCloseMutation()
   const openDay = openDayRes?.data
   const [showDayReportModal, setShowDayReportModal] = useState(false)
   const [dayReportData, setDayReportData] = useState<any>(null)
   
+  // Shift-related state
+  const [showShiftStartModal, setShowShiftStartModal] = useState(false)
+  const [showShiftCloseModal, setShowShiftCloseModal] = useState(false)
+  const { data: currentShiftData, refetch: refetchCurrentShift } = useGetCurrentShiftQuery()
+  const [startShift] = useStartShiftMutation()
+  const [closeShift] = useCloseShiftMutation()
+  const currentShift = currentShiftData?.data
+  
   // Get menus with filters - using proper menu API with search, brand, category, and price type filtering
+  // For membershipMeal orders, use master menu API; for regular membership (New Membership), use meal plan API
   const { data: menusData } = useGetMenusQuery(
-    searchQuery || selectedBrand || selectedCategory || selectedPriceType
+    selectedOrderType !== 'NewMembership' && (searchQuery || selectedBrand || selectedCategory || selectedPriceType)
       ? {
           q: searchQuery || undefined,
           brand: selectedBrand || undefined,
@@ -90,43 +329,85 @@ const POS = () => {
           priceType: selectedPriceType || undefined,
           limit: 100
         }
-      : { limit: 100 }
+      : selectedOrderType !== 'NewMembership' ? { limit: 100 } : undefined
+  )
+
+  // Get meal plans for New Membership orders (orderType: 'membership')
+  const { data: mealPlansData } = useGetMealPlansQuery(
+    selectedOrderType === 'NewMembership'
+      ? {
+          q: searchQuery || undefined,
+          brand: selectedBrand || undefined,
+          category: selectedCategory || undefined,
+          limit: 100
+        }
+      : undefined
   )
   
-  const brands = brandsData ?? []
-  const categories = categoriesData ?? []
+  // Use meal plan brands and categories for New Membership orders, master menu ones for others
+  const brands = selectedOrderType === 'NewMembership' 
+    ? [
+        { _id: 'Totally Health', name: 'Totally Health' },
+        { _id: 'Subway', name: 'Subway' },
+        { _id: 'Pizza Hut', name: 'Pizza Hut' },
+        { _id: 'Burger King', name: 'Burger King' }
+      ]
+    : (brandsData ?? [])
+    
+  const categories = selectedOrderType === 'NewMembership'
+    ? [
+        { _id: 'Weight Loss', title: 'Weight Loss' },
+        { _id: 'Weight Gain', title: 'Weight Gain' },
+        { _id: 'Fat Loss', title: 'Fat Loss' },
+        { _id: 'Muscle Gain', title: 'Muscle Gain' },
+        { _id: 'Healthy Diet', title: 'Healthy Diet' },
+        { _id: 'Healthy Lifestyle', title: 'Healthy Lifestyle' },
+        { _id: 'Healthy Eating', title: 'Healthy Eating' }
+      ]
+    : (categoriesData ?? [])
+    
   const aggregators = aggregatorsData ?? []
   const paymentMethods = paymentMethodsData ?? []
-  const menus = menusData?.data ?? []
+  
+  // Use meal plans for New Membership orders, master menu data for others including Membership Meal
+  const menus = selectedOrderType === 'NewMembership'
+    ? (mealPlansData?.data ?? []).map((mealPlan: any) => ({
+        ...mealPlan,
+        // Map meal plan fields to menu fields for compatibility
+        title: mealPlan.title,
+        image: mealPlan.thumbnail || (mealPlan.images && mealPlan.images[0]),
+        // Use delPrice (discounted price) for new membership if available, otherwise fallback to regular price
+        membershipTotalPrice: mealPlan.delPrice || mealPlan.price,
+        membershipPrice: mealPlan.delPrice || mealPlan.price,
+        // Set other price types to 0 or undefined for membership-only items
+        restaurantTotalPrice: 0,
+        restaurantPrice: 0,
+        onlineTotalPrice: 0,
+        onlinePrice: 0,
+        // Add category and brand info
+        category: mealPlan.category,
+        brands: mealPlan.brand ? [mealPlan.brand] : [],
+      }))
+    : (menusData?.data ?? [])
 
   const handleProductClick = (menu: any) => {
     const id = menu._id || menu.id
-    // Use price based on selected price type
-    const price = selectedPriceType === 'restaurant' ? menu.restaurantPrice :
-                  selectedPriceType === 'online' ? menu.onlinePrice :
-                  selectedPriceType === 'membership' ? menu.membershipPrice :
-                  menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+    // Use total price (including VAT) based on selected price type
+    const price = selectedPriceType === 'restaurant' ? menu.restaurantTotalPrice :
+                  selectedPriceType === 'online' ? menu.onlineTotalPrice :
+                  selectedPriceType === 'membership' ? menu.membershipTotalPrice :
+                  menu.restaurantTotalPrice || menu.onlineTotalPrice || menu.membershipTotalPrice || 0
     
     setSelectedProducts(prev => {
-      if (prev[id]) {
-        // If already selected, increase quantity
-        return {
-          ...prev,
-          [id]: {
-            ...prev[id],
-            qty: prev[id].qty + 1,
-          },
-        }
-      } else {
-        // Add new menu item
-        return {
-          ...prev,
-          [id]: {
-            ...menu,
-            price: price, // Store the calculated price based on order type
-            qty: 1,
-          },
-        }
+      // Always create a new separate record for each click
+      const uniqueId = `${id}_${Date.now()}`
+      return {
+        ...prev,
+        [uniqueId]: {
+          ...menu,
+          price: price,
+          qty: 1,
+        },
       }
     })
   }
@@ -150,45 +431,60 @@ const POS = () => {
       delete updated[id]
       return updated
     })
+    // Also remove item options when item is deleted
+    setItemOptions((prev) => {
+      const updated = { ...prev }
+      delete updated[id]
+      return updated
+    })
+  }
+
+  const handleItemOptionsChange = (itemId: string, options: string[]) => {
+    setItemOptions((prev) => ({
+      ...prev,
+      [itemId]: options
+    }))
   }
 
   // Payment split handlers
   const handleAddPayment = () => {
     const amt = parseFloat(newPaymentAmount)
     if (isNaN(amt) || amt <= 0) return
-    setPayments((prev) => [...prev, { type: newPaymentType, amount: amt }])
+    setPayments((prev) => [...prev, { type: newPaymentType, methodType: 'split', amount: amt }])
     setNewPaymentAmount('')
     setShowAddPayment(false)
   }
 
   const handleRemovePayment = (index: number) => {
-    setPayments((prev) => prev.filter((_, i) => i !== index))
+    setPayments((prev) => {
+      const newPayments = prev.filter((_, i) => i !== index)
+      // If all payments are removed, keep the current cumulativePaid value
+      // Don't reset it to 0
+      return newPayments
+    })
   }
 
-  // If there are split payments, keep receiveAmount in sync as the sum
+  // If there are split payments, keep receiveAmount and cumulativePaid in sync as the sum
+  // Only update when payments array changes, not when it's empty
   useEffect(() => {
     if (payments.length > 0) {
       const total = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
       setReceiveAmount(total)
+      
+      if (isEditMode) {
+        // In edit mode, cumulative paid = original cumulative + new split payments
+        setCumulativePaid(originalCumulativePaid + total)
+      } else {
+        // In create mode, cumulative paid equals split payments total
+        setCumulativePaid(total)
+      }
     }
-  }, [payments])
+    // Don't reset to 0 when payments array is empty - preserve manual input
+  }, [payments, isEditMode, originalCumulativePaid])
 
-  // Calculate totals
-  const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
-  const moreOptionsTotal = moreOptions.reduce((sum, opt: any) => sum + (opt.price || 0) * (opt.qty || 1), 0)
-  const vatPercent = 5
-  const vatAmount = ((subTotal + moreOptionsTotal) * vatPercent) / 100
-  const discountAmountApplied = discount
-    ? (discount.type?.toLowerCase?.() === 'percent'
-        ? ((subTotal + moreOptionsTotal) * (discount.amount || 0)) / 100
-        : (discount.amount || 0))
-    : 0
-  const totalBeforeRounding = subTotal + moreOptionsTotal + vatAmount + deliveryCharge - discountAmountApplied
-  const totalAmount = totalBeforeRounding + rounding
-  
-  // Calculate payable amount and change amount
-  const payableAmount = Math.max(0, totalAmount - receiveAmount) // Remaining amount to be paid
-  const changeAmount = Math.max(0, receiveAmount - totalAmount) // Change to be given back
+  // VAT% logic - COMMENTED OUT (VAT calculation disabled)
+  // const vatPercent = 5
+  // const vatAmount = ((subTotal + moreOptionsTotal) * vatPercent) / 100
 
   const [showDefaultModal, setShowDefaultModal] = useState(false)
 
@@ -198,18 +494,35 @@ const POS = () => {
 
   const handleStartDay = async () => {
     try {
-      await startDayClose().unwrap()
+      console.log('Starting day...')
+      const result = await startDayClose({
+        startTime: new Date().toISOString(),
+        note: 'Day started from POS system'
+      }).unwrap()
+      
+      console.log('Start day result:', result)
       await refetchOpenDay()
-      alert('Day started successfully')
+      showSuccess('Day started successfully')
     } catch (e: any) {
-      alert(e?.data?.message || 'Failed to start day')
+      console.error('Start day error:', e)
+      
+      // Check if it's a network error
+      if (e?.status === 'FETCH_ERROR' || e?.error === 'FETCH_ERROR') {
+        showError('Unable to connect to server. Please check your internet connection and try again.')
+      } else if (e?.status === 404) {
+        showError('Day start endpoint not found. Please contact support.')
+      } else if (e?.status === 500) {
+        showError('Server error occurred. Please try again later.')
+      } else {
+        showError(e?.data?.message || e?.message || 'Failed to start day. Please try again.')
+      }
     }
   }
 
   const handleCloseDay = async () => {
     try {
       if (!openDay?._id) {
-        alert('No open day found')
+        showError('No open day found')
         return
       }
       const res = await closeDayClose({ id: String(openDay._id), endTime: new Date().toISOString() }).unwrap()
@@ -217,99 +530,240 @@ const POS = () => {
       setShowDayReportModal(true)
       await refetchOpenDay()
     } catch (e: any) {
-      alert(e?.data?.message || 'Failed to close day')
+      showError(e?.data?.message || 'Failed to close day')
     }
+  }
+
+  // Shift handlers
+  const handleStartShift = () => {
+    setShowShiftStartModal(true)
+  }
+
+  const handleCloseShift = () => {
+    setShowShiftCloseModal(true)
+  }
+
+  const handleShiftStartSuccess = async () => {
+    await refetchCurrentShift()
+    // Invalidate order cache to refresh paid/unpaid lists
+    rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+    showSuccess('Shift started successfully')
+  }
+
+  const handleShiftCloseSuccess = async () => {
+    await refetchCurrentShift()
+    // Invalidate order cache to refresh paid/unpaid lists
+    rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+    showSuccess('Shift closed successfully')
   }
   
   const handleSaveOrder = async () => {
     try {
-      if (!customer) {
-        alert('Please select a customer')
-        return
+      // Check if this is a membership order and customer is required
+      if ((selectedOrderType === 'NewMembership' || selectedOrderType === 'MembershipMeal') && !customer) {
+        const shouldProceed = await showCustomerRequiredAlert()
+        if (!shouldProceed) {
+          return // User cancelled, don't proceed with save
+        }
+        // If user clicked "Select Customer", we still need to wait for them to select one
+        if (!customer) {
+          return // Don't proceed without customer
+        }
       }
-      
+
       const orderData = {
-        // customer object
-        customer: {
+        // customer object - now optional for non-membership orders, required for membership
+        customer: customer ? {
           id: customer._id || customer.id,
           name: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
           phone: customer.phone || customer.mobile || '',
-        },
-        items: Object.values(selectedProducts).map((p: any) => ({
+        } : undefined,
+        items: Object.entries(selectedProducts).map(([uniqueId, p]: [string, any]) => ({
           productId: p._id || p.id,
           title: p.title || p.name,
           price: p.price,
-          qty: p.qty
-        })),
-        extraItems: moreOptions.map((opt: any) => ({
-          name: opt.name,
-          price: opt.price,
-          qty: opt.qty || 1
+          qty: p.qty,
+          moreOptions: (itemOptions[uniqueId] || []).map(optionName => ({ name: optionName }))
         })),
         date: startDate,  // Required field
         subTotal,
         total: totalAmount,  // Required field
-        vatPercent,
-        vatAmount,
+        // VAT fields commented out - VAT calculation disabled
+        // vatPercent,
+        // vatAmount,
         discountType: discount ? (discount.type?.toLowerCase?.() === 'percent' ? 'percent' : 'flat') as 'flat' | 'percent' : undefined,
         discountAmount: discountAmountApplied,
         shippingCharge: deliveryCharge,
         rounding,
         payableAmount,
         receiveAmount,
+        cumulativePaid,
         changeAmount,
         dueAmount: payableAmount,
         note: notes,  // Field is 'note' not 'notes'
-        paymentMode: selectedPaymentMode,
-        payments: payments,
-        salesType: (selectedPriceType === 'membership' ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
-        orderType: selectedOrderType || undefined,
+        payments: payments.length === 0 
+          ? [{ type: selectedPaymentMode as 'Cash' | 'Card' | 'Gateway', methodType: 'direct' as const, amount: receiveAmount }]
+          : payments,
+        salesType: ((selectedOrderType === 'NewMembership' || selectedOrderType === 'MembershipMeal') ? 'membership' : selectedPriceType === 'online' ? 'online' : selectedPriceType === 'restaurant' ? 'restaurant' : undefined) as 'restaurant' | 'online' | 'membership' | undefined,
+        orderType: selectedOrderType as 'DineIn' | 'TakeAway' | 'Delivery' | 'online' | 'NewMembership' | 'MembershipMeal' | undefined,
         aggregatorId: selectedAggregator || undefined,
         brand: selectedBrand || undefined,
         startDate,
         endDate,
-        status: (receiveAmount >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
+        status: (cumulativePaid >= totalAmount ? 'paid' : 'unpaid') as 'paid' | 'unpaid'  // Ensure correct type
       }
       
-      const result = await createOrder(orderData).unwrap()
-      alert(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+      let result
+      if (isEditMode && editingOrder) {
+        // Update existing order (called from Settle Bill button)
+        result = await updateOrder({ id: editingOrder._id, data: orderData }).unwrap()
+        showSuccess(`Order updated successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+        
+        // Exit edit mode after successful update
+        dispatch(exitEditMode())
+        
+        // Invalidate order cache to refresh paid/unpaid lists
+        rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+        
+        // Optionally navigate back to reports after successful update
+        // Uncomment the line below if you want automatic navigation back to reports
+        // setTimeout(() => router.push('/reports/all-income'), 2000)
+      } else {
+        // Create new order (called from Save button)
+        result = await createOrder(orderData).unwrap()
+        showSuccess(`Order created successfully! Invoice: ${result.invoiceNo}, Order: ${result.orderNo || ''}`)
+        
+        // Invalidate order cache to refresh paid/unpaid lists
+        rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+      }
       
       // Reset form
       setSelectedProducts({})
-      setMoreOptions([])
+      setItemOptions({})
       setCustomer(null)
       setDiscount(null)
       setDeliveryCharge(0)
       setRounding(0)
       setNotes('')
       setReceiveAmount(0)
+      setCumulativePaid(0)
+      setOriginalCumulativePaid(0)
       setPayments([])
+      
+      // Clear Redux state and localStorage after successful save
+      dispatch(clearCurrentOrderData())
+      localStorage.removeItem('currentOrderData')
     } catch (error: any) {
-      alert(error?.data?.message || 'Failed to create order')
+      const action = isEditMode ? 'update' : 'create'
+      showError(error?.data?.message || `Failed to ${action} order`)
     }
+  }
+
+  const handleEditOrder = (orderData: any) => {
+    // Determine order type and price type from the order data
+    const orderType = orderData.orderType || 'DineIn'
+    const priceType = orderData.salesType === 'membership' ? 'membership' : 
+                     orderData.salesType === 'restaurant' ? 'restaurant' : 'online'
+    
+    // Add source identifier for ViewOrders
+    const orderDataWithSource = {
+      ...orderData,
+      editSource: 'viewOrders'
+    }
+    
+    // Set edit mode in Redux
+    dispatch(setEditMode({ orderData: orderDataWithSource, orderType, priceType }))
   }
   
   const handleReset = () => {
     setSelectedProducts({})
-    setMoreOptions([])
+    setItemOptions({})
     setCustomer(null)
     setDiscount(null)
     setDeliveryCharge(0)
     setRounding(0)
     setNotes('')
     setReceiveAmount(0)
+    setCumulativePaid(0)
+    setOriginalCumulativePaid(0)
     setSelectedAggregator('')
     setSelectedPaymentMode('Cash')
     setPayments([])
     setShowAddPayment(false)
     setNewPaymentType('Cash')
     setNewPaymentAmount('')
+    
+    // Generate new invoice number for new order
+    setInvoiceNo(generateUniqueBillNumber())
+    
+    // Clear Redux state and localStorage
+    dispatch(clearCurrentOrderData())
+    localStorage.removeItem('currentOrderData')
+    
+    // Exit edit mode if in edit mode
+    if (isEditMode) {
+      dispatch(exitEditMode())
+    }
   }
 
   return (
     <>
       <DefaultModaal show={showOrderTypeModal} onClose={() => dispatch(hideOrderTypeModal())} />
       <ReportModal show={showDayReportModal} onClose={() => setShowDayReportModal(false)} data={dayReportData || undefined} />
+      
+      {/* Shift Modals */}
+      <ShiftStartModal
+        show={showShiftStartModal}
+        onHide={() => setShowShiftStartModal(false)}
+        onSuccess={handleShiftStartSuccess}
+      />
+      
+      <ShiftCloseModal
+        show={showShiftCloseModal}
+        onHide={() => setShowShiftCloseModal(false)}
+        onSuccess={handleShiftCloseSuccess}
+        currentShift={currentShift}
+      />
+      
+      {/* Edit Mode Indicator */}
+      {isEditMode && editingOrder && (
+        <div className="alert alert-info d-flex justify-content-between align-items-center mb-3">
+          <div className="d-flex align-items-center">
+            <IconifyIcon icon="mdi:pencil-outline" className="me-2" />
+            <strong>Editing Order:</strong> {editingOrder.orderNo || editingOrder.invoiceNo}
+            <span className={`badge ms-2 ${editingOrder.editSource === 'reports' ? 'bg-success' : 'bg-primary'}`}>
+              From {editingOrder.editSource === 'reports' ? 'Reports' : 'View Orders'}
+            </span>
+          </div>
+          <div className="d-flex gap-2">
+            <Button 
+              variant="outline-primary" 
+              size="sm" 
+              onClick={() => {
+                if (editingOrder.editSource === 'reports') {
+                  window.history.back()
+                } else {
+                  // For View Orders, we need to trigger the ViewOrders modal
+                  // We'll use a custom event to communicate with ViewOrders component
+                  window.dispatchEvent(new CustomEvent('reopenViewOrders'))
+                  dispatch(exitEditMode())
+                }
+              }}
+            >
+              <IconifyIcon icon="mdi:arrow-left" className="me-1" />
+              Back to {editingOrder.editSource === 'reports' ? 'Reports' : 'View Orders'}
+            </Button>
+            <Button 
+              variant="outline-secondary" 
+              size="sm" 
+              onClick={() => dispatch(exitEditMode())}
+            >
+              <IconifyIcon icon="mdi:close" className="me-1" />
+              Exit Edit Mode
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Row className="g-3">
         <Col lg={4}>
@@ -374,11 +828,11 @@ const POS = () => {
                 {selectedPriceType && menus.map((menu: any, index: number) => {
                   const menuId = menu._id || menu.id
                   const imageUrl = menu.image || fallbackImages[index % fallbackImages.length]
-                  // Use price based on selected price type
-                  const price = selectedPriceType === 'restaurant' ? menu.restaurantPrice :
-                                selectedPriceType === 'online' ? menu.onlinePrice :
-                                selectedPriceType === 'membership' ? menu.membershipPrice :
-                                menu.restaurantPrice || menu.onlinePrice || menu.membershipPrice || 0
+                  // Use total price (including VAT) based on selected price type
+                  const price = selectedPriceType === 'restaurant' ? menu.restaurantTotalPrice :
+                                selectedPriceType === 'online' ? menu.onlineTotalPrice :
+                                selectedPriceType === 'membership' ? menu.membershipTotalPrice :
+                                menu.restaurantTotalPrice || menu.onlineTotalPrice || menu.membershipTotalPrice || 0
                   
                   return (
                     <Col xs={4} key={menuId}>
@@ -418,27 +872,37 @@ const POS = () => {
               <CardTitle as="h4" className="flex-grow-1 mb-0 text-primary">
                 Quick Action
               </CardTitle>
-              <Link href="/meal-plan/meal-plan-list" className="btn btn-lg btn-success">
-                <IconifyIcon icon="mdi:food-variant" /> Meal Plan List
-              </Link>
-              <Link href="/sales/sales-list" className="btn btn-lg btn-warning">
-                <IconifyIcon icon="mdi:cash-register" /> Sales List
-              </Link>
-              <Calculator />
+              {hasAccessToPOSButton('meal-plan-list') && (
+                <Link href="/meal-plan/meal-plan-list" className="btn btn-lg btn-success">
+                  <IconifyIcon icon="mdi:food-variant" /> Meal Plan List
+                </Link>
+              )}
+              {hasAccessToPOSButton('sales-list') && (
+                <Link href="/sales/sales-list" className="btn btn-lg btn-warning">
+                  <IconifyIcon icon="mdi:cash-register" /> Sales List
+                </Link>
+              )}
+              {hasAccessToPOSButton('calculator') && <Calculator />}
               <Link href="/dashboard" className="btn btn-lg btn-dark">
                 <IconifyIcon icon="mdi:view-dashboard-outline" /> Dashboard
               </Link>
               <div className="d-flex align-items-center gap-2">
-                <span className="badge bg-secondary">
+                {/* <span className="badge bg-secondary">
                   Day Status: {openDay ? 'Open' : 'Closed'}
-                </span>
-                {openDay ? (
-                  <Button variant="danger" className="btn" onClick={handleCloseDay}>
-                    <IconifyIcon icon="mdi:calendar-check" /> Close Day
+                </span> */}
+                {hasAccessToPOSButton('start-shift') && (
+                  <Button 
+                    variant={currentShift ? "danger" : "success"}
+                    className="btn" 
+                    onClick={currentShift ? handleCloseShift : handleStartShift}
+                  >
+                    <IconifyIcon icon={currentShift ? "mdi:clock-out" : "mdi:clock-in"} /> 
+                    {currentShift ? "Close Shift" : "Start Shift"}
                   </Button>
-                ) : (
-                  <Button variant="success" className="btn" onClick={handleStartDay}>
-                    <IconifyIcon icon="mdi:calendar-start" /> Start Day
+                )}
+                {openDay && (
+                  <Button variant="warning" className="btn" onClick={handleCloseDay}>
+                    <IconifyIcon icon="mdi:calendar-check" /> Close Day
                   </Button>
                 )}
               </div>
@@ -487,15 +951,23 @@ const POS = () => {
                       <th>Title</th>
                       <th>Qty</th>
                       <th>Sub Total</th>
+                      {/* VAT columns commented out - VAT calculation disabled */}
+                      {/* <th>VAT (5%)</th> */}
+                      {/* <th>Total with VAT</th> */}
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.values(selectedProducts).map((product: any, index: number) => {
-                      const productId = product._id || product.id
+                    {Object.entries(selectedProducts).map(([uniqueId, product]: [string, any], index: number) => {
                       const imageUrl = product.image || fallbackImages[index % fallbackImages.length]
+                      const itemSubTotal = product.price * product.qty
+                      
+                      // VAT calculation commented out - VAT logic disabled
+                      // const itemVAT = (itemSubTotal * vatPercent) / 100
+                      // const itemTotalWithVAT = itemSubTotal + itemVAT
+                      
                       return (
-                        <tr key={productId}>
+                        <tr key={uniqueId}>
                           <td>
                             <Image 
                               src={product.image || imageUrl} 
@@ -509,29 +981,37 @@ const POS = () => {
 
                           <td>
                             <div className="d-flex gap-1 align-items-center">
-                              <Button size="sm" onClick={() => handleQtyChange(productId, -1)}>
+                              <Button size="sm" onClick={() => handleQtyChange(uniqueId, -1)}>
                                 -
                               </Button>
                               <span className="px-2">{product.qty}</span>
-                              <Button size="sm" onClick={() => handleQtyChange(productId, 1)}>
+                              <Button size="sm" onClick={() => handleQtyChange(uniqueId, 1)}>
                                 +
                               </Button>
                             </div>
                           </td>
-                          <td>AED {(product.price * product.qty).toFixed(2)}</td>
+                          <td>AED {itemSubTotal.toFixed(2)}</td>
+                          {/* VAT columns commented out - VAT calculation disabled */}
+                          {/* <td>AED {itemVAT.toFixed(2)}</td> */}
+                          {/* <td>AED {itemTotalWithVAT.toFixed(2)}</td> */}
                           <td>
-                            <Button size="sm" variant="danger" onClick={() => handleDelete(productId)}>
-                              <IconifyIcon icon="mdi:delete" />
-                            </Button>
+                            <div className="d-flex gap-1 align-items-center">
+                              <ItemMoreOptions
+                                itemId={uniqueId}
+                                itemName={product.title || product.name}
+                                onOptionsChange={handleItemOptionsChange}
+                                currentOptions={itemOptions[uniqueId] || []}
+                              />
+                              <Button size="sm" variant="danger" onClick={() => handleDelete(uniqueId)}>
+                                <IconifyIcon icon="mdi:delete" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
-                <div className="text-end">
-                  <MoreOptions onOptionsChange={setMoreOptions} />
-                </div>
               </div>
 
               <Row className="g-3">
@@ -549,7 +1029,24 @@ const POS = () => {
                         type="number" 
                         placeholder="Enter received amount" 
                         value={receiveAmount} 
-                        onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const amount = parseFloat(e.target.value) || 0
+                          setReceiveAmount(amount)
+                          
+                          // Only update cumulativePaid if there are no split payments
+                          // If there are split payments, cumulativePaid should be managed by the payments array
+                          if (payments.length === 0) {
+                            if (isEditMode) {
+                              // In edit mode, treat the receive amount as additional payment
+                              // New cumulative = original cumulative + new receive amount
+                              const newCumulative = originalCumulativePaid + amount
+                              setCumulativePaid(newCumulative)
+                            } else {
+                              // In create mode, receive amount equals cumulative paid
+                              setCumulativePaid(amount)
+                            }
+                          }
+                        }}
                         min={0} 
                         disabled={payments.length > 0}
                       />
@@ -557,7 +1054,12 @@ const POS = () => {
                         <IconifyIcon icon="mdi:plus" />
                       </Button>
                     </InputGroup>
-                    <Form.Text className="text-muted">Amount received from customer</Form.Text>
+                    <Form.Text className="text-muted">
+                      {isEditMode 
+                        ? "Additional amount received (will be added to existing payments)" 
+                        : "Amount received from customer"
+                      }
+                    </Form.Text>
 
                     {showAddPayment && (
                       <Row className="mt-2 g-2 align-items-end">
@@ -608,6 +1110,38 @@ const POS = () => {
                   </Form.Group>
 
                   <Form.Group className="mb-3">
+                    <Form.Label>Cumulative Paid (AED)</Form.Label>
+                    <Form.Control 
+                      type="number" 
+                      placeholder="Enter cumulative paid amount" 
+                      value={cumulativePaid} 
+                      onChange={(e) => {
+                        const amount = parseFloat(e.target.value) || 0
+                        setCumulativePaid(amount)
+                        
+                        // If there are no split payments, also update receiveAmount to match
+                        if (payments.length === 0) {
+                          if (isEditMode) {
+                            // In edit mode, receive amount = new cumulative - original cumulative
+                            const newReceiveAmount = amount - originalCumulativePaid
+                            setReceiveAmount(Math.max(0, newReceiveAmount))
+                          } else {
+                            // In create mode, receive amount equals cumulative paid
+                            setReceiveAmount(amount)
+                          }
+                        }
+                      }}
+                      min={0} 
+                    />
+                    <Form.Text className="text-muted">
+                      {isEditMode 
+                        ? "Total amount paid so far (original + additional payments)" 
+                        : "Total amount paid so far (for tracking payment history)"
+                      }
+                    </Form.Text>
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
                     <Form.Label>Aggregator</Form.Label>
                     <Form.Select 
                       value={selectedAggregator}
@@ -634,12 +1168,16 @@ const POS = () => {
                   </Form.Group>
 
                   {/* Split Bill Button */}
-                  <Button variant="info" size="lg" onClick={() => setShowSplitModal(true)}>
-                    <IconifyIcon icon="mdi:account-multiple-outline" /> Split Bill
-                  </Button>
-                  <Button variant="success" size="lg" onClick={() => setShowDiscountModal(true)} className="mx-3">
-                    <IconifyIcon icon="mdi:ticket-percent-outline" /> Apply Discount
-                  </Button>
+                  {hasAccessToPOSButton('split-bill') && (
+                    <Button variant="info" size="lg" onClick={() => setShowSplitModal(true)}>
+                      <IconifyIcon icon="mdi:account-multiple-outline" /> Split Bill
+                    </Button>
+                  )}
+                  {hasAccessToPOSButton('apply-discount') && (
+                    <Button variant="success" size="lg" onClick={() => setShowDiscountModal(true)} className="mx-3">
+                      <IconifyIcon icon="mdi:ticket-percent-outline" /> Apply Discount
+                    </Button>
+                  )}
 
                   <DiscountModal
                     show={showDiscountModal}
@@ -648,11 +1186,23 @@ const POS = () => {
                   />
 
                   <SplitBillModal show={showSplitModal} onClose={() => setShowSplitModal(false)} totalAmount={totalAmount} />
-                  <PaymentModeSelector 
-                    selectedMode={selectedPaymentMode}
-                    onModeChange={setSelectedPaymentMode}
-                    paymentMethods={paymentMethods}
-                  />
+                  
+                  {/* Show split payments indicator when active */}
+                  {payments.length > 0 && (
+                    <div className="alert alert-info mb-3">
+                      <IconifyIcon icon="mdi:information" className="me-2" />
+                      <strong>Split Payments Active:</strong> Payment modes are managed through individual payment entries above.
+                    </div>
+                  )}
+                  
+                  {/* Only show Payment Mode when no split payments are active */}
+                  {payments.length === 0 && (
+                    <PaymentModeSelector 
+                      selectedMode={selectedPaymentMode}
+                      onModeChange={setSelectedPaymentMode}
+                      paymentMethods={paymentMethods}
+                    />
+                  )}
                 </Col>
 
                 {/* Right Side */}
@@ -676,10 +1226,12 @@ const POS = () => {
                     />
                     <Form.Text className="text-muted">Change to return (auto-calculated)</Form.Text>
                   </Form.Group>
-                  <Form.Group className="mb-3">
+                  
+                  {/* VAT form field commented out - VAT calculation disabled */}
+                  {/* <Form.Group className="mb-3">
                     <Form.Label>VAT (5%)</Form.Label>
                     <Form.Control type="text" value={`AED ${vatAmount.toFixed(2)}`} disabled />
-                  </Form.Group>
+                  </Form.Group> */}
 
                   <Form.Group className="mb-3">
                     <Form.Label>Discount</Form.Label>
@@ -729,18 +1281,36 @@ const POS = () => {
               <Button variant="warning" size="lg" onClick={handleReset}>
                 <IconifyIcon icon="mdi:restart" /> Reset
               </Button>
-              <Button variant="info" size="lg">
-                <IconifyIcon icon="mdi:restart" /> Settle Bill
-              </Button>
-              <PrintOrder />
-              <ViewOrder />
-              <Link href="/reports/all-income" className="btn btn-lg btn-dark">
-                <IconifyIcon icon="mdi:document" /> Reports
-              </Link>
-              <Link href="/reports/transactions" className="btn btn-lg btn-light">
-                <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
-              </Link>
-              <Button variant="primary" size="lg" onClick={handleSaveOrder}>
+              {hasAccessToPOSButton('settle-bill') && (
+                <Button 
+                  variant="info" 
+                  size="lg"
+                  onClick={isEditMode ? handleSaveOrder : undefined}
+                  disabled={!isEditMode}
+                  style={{ opacity: !isEditMode ? 0.5 : 1 }}
+                >
+                  <IconifyIcon icon="mdi:restart" /> Settle Bill
+                </Button>
+              )}
+              {hasAccessToPOSButton('print-order') && <PrintOrder />}
+              {hasAccessToPOSButton('view-orders') && <ViewOrder onEditOrder={handleEditOrder} />}
+              {hasAccessToPOSButton('pos-reports') && (
+                <Link href="/reports/all-income" className="btn btn-lg btn-dark">
+                  <IconifyIcon icon="mdi:document" /> Reports
+                </Link>
+              )}
+              {hasAccessToPOSButton('transaction-history') && (
+                <Link href="/reports/transactions" className="btn btn-lg btn-light">
+                  <IconifyIcon icon="mdi:credit-card-outline" /> Transaction
+                </Link>
+              )}
+              <Button 
+                variant="primary" 
+                size="lg" 
+                onClick={handleSaveOrder}
+                disabled={isEditMode}
+                style={{ opacity: isEditMode ? 0.5 : 1 }}
+              >
                 <IconifyIcon icon="mdi:content-save-outline" /> Save
               </Button>
             </CardFooter>

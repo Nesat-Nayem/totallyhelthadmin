@@ -145,7 +145,7 @@ const SalesList = () => {
                     {!isLoading && !error && orders.map((order, idx) => {
                       const paymentText = (order.payments && order.payments.length > 0)
                         ? order.payments.map(p => `${p.type} AED ${p.amount.toFixed(2)}`).join(', ')
-                        : order.paymentMode || '-'
+                        : (order as any).paymentMode || '-'
                       return (
                         <tr key={order._id}>
                           <td>

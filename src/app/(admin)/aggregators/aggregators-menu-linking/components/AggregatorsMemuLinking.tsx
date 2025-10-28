@@ -36,7 +36,7 @@ const data = [
   },
 ]
 
-const AggregatorsMemuLinking = async () => {
+const AggregatorsMemuLinking = () => {
   return (
     <Row>
       <Col xl={12}>

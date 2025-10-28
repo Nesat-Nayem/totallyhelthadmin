@@ -13,6 +13,85 @@ export const MENU_ITEMS: MenuItemType[] = [
     icon: 'solar:widget-5-bold-duotone',
     url: '/dashboard',
   },
+  // {
+  //   key: 'pos-module',
+  //   label: 'POS Module',
+  //   icon: 'solar:cart-5-bold-duotone',
+  //   children: [
+  //     {
+  //       key: 'pos-main',
+  //       label: 'POS Main',
+  //       url: '/pos',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'settle-bill',
+  //       label: 'Settle Bill',
+  //       url: '/pos/settle-bill',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'print-order',
+  //       label: 'Print Order',
+  //       url: '/pos/print-order',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'pos-reports',
+  //       label: 'POS Reports',
+  //       url: '/pos/reports',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'view-orders',
+  //       label: 'View Orders',
+  //       url: '/pos/view-orders',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'transaction-history',
+  //       label: 'Transaction History',
+  //       url: '/pos/transaction-history',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'split-bill',
+  //       label: 'Split Bill',
+  //       url: '/pos/split-bill',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'apply-discount',
+  //       label: 'Apply Discount',
+  //       url: '/pos/apply-discount',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'meal-plan-list',
+  //       label: 'Meal Plan List',
+  //       url: '/pos/meal-plan-list',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'sales-list',
+  //       label: 'Sales List',
+  //       url: '/pos/sales-list',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'calculator',
+  //       label: 'Calculator',
+  //       url: '/pos/calculator',
+  //       parentKey: 'pos-module',
+  //     },
+  //     {
+  //       key: 'start-shift',
+  //       label: 'Start Shift',
+  //       url: '/pos/start-shift',
+  //       parentKey: 'pos-module',
+  //     },
+  //   ],
+  // },
   {
     key: 'sales',
     label: 'Sales',
@@ -152,6 +231,32 @@ export const MENU_ITEMS: MenuItemType[] = [
         label: 'Meal Plan Menu',
         url: '/meal-plan/sample-menu',
         parentKey: 'meal-plan',
+      },
+    ],
+  },
+
+  {
+    key: 'membership',
+    label: 'Membership Management',
+    icon: 'solar:user-id-bold-duotone',
+    children: [
+      {
+        key: 'membership-customers',
+        label: 'Customers',
+        url: '/membership/customers',
+        parentKey: 'membership',
+      },
+      {
+        key: 'membership-list',
+        label: 'Meal Plans',
+        url: '/meal-plan/meal-plan-list',
+        parentKey: 'membership',
+      },
+      {
+        key: 'user-membership',
+        label: 'User Memberships',
+        url: '/membership/user-membership',
+        parentKey: 'membership',
       },
     ],
   },
@@ -539,6 +644,12 @@ export const MENU_ITEMS: MenuItemType[] = [
     label: 'Role Management',
     icon: 'solar:users-group-two-rounded-bold-duotone',
     url: '/role-management',
+  },
+  {
+    key: 'role-management-v2',
+    label: 'Role Management V2',
+    icon: 'solar:users-group-two-rounded-bold-duotone',
+    url: '/role-management-v2',
   },
   {
     key: 'settings',

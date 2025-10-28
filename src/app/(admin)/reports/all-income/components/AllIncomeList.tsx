@@ -1,6 +1,7 @@
 'use client'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import React from 'react'
 import {
   Button,
@@ -13,11 +14,23 @@ import {
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import { useGetOrdersQuery } from '@/services/orderApi'
+import { useGetOrdersQuery, useUpdatePaymentModeMutation } from '@/services/orderApi'
+import { useSession } from 'next-auth/react'
+import PaymentModeChangeModal from '@/components/PaymentModeChangeModal'
+import OrderDetailsModal from '@/components/OrderDetailsModal'
 
 function formatDate(d: string | Date) {
   const date = typeof d === 'string' ? new Date(d) : d
   return date.toLocaleDateString()
+}
+
+function isCurrentDate(d: string | Date) {
+  const date = typeof d === 'string' ? new Date(d) : d
+  const today = new Date()
+  
+  return date.getDate() === today.getDate() &&
+         date.getMonth() === today.getMonth() &&
+         date.getFullYear() === today.getFullYear()
 }
 
 function firstDayOfMonthISO() {
@@ -56,21 +69,142 @@ function toCSV(rows: any[]) {
   return new Blob([csv], { type: 'text/csv;charset=utf-8;' })
 }
 
+
+
+
 const AllIncomeList = () => {
+  const router = useRouter()
+  const { data: session, status } = useSession()
   const [q, setQ] = React.useState('')
   const [startDate, setStartDate] = React.useState<string>('')
   const [endDate, setEndDate] = React.useState<string>('')
   const [page, setPage] = React.useState(1)
   const limit = 20
+  
+  // Payment mode change modal state
+  const [showPaymentModal, setShowPaymentModal] = React.useState(false)
+  const [selectedOrder, setSelectedOrder] = React.useState<any>(null)
+  
+  // Order details modal state
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = React.useState(false)
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = React.useState<any>(null)
 
-  const { data: ordersResp } = useGetOrdersQuery({ q: q || undefined, page, limit, startDate: startDate || undefined, endDate: endDate || undefined })
+  // Wait for session to be ready before making API calls
+  const isSessionReady = status !== 'loading'
+  
+  // Check for token with a small delay to ensure localStorage is synced
+  const [tokenReady, setTokenReady] = React.useState(false)
+  const [showNoData, setShowNoData] = React.useState(false)
+  
+  React.useEffect(() => {
+    if (isSessionReady) {
+      // Small delay to ensure LocalAuthSync has updated localStorage
+      const timer = setTimeout(() => {
+        const token = localStorage.getItem('backend_token')
+        setTokenReady(!!token)
+      }, 50) // Reduced delay
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isSessionReady])
+  
+  const hasToken = tokenReady
+
+  const { data: ordersResp, isLoading, error, refetch } = useGetOrdersQuery({ 
+    ...(q && { q }), 
+    page, 
+    limit, 
+    ...(startDate && { startDate }), 
+    ...(endDate && { endDate }) 
+  }, {
+    skip: !isSessionReady || !hasToken,
+    // Force fresh data on mount
+    refetchOnMountOrArgChange: true
+  })
+
+  // Payment mode update mutation
+  const [updatePaymentMode, { isLoading: isUpdatingPayment }] = useUpdatePaymentModeMutation()
+
+  // this month
+  const { data: monthResp } = useGetOrdersQuery({ startDate: firstDayOfMonthISO(), endDate: todayISO(), page: 1, limit: 1 }, {
+    skip: !isSessionReady || !hasToken
+  })
+  const monthTotal = monthResp?.summary?.total ?? 0
+
   const orders = ordersResp?.data ?? []
   const meta = ordersResp?.meta
   const summary = ordersResp?.summary
+  
+  // Delay showing "No Data" message to prevent blinking
+  React.useEffect(() => {
+    if (isSessionReady && !isLoading && !error && orders.length === 0) {
+      const timer = setTimeout(() => {
+        setShowNoData(true)
+      }, 300) // 300ms delay before showing "No Data"
+      
+      return () => clearTimeout(timer)
+    } else {
+      setShowNoData(false)
+    }
+  }, [isSessionReady, isLoading, error, orders.length])
 
-  // this month
-  const { data: monthResp } = useGetOrdersQuery({ startDate: firstDayOfMonthISO(), endDate: todayISO(), page: 1, limit: 1 })
-  const monthTotal = monthResp?.summary?.total ?? 0
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Session status:', { status, isSessionReady, hasToken })
+    console.log('Orders query state:', { ordersResp, isLoading, error })
+    console.log('Orders data:', orders)
+    
+    if (error) {
+      console.error('Orders query error:', error)
+    }
+  }, [ordersResp, isLoading, error, status, isSessionReady, hasToken, orders])
+
+
+
+  const handleEditOrder = (order: any) => {
+    // Store order data in sessionStorage for POS to access with source identifier
+    const orderDataWithSource = {
+      ...order,
+      editSource: 'reports'
+    }
+    sessionStorage.setItem('editOrderData', JSON.stringify(orderDataWithSource))
+    // Navigate to POS page
+    router.push('/pos')
+  }
+
+  const handleChangePaymentMode = (order: any) => {
+    setSelectedOrder(order)
+    setShowPaymentModal(true)
+  }
+
+  const handleViewOrderDetails = (order: any) => {
+    setSelectedOrderForDetails(order)
+    setShowOrderDetailsModal(true)
+  }
+
+  const handleConfirmPaymentModeChange = async (newPaymentMode: string) => {
+    if (!selectedOrder) return
+
+    try {
+      await updatePaymentMode({
+        id: selectedOrder._id,
+        paymentMode: newPaymentMode
+      }).unwrap()
+
+      // Show success message
+      alert(`Payment mode changed to ${newPaymentMode} successfully!`)
+      
+      // Close modal and refresh data
+      setShowPaymentModal(false)
+      setSelectedOrder(null)
+      refetch()
+    } catch (error) {
+      console.error('Failed to update payment mode:', error)
+      alert('Failed to update payment mode. Please try again.')
+    }
+  }
+
+
 
   const handleExportCSV = () => {
     const blob = toCSV(
@@ -156,8 +290,103 @@ const AllIncomeList = () => {
             </CardHeader>
 
             <div>
-              <div className="table-responsive">
-                <table className="table align-middle mb-0 table-hover table-centered table-bordered">
+              {/* Combined Loading State - Show only when actually loading */}
+              {(!isSessionReady || isLoading) && (
+                <div className="text-center py-4">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2">Loading orders...</p>
+                </div>
+              )}
+
+              {/* Error State */}
+              {isSessionReady && error && (
+                <div className="alert alert-danger text-center">
+                  <p>Failed to load orders. Please try again.</p>
+                  <div className="small text-muted mb-2">
+                    {(() => {
+                      const errorStatus = (error as any)?.status
+                      const errorMessage = (error as any)?.data?.message
+                      
+                      return (
+                        <>
+                          Error: {errorStatus ? `Status ${errorStatus}` : 'Network Error'}
+                          {errorMessage && <div>Message: {errorMessage}</div>}
+                          {errorStatus === 401 && (
+                            <div className="text-warning mt-2">
+                              <strong>Authentication Error:</strong> Please check if you&apos;re logged in properly.
+                            </div>
+                          )}
+                          {errorStatus === 'FETCH_ERROR' && (
+                            <div className="text-warning mt-2">
+                              <strong>Connection Error:</strong> Unable to connect to the server. Please check your internet connection.
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                  <div className="d-flex gap-2 justify-content-center">
+                    <button className="btn btn-outline-danger btn-sm" onClick={() => window.location.reload()}>
+                      Retry
+                    </button>
+                    {(error as any)?.status === 401 && (
+                      <button className="btn btn-outline-warning btn-sm" onClick={() => {
+                        localStorage.removeItem('backend_token')
+                        window.location.href = '/auth/login'
+                      }}>
+                        Login Again
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* No Data Message - Only show after delay to prevent blinking */}
+              {showNoData && (
+                <div className="text-center py-4">
+                  <div className="alert alert-info">
+                    <h5>No orders found</h5>
+                    <p className="mb-0">
+                      {q || startDate || endDate 
+                        ? 'No orders match your current search criteria. Try adjusting your filters.'
+                        : 'No orders have been created yet. Create your first order to see it here.'
+                      }
+                    </p>
+                    <div className="d-flex gap-2 justify-content-center mt-3">
+                      {(q || startDate || endDate) && (
+                        <button 
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => {
+                            setQ('')
+                            setStartDate('')
+                            setEndDate('')
+                            setPage(1)
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                      <button 
+                        className="btn btn-outline-success btn-sm"
+                        onClick={() => {
+                          console.log('Manual refresh triggered')
+                          refetch()
+                        }}
+                      >
+                        <IconifyIcon icon="mdi:refresh" className="me-1" />
+                        Refresh Data
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Orders Table */}
+              {isSessionReady && !isLoading && !error && orders.length > 0 && (
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0 table-hover table-centered table-bordered">
                   <thead className="bg-light-subtle">
                     <tr>
                       <th style={{ width: 20 }}>
@@ -170,8 +399,8 @@ const AllIncomeList = () => {
                       <th style={{ textWrap: 'nowrap' }}>Date</th>
                       <th style={{ textWrap: 'nowrap' }}>Invoice No</th>
                       <th style={{ textWrap: 'nowrap' }}>Total</th>
-                      <th style={{ textWrap: 'nowrap' }}>Paid Status</th>
                       <th style={{ textWrap: 'nowrap' }}>Payment Mode</th>
+                      <th style={{ textWrap: 'nowrap' }}>Paid Status</th>
                       <th style={{ textWrap: 'nowrap' }}>Action</th>
                     </tr>
                   </thead>
@@ -188,11 +417,74 @@ const AllIncomeList = () => {
                         <td style={{ textWrap: 'nowrap' }}>{o.invoiceNo}</td>
                         <td style={{ textWrap: 'nowrap' }}>AED {o.total}</td>
                         <td style={{ textWrap: 'nowrap' }}>
-                          <span className={`badge ${o.status === 'paid' ? 'bg-success' : 'bg-warning'}`}>{o.status}</span>
+                          {o.payments?.length > 1 ? (
+                            <div>
+                              <span className="badge bg-warning me-1">Multiple</span>
+                              <span className="badge bg-info">
+                                {o.payments?.[0]?.type || 'Unknown'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="badge bg-info">
+                              {o.payments?.[0]?.type || 'Unknown'}
+                            </span>
+                          )}
                         </td>
-                        <td style={{ textWrap: 'nowrap' }}>{o.paymentMode || '-'}</td>
+                        <td style={{ textWrap: 'nowrap' }}>
+                          <span 
+                            className={`badge ${o.status === 'paid' ? 'bg-success' : 'bg-warning'}`}
+                            style={{ 
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}
+                          >
+                            {o.status === 'paid' ? 'PAID' : 'UNPAID'}
+                          </span>
+                        </td>
                         <td>
                           <div className="d-flex gap-2">
+                            {/* View button - always available */}
+                            <Button
+                              variant="outline-info"
+                              size="sm"
+                              onClick={() => handleViewOrderDetails(o)}
+                              title="View Order Details"
+                              className="p-1"
+                            >
+                              <IconifyIcon icon="solar:eye-bold" className="align-middle fs-16" />
+                            </Button>
+                            
+                            {/* Edit button for unpaid orders */}
+                            {o.status !== 'paid' && (
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => handleEditOrder(o)}
+                                title="Edit Order"
+                                className="p-1"
+                              >
+                                <IconifyIcon icon="solar:pen-2-bold" className="align-middle fs-16" />
+                              </Button>
+                            )}
+                            
+                            {/* Payment mode change button for paid orders on current date only */}
+                            {o.status === 'paid' && isCurrentDate(o.date) && (
+                              <Button
+                                variant="outline-warning"
+                                size="sm"
+                                onClick={() => handleChangePaymentMode(o)}
+                                title="Change Payment Mode (Current Date Only)"
+                                className="p-1"
+                              >
+                                <IconifyIcon 
+                                  icon="solar:bill-bold" 
+                                  className="align-middle fs-16" 
+                                />
+                              </Button>
+                            )}
+                            
                             <Link href="#" className="btn btn-soft-danger btn-sm" title="Delete (coming soon)">
                               <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
                             </Link>
@@ -202,30 +494,58 @@ const AllIncomeList = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {isSessionReady && !isLoading && !error && orders.length > 0 && (
+                <CardFooter className="border-top">
+                  <nav aria-label="Page navigation example">
+                    <ul className="pagination justify-content-end mb-0">
+                      <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                          Previous
+                        </button>
+                      </li>
+                      <li className="page-item active">
+                        <span className="page-link">{page}</span>
+                      </li>
+                      <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
+                        <button className="page-link" onClick={() => setPage((p) => p + 1)}>
+                          Next
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </CardFooter>
+              )}
             </div>
-            <CardFooter className="border-top">
-              <nav aria-label="Page navigation example">
-                <ul className="pagination justify-content-end mb-0">
-                  <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                      Previous
-                    </button>
-                  </li>
-                  <li className="page-item active">
-                    <span className="page-link">{page}</span>
-                  </li>
-                  <li className={`page-item ${meta && page * limit >= (meta.total || 0) ? 'disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setPage((p) => p + 1)}>
-                      Next
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-            </CardFooter>
           </Card>
         </Col>
       </Row>
+
+      {/* Payment Mode Change Modal */}
+      <PaymentModeChangeModal
+        show={showPaymentModal}
+        onHide={() => {
+          setShowPaymentModal(false)
+          setSelectedOrder(null)
+        }}
+        order={selectedOrder}
+        onConfirm={handleConfirmPaymentModeChange}
+        isLoading={isUpdatingPayment}
+      />
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        show={showOrderDetailsModal}
+        onHide={() => {
+          setShowOrderDetailsModal(false)
+          setSelectedOrderForDetails(null)
+        }}
+        order={selectedOrderForDetails}
+      />
+
     </>
   )
 }

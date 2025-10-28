@@ -24,8 +24,25 @@ export const customerApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: [{ type: 'Customer', id: 'LIST' }],
     }),
+    updateCustomer: build.mutation<Customer, { id: string; data: Partial<Customer> }>({
+      query: ({ id, data }) => ({ url: `/customers/${id}`, method: 'PUT', body: data }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'Customer', id }],
+    }),
+    deleteCustomer: build.mutation<Customer, string>({
+      query: (id) => ({ url: `/customers/${id}`, method: 'DELETE' }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: (_r, _e, id) => [{ type: 'Customer', id }],
+    }),
   }),
   overrideExisting: true,
 })
 
-export const { useGetCustomersQuery, useLazyGetCustomersQuery, useGetCustomerByIdQuery, useCreateCustomerMutation } = customerApi
+export const { 
+  useGetCustomersQuery, 
+  useLazyGetCustomersQuery, 
+  useGetCustomerByIdQuery, 
+  useCreateCustomerMutation,
+  useUpdateCustomerMutation,
+  useDeleteCustomerMutation
+} = customerApi
