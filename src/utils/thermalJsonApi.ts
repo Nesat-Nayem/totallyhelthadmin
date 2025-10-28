@@ -102,8 +102,8 @@ export const fetchThermalReceiptJson = async (date: string): Promise<ThermalRece
     throw new Error('Authentication token not found')
   }
 
-  const apiBaseUrl = 'https://totally-helth.vercel.app/v1/api'
-  // const apiBaseUrl = 'http://localhost:5050/v1/api'
+  // const apiBaseUrl = 'https://totally-helth.vercel.app/v1/api'
+  const apiBaseUrl = 'http://localhost:5050/v1/api'
   const url = `${apiBaseUrl}/day-close-report/thermal-json/${date}`
   
   const response = await fetch(url, {

@@ -7,7 +7,7 @@ const PageTItle = ({ title }: { title: string }) => {
 
   useEffect(() => {
     setTitle(title)
-  }, [setTitle])
+  }, [setTitle, title])
   return <></>
 }
 

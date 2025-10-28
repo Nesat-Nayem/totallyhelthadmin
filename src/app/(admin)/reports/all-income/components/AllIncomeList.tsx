@@ -315,7 +315,7 @@ const AllIncomeList = () => {
                           {errorMessage && <div>Message: {errorMessage}</div>}
                           {errorStatus === 401 && (
                             <div className="text-warning mt-2">
-                              <strong>Authentication Error:</strong> Please check if you're logged in properly.
+                              <strong>Authentication Error:</strong> Please check if you&apos;re logged in properly.
                             </div>
                           )}
                           {errorStatus === 'FETCH_ERROR' && (

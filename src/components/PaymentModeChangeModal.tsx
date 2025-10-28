@@ -65,7 +65,7 @@ const PaymentModeChangeModal: React.FC<PaymentModeChangeModalProps> = ({
             <Alert variant="info" className="mb-3">
               <IconifyIcon icon="solar:info-circle-bold" className="me-2" />
               <strong>Payment Mode Change Available for Current Date Only</strong><br/>
-              Select the new payment mode for this order. Only the payment method will be changed. This feature is only available for orders from today's date.
+              Select the new payment mode for this order. Only the payment method will be changed. This feature is only available for orders from today&apos;s date.
             </Alert>
             
             <h6>Select Payment Mode:</h6>

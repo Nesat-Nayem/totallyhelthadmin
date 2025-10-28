@@ -12,7 +12,7 @@ import { Button, Dropdown } from 'react-bootstrap'
 import Link from 'next/link'
 import { useAccessControl } from '@/hooks/useAccessControl'
 
-const page = () => {
+const Page = () => {
   const { hasPOSAccess, accessiblePOSOptions } = useAccessControl()
 
   return (
@@ -49,4 +49,4 @@ const page = () => {
   )
 }
 
-export default page
+export default Page

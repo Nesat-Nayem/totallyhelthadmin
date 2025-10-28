@@ -29,7 +29,7 @@ export default function useLocalStorage<T>(key: string, initialValue: T, overrid
   useEffect(() => {
     window.addEventListener('storage', getStoredItem, false)
     return () => window.removeEventListener('storage', getStoredItem)
-  }, [])
+  }, [getStoredItem])
 
   const setValue = (value: T | ((val: T) => T)) => {
     try {

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { Table, Badge, Button, Dropdown, Modal, Form, Row, Col, Alert } from 'react-bootstrap'
+import Image from 'next/image'
 import { useGetMealPlansQuery, useCreateMealPlanMutation, useUpdateMealPlanMutation, useDeleteMealPlanMutation } from '@/services/mealPlanApi'
 import { useGetCustomersQuery } from '@/services/customerApi'
 import { showSuccess, showError } from '@/utils/sweetAlert'
@@ -147,10 +148,12 @@ const MembershipDataList: React.FC<MembershipDataListProps> = ({ searchQuery }) 
               <tr key={membership._id}>
                 <td>
                   {membership.images && membership.images.length > 0 ? (
-                    <img
+                    <Image
                       src={membership.images[0]}
                       alt={membership.title}
-                      style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                      width={50}
+                      height={50}
+                      style={{ objectFit: 'cover' }}
                       className="img-thumbnail"
                     />
                   ) : (
@@ -355,7 +358,7 @@ const MembershipDataList: React.FC<MembershipDataListProps> = ({ searchQuery }) 
           <Modal.Title>Delete Membership</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Are you sure you want to delete "{selectedMembership?.title}"? This action cannot be undone.
+          Are you sure you want to delete &quot;{selectedMembership?.title}&quot;? This action cannot be undone.
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>

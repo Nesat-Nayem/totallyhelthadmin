@@ -38,7 +38,7 @@ const MealPlan = () => {
   // Force refetch when component mounts (after redirect from create)
   React.useEffect(() => {
     refetch()
-  }, [])
+  }, [refetch])
 
   const [deleteMealPlan] = useDeleteMealPlanMutation()
 

@@ -22,7 +22,7 @@ const CustomerDataList: React.FC<CustomerDataListProps> = ({ searchQuery }) => {
   const [deleteCustomer, { isLoading: isDeleting }] = useDeleteCustomerMutation()
 
   const customers = useMemo(() => customersRes?.data || [], [customersRes])
-  const userMemberships = useMemo(() => userMembershipsRes?.data?.memberships || [], [userMembershipsRes])
+  const userMemberships = useMemo(() => userMembershipsRes?.memberships || [], [userMembershipsRes])
 
   // Create a map of active memberships by customer
   const activeMembershipsByCustomer = useMemo(() => {
@@ -289,7 +289,7 @@ const CustomerDataList: React.FC<CustomerDataListProps> = ({ searchQuery }) => {
           <Modal.Title>Delete Customer</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Are you sure you want to delete "{selectedCustomer?.name}"? This action cannot be undone.
+          Are you sure you want to delete &quot;{selectedCustomer?.name}&quot;? This action cannot be undone.
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)}>

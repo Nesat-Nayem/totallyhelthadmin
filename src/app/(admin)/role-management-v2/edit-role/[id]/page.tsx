@@ -13,6 +13,9 @@ const EditRolePage: React.FC = () => {
   
   console.log('Edit page - Role ID from params:', roleId)
   
+  // API hooks - moved before conditional returns
+  const { data, isLoading, error } = useGetRoleByIdQuery(roleId || '')
+  
   // Validate roleId
   if (!roleId) {
     return (
@@ -27,9 +30,6 @@ const EditRolePage: React.FC = () => {
       </div>
     )
   }
-  
-  // API hooks
-  const { data, isLoading, error } = useGetRoleByIdQuery(roleId)
   
   console.log('Edit page - API state:', { data, isLoading, error, roleId })
   console.log('Edit page - API call made for roleId:', roleId)
@@ -72,7 +72,7 @@ const EditRolePage: React.FC = () => {
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
         <div className="text-center">
           <h5 className="text-warning">Role not found</h5>
-          <p>The role you're looking for doesn't exist.</p>
+          <p>The role you&apos;re looking for doesn&apos;t exist.</p>
           <button className="btn btn-outline-primary" onClick={() => router.push('/role-management-v2')}>
             Back to List
           </button>

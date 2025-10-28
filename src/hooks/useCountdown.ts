@@ -14,7 +14,7 @@ const useCountdown = () => {
     return () => {
       clearInterval(timer)
     }
-  }, [])
+  }, [timeRemaining])
 
   const days = Math.floor(countdown / (1000 * 60 * 60 * 24))
   const hours = Math.floor((countdown % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
