@@ -44,8 +44,8 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
       setTimeout(() => {
         dispatch(setLoading(false))
         onClose()
-        // Redirect to customer management with query parameter to open add customer modal
-        router.push('/membership/customers?openAddCustomerModal=true')
+        // Redirect to user membership management with query parameter to open create modal
+        router.push('/membership/user-membership?openCreateModal=true')
       }, 500)
       return
     }

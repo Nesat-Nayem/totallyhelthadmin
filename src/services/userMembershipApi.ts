@@ -32,14 +32,20 @@ export const userMembershipApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       providesTags: (_r, _e, id) => [{ type: 'UserMembership' as const, id }],
     }),
-    createUserMembership: build.mutation<UserMembership, {
-      userId: string
-      mealPlanId: string
-      totalMeals: number
-      price: number
-      startDate?: string
-      endDate: string
-    }>({
+        createUserMembership: build.mutation<UserMembership, {
+          userId: string
+          mealPlanId: string
+          totalMeals: number
+          startDate?: string
+          endDate: string
+          // Payment fields
+          totalPrice?: number
+          receivedAmount?: number
+          cumulativePaid?: number
+          paymentStatus?: string
+          paymentMode?: string
+          note?: string
+        }>({
       query: (body) => ({ 
         url: '/user-memberships', 
         method: 'POST', 

@@ -20,6 +20,7 @@ import Link from 'next/link'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import { MenuAccess } from './MenuAccessCheckbox'
 import { POS_ROLE_MENU_ITEMS } from '@/assets/data/pos-role-menu-items'
+import { useAccessControl } from '@/hooks/useAccessControl'
 
 export interface RoleData {
   id: string
@@ -65,11 +66,15 @@ const RoleList: React.FC<RoleListProps> = ({
   search,
   filter
 }) => {
+  const { hasAccessToSubModule, isAdmin } = useAccessControl()
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
   const [showPermissionsModal, setShowPermissionsModal] = useState(false)
   const [selectedRolePermissions, setSelectedRolePermissions] = useState<MenuAccess | null>(null)
   const [selectedRoleName, setSelectedRoleName] = useState<string>('')
+
+  // Role-based access control
+  const canManageRole = isAdmin || hasAccessToSubModule('role-management', 'manage')
 
   // Use external search if provided, otherwise use local state
   const searchTerm = search?.value || ''
@@ -88,6 +93,10 @@ const RoleList: React.FC<RoleListProps> = ({
   )
 
   const handleDeleteClick = (id: string) => {
+    if (!canManageRole) {
+      alert('You do not have permission to manage roles')
+      return
+    }
     setSelectedRoleId(id)
     setShowDeleteModal(true)
   }
@@ -104,6 +113,16 @@ const RoleList: React.FC<RoleListProps> = ({
     setSelectedRolePermissions(role.menuAccess || {})
     setSelectedRoleName(`${role.staffName} (${role.role})`)
     setShowPermissionsModal(true)
+  }
+
+  const handleAddRoleClick = () => {
+    if (!canManageRole) {
+      alert('You do not have permission to manage roles')
+      return
+    }
+    if (onAddRole) {
+      onAddRole()
+    }
   }
 
   const getMenuAccessBadges = (menuAccess: MenuAccess) => {
@@ -316,17 +335,27 @@ const RoleList: React.FC<RoleListProps> = ({
               )}
 
               {/* Add Role Button */}
-              {onAddRole ? (
+              {canManageRole ? (
+                onAddRole ? (
+                  <button 
+                    onClick={handleAddRoleClick} 
+                    className="btn btn-lg btn-primary"
+                  >
+                    + Add Role
+                  </button>
+                ) : (
+                  <Link href="/role-management-v2/add-role" className="btn btn-lg btn-primary">
+                    + Add Role
+                  </Link>
+                )
+              ) : (
                 <button 
-                  onClick={onAddRole} 
-                  className="btn btn-lg btn-primary"
+                  className="btn btn-lg btn-secondary" 
+                  disabled
+                  title="You do not have permission to manage roles"
                 >
                   + Add Role
                 </button>
-              ) : (
-                <Link href="/role-management-v2/add-role" className="btn btn-lg btn-primary">
-                  + Add Role
-                </Link>
               )}
             </CardHeader>
 
@@ -391,21 +420,27 @@ const RoleList: React.FC<RoleListProps> = ({
                           </td>
                           <td style={{ textWrap: 'nowrap' }}>
                             <div className="d-flex gap-2">
-                              <Link 
-                                href={`/role-management-v2/edit-role/${role.id}`} 
-                                className="btn btn-soft-primary btn-sm"
-                                title="Edit Role"
-                              >
-                                <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                              </Link>
-                              <Button 
-                                variant="outline-danger" 
-                                size="sm"
-                                onClick={() => handleDeleteClick(role.id)}
-                                title="Delete Role"
-                              >
-                                <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                              </Button>
+                              {canManageRole ? (
+                                <>
+                                  <Link 
+                                    href={`/role-management-v2/edit-role/${role.id}`} 
+                                    className="btn btn-soft-primary btn-sm"
+                                    title="Edit Role"
+                                  >
+                                    <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                                  </Link>
+                                  <Button 
+                                    variant="outline-danger" 
+                                    size="sm"
+                                    onClick={() => handleDeleteClick(role.id)}
+                                    title="Delete Role"
+                                  >
+                                    <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className="text-muted small">No permissions</span>
+                              )}
                             </div>
                           </td>
                         </tr>

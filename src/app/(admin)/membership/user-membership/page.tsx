@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, Row, Col, Button, Form, InputGroup } from 'react-bootstrap'
 import { useRouter, useSearchParams } from 'next/navigation'
 import PageTitle from '@/components/PageTItle'
@@ -12,6 +12,7 @@ const UserMembershipPage = () => {
   const searchParams = useSearchParams()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const dataListRef = useRef<any>(null)
 
   // Check for query parameter to open create modal
   useEffect(() => {
@@ -64,7 +65,7 @@ const UserMembershipPage = () => {
                 </Col>
               </Row>
               
-              <UserMembershipDataList searchQuery={searchQuery} />
+              <UserMembershipDataList ref={dataListRef} searchQuery={searchQuery} />
             </Card.Body>
           </Card>
         </Col>
@@ -75,8 +76,10 @@ const UserMembershipPage = () => {
         onHide={handleCloseModal}
         onSuccess={() => {
           handleCloseModal()
-          // Refresh the list
-          window.location.reload()
+          // Refetch the data list without page reload
+          if (dataListRef.current?.refetch) {
+            dataListRef.current.refetch()
+          }
         }}
       />
     </>

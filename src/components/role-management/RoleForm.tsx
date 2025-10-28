@@ -11,6 +11,7 @@ import PasswordFormInput from '@/components/form/PasswordFormInput'
 import { useCreateRoleMutation } from '@/services/roleApi'
 import { RoleFormData } from '@/types/role'
 import Swal from 'sweetalert2'
+import { useAccessControl } from '@/hooks/useAccessControl'
 
 export interface LocalRoleFormData {
   staffName: string
@@ -49,6 +50,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
   isLoading = false,
   mode = 'create'
 }) => {
+  const { hasAccessToSubModule, isAdmin } = useAccessControl()
   const [menuAccess, setMenuAccess] = useState<MenuAccess>(initialData?.menuAccess || {})
   
   // Fixed roles as per backend enum - no dynamic creation
@@ -56,6 +58,9 @@ const RoleForm: React.FC<RoleFormProps> = ({
   
   // API mutation
   const [createRole, { isLoading: isCreating }] = useCreateRoleMutation()
+
+  // Role-based access control
+  const canManageRole = isAdmin || hasAccessToSubModule('role-management', 'manage')
 
   const {
     control,
@@ -132,6 +137,16 @@ const RoleForm: React.FC<RoleFormProps> = ({
 
   const handleFormSubmit = async (data: any) => {
     try {
+      if (!canManageRole) {
+        Swal.fire({
+          title: 'Access Denied',
+          text: 'You do not have permission to manage roles',
+          icon: 'error',
+          confirmButtonText: 'OK'
+        })
+        return
+      }
+
       if (mode === 'edit') {
         // For edit mode, call the onSubmit callback directly
         if (onSubmit) {
