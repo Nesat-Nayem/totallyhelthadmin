@@ -25,11 +25,10 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
     totalMeals: 0,
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
-    // Payment fields
+    // Payment fields (only fields that backend stores)
     totalPrice: 0,
     receivedAmount: 0,
-    cumulativePaid: 0,
-    paymentMode: '',
+    paymentMode: 'cash', // Default to cash
     note: ''
   })
   const [errors, setErrors] = useState<any>({})
@@ -104,28 +103,38 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
 
   // Calculate payment status and remaining amount
   const paymentStatus = useMemo(() => {
-    const cumulativePaid = formData.cumulativePaid || 0
-    const totalPrice = formData.totalPrice || 0
-    if (cumulativePaid >= totalPrice) {
+    const receivedAmount = parseFloat((formData.receivedAmount || 0).toString())
+    const totalPrice = parseFloat((formData.totalPrice || 0).toString())
+    
+    // If received amount equals total price, status is always paid (even if both are 0)
+    // Use Math.abs to handle floating point precision issues
+    if (Math.abs(receivedAmount - totalPrice) < 0.01) {
       return 'paid'
     } else {
       return 'unpaid'
     }
-  }, [formData.cumulativePaid, formData.totalPrice])
+  }, [formData.receivedAmount, formData.totalPrice])
 
   const remainingAmount = useMemo(() => {
     const totalPrice = formData.totalPrice || 0
-    const cumulativePaid = formData.cumulativePaid || 0
-    return Math.max(0, totalPrice - cumulativePaid)
-  }, [formData.totalPrice, formData.cumulativePaid])
+    const receivedAmount = formData.receivedAmount || 0
+    return Math.max(0, totalPrice - receivedAmount)
+  }, [formData.totalPrice, formData.receivedAmount])
 
-  // Update cumulative paid when received amount changes
+  // Update received amount when changed
   const handleReceivedAmountChange = (value: number) => {
+    const receivedAmount = parseFloat((value || 0).toString())
+    const totalPrice = parseFloat((formData.totalPrice || 0).toString())
+    
     setFormData(prev => ({
       ...prev,
-      receivedAmount: value,
-      cumulativePaid: value // For new memberships, received amount = cumulative paid
+      receivedAmount: value
     }))
+    
+    // If received amount equals total price, ensure status is paid (even if both are 0)
+    if (Math.abs(receivedAmount - totalPrice) < 0.01) {
+      console.log('Received amount equals total price - status will be paid')
+    }
   }
 
   const handleStartDateChange = (startDate: string) => {
@@ -175,17 +184,21 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
     if (formData.receivedAmount < 0) {
       newErrors.receivedAmount = 'Received amount cannot be negative'
     }
-    if (formData.cumulativePaid < 0) {
-      newErrors.cumulativePaid = 'Cumulative paid amount cannot be negative'
-    }
-    if (formData.cumulativePaid > formData.totalPrice) {
-      newErrors.cumulativePaid = 'Cumulative paid amount cannot exceed total price'
+    if (formData.receivedAmount > formData.totalPrice) {
+      newErrors.receivedAmount = 'Received amount cannot exceed total price'
     }
     if (formData.paymentMode && !['cash', 'card', 'online', 'payment_link'].includes(formData.paymentMode)) {
       newErrors.paymentMode = 'Invalid payment mode'
     }
 
+    // Payment status validation
+    const currentPaymentStatus = paymentStatus
+    if (!['paid', 'unpaid'].includes(currentPaymentStatus)) {
+      newErrors.paymentStatus = 'Invalid payment status'
+    }
+
     console.log('Validation errors:', newErrors)
+    console.log('Current payment status:', currentPaymentStatus)
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -200,33 +213,70 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
     }
     
     console.log('Form submitted with data:', formData)
+    console.log('Current payment status:', paymentStatus)
     
     if (!validateForm()) {
       console.log('Form validation failed:', errors)
       return
     }
 
+    // Additional payment status validation
+    // Recalculate to ensure accuracy
+    const validationReceivedAmount = parseFloat((formData.receivedAmount || 0).toString())
+    const validationTotalPrice = parseFloat((formData.totalPrice || 0).toString())
+    const validatedPaymentStatus = (Math.abs(validationReceivedAmount - validationTotalPrice) < 0.01) ? 'paid' : 'unpaid'
+    
+    if (!validatedPaymentStatus || !['paid', 'unpaid'].includes(validatedPaymentStatus)) {
+      showError('Invalid payment status. Please refresh the page and try again.')
+      return
+    }
+
+    // Validate payment amounts
+    if (formData.receivedAmount > formData.totalPrice) {
+      showError('Received amount cannot exceed total price. Please adjust the amounts.')
+      return
+    }
+
+    if (formData.totalPrice <= 0) {
+      showError('Total price must be greater than 0. Please select a valid meal plan.')
+      return
+    }
+
+    // Mandatory payment validation - must be fully paid to create membership
+    if (Math.abs(validationReceivedAmount - validationTotalPrice) >= 0.01) {
+      showError('Please enter total price in receive amount so it is paid')
+      return
+    }
+
+    // Recalculate payment status to ensure it's correct before sending
+    const receivedAmount = parseFloat((formData.receivedAmount || 0).toString())
+    const totalPrice = parseFloat((formData.totalPrice || 0).toString())
+    const finalPaymentStatus = (Math.abs(receivedAmount - totalPrice) < 0.01) ? 'paid' : 'unpaid'
+    
     console.log('Form validation passed, calling API...')
+    console.log('Payment status being sent:', finalPaymentStatus)
+    console.log('Received Amount:', receivedAmount, 'Total Price:', totalPrice)
     setIsSubmitting(true)
     
     try {
-      // Prepare the data exactly as the backend expects
+      // Prepare the data exactly as the backend expects (only fields that backend stores)
             const membershipData = {
               userId: formData.userId,
               mealPlanId: formData.mealPlanId,
               totalMeals: formData.totalMeals,
               startDate: formData.startDate,
               endDate: formData.endDate,
-              // Payment fields
+              // Payment fields (only fields backend stores: totalPrice, receivedAmount, paymentMode, paymentStatus, note)
               totalPrice: formData.totalPrice,
               receivedAmount: formData.receivedAmount,
-              cumulativePaid: formData.cumulativePaid,
-              paymentStatus: paymentStatus,
+              paymentStatus: finalPaymentStatus, // Always 'paid' or 'unpaid' - paid when receivedAmount equals totalPrice
               paymentMode: formData.paymentMode || undefined,
               note: formData.note || ''
             }
       
       console.log('Creating user membership with data:', membershipData)
+      console.log('Payment status type:', typeof finalPaymentStatus)
+      console.log('Payment status value:', JSON.stringify(finalPaymentStatus))
       console.log('API call starting...')
       console.log('Network request will be visible in browser dev tools...')
       
@@ -259,11 +309,26 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
         originalStatus: error?.originalStatus
       })
       
-      // Show detailed error message
-      const errorMessage = error?.data?.message || 
-                          error?.data?.error || 
-                          error?.message || 
-                          `Failed to create user membership (Status: ${error?.status || 'Unknown'})`
+      // Parse and show detailed error message
+      let errorMessage = 'Failed to create user membership'
+      
+      if (error?.data?.message) {
+        // Handle validation errors from backend
+        if (error.data.message.includes('paymentStatus')) {
+          errorMessage = 'Payment status validation failed. Please check your payment details.'
+        } else if (error.data.message.includes('Invalid input data')) {
+          errorMessage = 'Invalid data provided. Please check all required fields and try again.'
+        } else {
+          errorMessage = error.data.message
+        }
+      } else if (error?.data?.error) {
+        errorMessage = error.data.error
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (error?.status) {
+        errorMessage = `Server error (${error.status}). Please try again.`
+      }
+      
       showError(errorMessage)
     } finally {
       setIsSubmitting(false)
@@ -277,11 +342,10 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
       totalMeals: 0,
       startDate: new Date().toISOString().split('T')[0],
       endDate: '',
-      // Payment fields
+      // Payment fields (only fields that backend stores)
       totalPrice: 0,
       receivedAmount: 0,
-      cumulativePaid: 0,
-      paymentMode: '',
+      paymentMode: 'cash', // Reset to cash default
       note: ''
     })
     setErrors({})
@@ -293,12 +357,15 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
   }, [mealPlans, formData.mealPlanId])
 
   return (
-    <Modal show={show} onHide={handleClose} size="lg">
-      <Modal.Header closeButton>
-        <Modal.Title>Create User Membership</Modal.Title>
+    <Modal show={show} onHide={handleClose} size="lg" centered>
+      <Modal.Header closeButton className="bg-primary text-white border-0">
+        <Modal.Title className="fw-bold">
+          <i className="ri-user-add-line me-2"></i>
+          Create User Membership
+        </Modal.Title>
       </Modal.Header>
       <Form onSubmit={handleSubmit}>
-        <Modal.Body style={{ position: 'relative' }}>
+        <Modal.Body style={{ position: 'relative', maxHeight: '70vh', overflowY: 'auto' }} className="p-3">
           {(isLoading || isSubmitting) && (
             <div 
               className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
@@ -321,330 +388,368 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
               </div>
             </div>
           )}
-          <Row className="g-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Customer *</Form.Label>
-                <div className="d-flex gap-2 mb-2">
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm" 
-                    onClick={handleAddNewCustomer}
-                    className="d-flex align-items-center"
-                  >
-                    <i className="ri-add-line me-1"></i>
-                    Add New Customer
-                  </Button>
-                </div>
-                <Form.Select
-                  value={formData.userId}
-                  onChange={(e) => handleInputChange('userId', e.target.value)}
-                  isInvalid={!!errors.userId}
-                >
-                  <option value="">Select Customer</option>
-                  {customers.map((customer: any) => (
-                    <option key={customer._id} value={customer._id}>
-                      {customer.name} - {customer.phone}
-                    </option>
-                  ))}
-                </Form.Select>
-                <Form.Control.Feedback type="invalid">
-                  {errors.userId}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Meal Plan *</Form.Label>
-                <Form.Select
-                  value={formData.mealPlanId}
-                  onChange={(e) => handleMealPlanChange(e.target.value)}
-                  isInvalid={!!errors.mealPlanId}
-                >
-                  <option value="">Select Meal Plan</option>
-                  {mealPlans.length > 0 ? (
-                    mealPlans.map((plan: any) => (
-                      <option key={plan._id} value={plan._id}>
-                        {plan.title} - AED {plan.price}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>Loading meal plans...</option>
-                  )}
-                </Form.Select>
-                <Form.Text className="text-muted">
-                  {mealPlans.length} meal plans available
-                </Form.Text>
-                <Form.Control.Feedback type="invalid">
-                  {errors.mealPlanId}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Col>
-            
-            {selectedMealPlan && (
-              <Col md={12}>
-                <Alert variant="info" className="mb-0">
-                  <strong>Selected Plan:</strong> {(selectedMealPlan as any).title}<br/>
-                  <strong>Description:</strong> {(selectedMealPlan as any).description}<br/>
-                  <strong>Price:</strong> AED {(selectedMealPlan as any).price}<br/>
-                  <strong>Category:</strong> {(selectedMealPlan as any).category || 'N/A'}<br/>
-                  <strong>Brand:</strong> {(selectedMealPlan as any).brand || 'N/A'}<br/>
-                  <strong>Duration:</strong> {(selectedMealPlan as any).durationDays} days
-                </Alert>
-              </Col>
-            )}
-
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Total Meals *</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={formData.totalMeals}
-                  onChange={(e) => handleInputChange('totalMeals', Number(e.target.value))}
-                  isInvalid={!!errors.totalMeals}
-                  min="1"
-                  placeholder="Total number of meals"
-                />
-                <Form.Control.Feedback type="invalid">
-                  {errors.totalMeals}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Meal Plan Price (AED)</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={selectedMealPlan ? `AED ${selectedMealPlan.price || 0}` : 'Select a meal plan'}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Price from selected meal plan
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Start Date *</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>End Date *</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => handleInputChange('endDate', e.target.value)}
-                  isInvalid={!!errors.endDate}
-                  min={formData.startDate}
-                />
-                <Form.Text className="text-muted">
-                  {selectedMealPlan ? `Auto-calculated based on ${selectedMealPlan.durationDays || 30} days duration` : 'Enter end date manually'}
-                </Form.Text>
-                <Form.Control.Feedback type="invalid">
-                  {errors.endDate}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Col>
-
-            {/* Payment Fields - POS Style */}
-            <Col md={12}>
-              <hr className="my-3" />
-              <h6 className="text-primary mb-3">Payment Information</h6>
-            </Col>
-            
-            {/* Left Column - Payment Inputs */}
-            <Col md={6}>
-              <Row className="g-3">
-                <Col md={12}>
-                  <Form.Group>
-                    <Form.Label>Total Price (AED) *</Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={formData.totalPrice}
-                      onChange={(e) => handleInputChange('totalPrice', Number(e.target.value))}
-                      isInvalid={!!errors.totalPrice}
-                      min="0"
-                      step="0.01"
-                      placeholder="Enter total price"
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.totalPrice}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Received Amount (AED)</Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={formData.receivedAmount}
-                      onChange={(e) => handleReceivedAmountChange(Number(e.target.value))}
-                      isInvalid={!!errors.receivedAmount}
-                      min="0"
-                      step="0.01"
-                      placeholder="Amount received now"
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.receivedAmount}
-                    </Form.Control.Feedback>
-                    <Form.Text className="text-muted">
-                      Amount received in this payment
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>Cumulative Paid (AED)</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={`AED ${formData.cumulativePaid.toFixed(2)}`}
-                      readOnly
-                      className="bg-light"
-                      plaintext
-                    />
-                    <Form.Text className="text-muted">
-                      Total amount paid so far
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={12}>
-                  <Form.Group>
-                    <Form.Label>Payable Amount (AED)</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={`AED ${remainingAmount.toFixed(2)}`}
-                      readOnly
-                      className="bg-light"
-                      plaintext
-                    />
-                    <Form.Text className="text-muted">
-                      Remaining amount to be paid
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={12}>
-                  <Form.Group>
-                    <Form.Label>Payment Mode</Form.Label>
-                    <Form.Select
-                      value={formData.paymentMode}
-                      onChange={(e) => handleInputChange('paymentMode', e.target.value)}
-                      isInvalid={!!errors.paymentMode}
+          {/* Customer & Meal Plan Section */}
+          <div className="mb-3">
+            <h6 className="text-primary mb-2 fw-semibold border-bottom pb-1">
+              <i className="ri-user-line me-2"></i>
+              Customer & Meal Plan Details
+            </h6>
+            <Row className="g-2">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold text-dark">Customer *</Form.Label>
+                  <div className="d-flex gap-2 mb-2">
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm" 
+                      onClick={handleAddNewCustomer}
+                      className="d-flex align-items-center"
                     >
-                      <option value="">Select Payment Mode</option>
-                      <option value="cash">Cash</option>
-                      <option value="card">Card</option>
-                      <option value="online">Online Transfer</option>
-                      <option value="payment_link">Payment Link</option>
-                    </Form.Select>
-                    <Form.Control.Feedback type="invalid">
-                      {errors.paymentMode}
-                    </Form.Control.Feedback>
-                  </Form.Group>
-                </Col>
-                
-                <Col md={12}>
-                  <Form.Group>
-                    <Form.Label>Note</Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
-                      value={formData.note}
-                      onChange={(e) => handleInputChange('note', e.target.value)}
-                      placeholder="Add any additional notes..."
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-            </Col>
+                      <i className="ri-add-line me-1"></i>
+                      Add New Customer
+                    </Button>
+                  </div>
+                  <Form.Select
+                    value={formData.userId}
+                    onChange={(e) => handleInputChange('userId', e.target.value)}
+                    isInvalid={!!errors.userId}
+                    className="form-control"
+                  >
+                    <option value="">Select Customer</option>
+                    {customers.map((customer: any) => (
+                      <option key={customer._id} value={customer._id}>
+                        {customer.name} - {customer.phone}
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">
+                    {errors.userId}
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold text-dark">Meal Plan *</Form.Label>
+                  <Form.Select
+                    value={formData.mealPlanId}
+                    onChange={(e) => handleMealPlanChange(e.target.value)}
+                    isInvalid={!!errors.mealPlanId}
+                    className="form-control"
+                  >
+                    <option value="">Select Meal Plan</option>
+                    {mealPlans.length > 0 ? (
+                      mealPlans.map((plan: any) => (
+                        <option key={plan._id} value={plan._id}>
+                          {plan.title} - AED {plan.price}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>Loading meal plans...</option>
+                    )}
+                  </Form.Select>
+                  <Form.Text className="text-muted">
+                    <i className="ri-restaurant-line me-1"></i>
+                    {mealPlans.length} meal plans available
+                  </Form.Text>
+                  <Form.Control.Feedback type="invalid">
+                    {errors.mealPlanId}
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+            </Row>
+          </div>
             
-            {/* Right Column - Payment Summary (POS Style) */}
-            <Col md={6}>
-              <div className="border rounded p-3 bg-light">
-                <h6 className="text-dark mb-3">Payment Summary</h6>
-                
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="text-muted">Total Amount:</span>
-                    <span className="fw-bold">AED {formData.totalPrice.toFixed(2)}</span>
-                  </div>
-                  
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="text-muted">Received Amount:</span>
-                <span className="fw-bold text-info">AED {(formData.receivedAmount || 0).toFixed(2)}</span>
+          {/* Selected Plan Information */}
+          {selectedMealPlan && (
+            <div className="mb-3">
+              <div className="card border-0 shadow-sm">
+                <div className="card-header bg-light py-2">
+                  <h6 className="mb-0 text-primary fw-semibold">
+                    <i className="ri-information-line me-2"></i>
+                    Selected Plan Details
+                  </h6>
+                </div>
+                <div className="card-body py-2">
+                  <Row>
+                    <Col md={6}>
+                      <div className="mb-1">
+                        <strong className="text-dark">Plan:</strong>
+                        <span className="ms-2 text-primary">{(selectedMealPlan as any).title}</span>
+                      </div>
+                      <div className="mb-1">
+                        <strong className="text-dark">Price:</strong>
+                        <span className="ms-2 text-success fw-bold">AED {(selectedMealPlan as any).price}</span>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="mb-1">
+                        <strong className="text-dark">Category:</strong>
+                        <span className="ms-2 badge bg-secondary">{(selectedMealPlan as any).category || 'N/A'}</span>
+                      </div>
+                      <div className="mb-1">
+                        <strong className="text-dark">Duration:</strong>
+                        <span className="ms-2 text-warning fw-bold">{(selectedMealPlan as any).durationDays} days</span>
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
               </div>
-              
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="text-muted">Cumulative Paid:</span>
-                <span className="fw-bold text-success">AED {(formData.cumulativePaid || 0).toFixed(2)}</span>
-              </div>
-                  
-                  <hr className="my-2" />
-                  
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="text-muted">Remaining Amount:</span>
-                    <span className={`fw-bold ${(remainingAmount || 0) > 0 ? 'text-danger' : 'text-success'}`}>
-                      AED {(remainingAmount || 0).toFixed(2)}
-                    </span>
+            </div>
+          )}
+
+          {/* Meals & Dates Section */}
+          <div className="mb-3">
+            <h6 className="text-primary mb-2 fw-semibold border-bottom pb-1">
+              <i className="ri-calendar-line me-2"></i>
+              Meals & Duration
+            </h6>
+            <Row className="g-2">
+
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold text-dark">Total Meals *</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={formData.totalMeals}
+                    onChange={(e) => handleInputChange('totalMeals', Number(e.target.value))}
+                    isInvalid={!!errors.totalMeals}
+                    min="1"
+                    placeholder="Total number of meals"
+                    className="form-control"
+                  />
+                  <Form.Control.Feedback type="invalid">
+                    {errors.totalMeals}
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold text-dark">Start Date *</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    className="form-control"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold text-dark">End Date *</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    isInvalid={!!errors.endDate}
+                    min={formData.startDate}
+                    className="form-control"
+                  />
+                  <Form.Text className="text-muted">
+                    <i className="ri-calendar-check-line me-1"></i>
+                    {selectedMealPlan ? `Auto-calculated based on ${selectedMealPlan.durationDays || 30} days duration` : 'Enter end date manually'}
+                  </Form.Text>
+                  <Form.Control.Feedback type="invalid">
+                    {errors.endDate}
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Payment Information Section */}
+          <div className="mb-3">
+            <h6 className="text-primary mb-2 fw-semibold border-bottom pb-1">
+              <i className="ri-money-dollar-circle-line me-2"></i>
+              Payment Information
+            </h6>
+            <Row className="g-2">
+              {/* Left Column - Payment Inputs */}
+              <Col md={6}>
+                <div className="card border-0 shadow-sm h-100">
+                  <div className="card-header bg-light py-2">
+                    <h6 className="mb-0 text-dark fw-semibold">
+                      <i className="ri-edit-line me-2"></i>
+                      Payment Details
+                    </h6>
                   </div>
-                  
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="text-muted">Payable Amount:</span>
-                    <span className={`fw-bold ${(remainingAmount || 0) > 0 ? 'text-danger' : 'text-success'}`}>
-                      AED {(remainingAmount || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <small className="text-muted">Remaining amount to be paid</small>
-                  
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <span className="text-muted">Payment Status:</span>
-                    <span className={`badge ${paymentStatus === 'paid' ? 'bg-success' : 'bg-danger'}`}>
-                      {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
-                    </span>
+                  <div className="card-body py-2">
+                    <Row className="g-2">
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label className="fw-semibold text-dark">Total Price (AED) *</Form.Label>
+                          <Form.Control
+                            type="number"
+                            value={formData.totalPrice}
+                            onChange={(e) => handleInputChange('totalPrice', Number(e.target.value))}
+                            isInvalid={!!errors.totalPrice}
+                            min="0"
+                            step="0.01"
+                            placeholder="Enter total price"
+                            className="form-control"
+                          />
+                          <Form.Control.Feedback type="invalid">
+                            {errors.totalPrice}
+                          </Form.Control.Feedback>
+                        </Form.Group>
+                      </Col>
+                      
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label className="fw-semibold text-dark">Received Amount (AED) *</Form.Label>
+                          <Form.Control
+                            type="number"
+                            value={formData.receivedAmount}
+                            onChange={(e) => handleReceivedAmountChange(Number(e.target.value))}
+                            isInvalid={!!errors.receivedAmount}
+                            min="0"
+                            step="0.01"
+                            placeholder="Amount received now"
+                            className="form-control"
+                          />
+                          <Form.Control.Feedback type="invalid">
+                            {errors.receivedAmount}
+                          </Form.Control.Feedback>
+                          <Form.Text className="text-muted">
+                            <i className="ri-information-line me-1"></i>
+                            Enter total price to make it paid
+                          </Form.Text>
+                        </Form.Group>
+                      </Col>
+                      
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label className="fw-semibold text-dark">Payment Mode</Form.Label>
+                          <Form.Select
+                            value={formData.paymentMode}
+                            onChange={(e) => handleInputChange('paymentMode', e.target.value)}
+                            isInvalid={!!errors.paymentMode}
+                            className="form-control"
+                          >
+                            <option value="">Select Payment Mode</option>
+                            <option value="cash">Cash</option>
+                            <option value="card">Card</option>
+                            <option value="online">Online Transfer</option>
+                            <option value="payment_link">Payment Link</option>
+                          </Form.Select>
+                          <Form.Control.Feedback type="invalid">
+                            {errors.paymentMode}
+                          </Form.Control.Feedback>
+                        </Form.Group>
+                      </Col>
+                      
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label className="fw-semibold text-dark">Note</Form.Label>
+                          <Form.Control
+                            as="textarea"
+                            rows={2}
+                            value={formData.note}
+                            onChange={(e) => handleInputChange('note', e.target.value)}
+                            placeholder="Add any additional notes..."
+                            className="form-control"
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
                   </div>
                 </div>
-                
-                {formData.paymentMode && (
-                  <div className="mb-2">
-                    <small className="text-muted">Payment Mode: </small>
-                    <span className="badge bg-info">
-                      {formData.paymentMode.charAt(0).toUpperCase() + formData.paymentMode.slice(1)}
-                    </span>
+              </Col>
+            
+              {/* Right Column - Payment Summary */}
+              <Col md={6}>
+                <div className="card border-0 shadow-sm h-100">
+                  <div className="card-header bg-success text-white py-2">
+                    <h6 className="mb-0 fw-semibold">
+                      <i className="ri-calculator-line me-2"></i>
+                      Payment Summary
+                    </h6>
                   </div>
-                )}
-              </div>
-            </Col>
-          </Row>
+                  <div className="card-body py-2">
+                    <div className="mb-2">
+                      <div className="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                        <span className="text-muted fw-semibold">Total Amount:</span>
+                        <span className="fw-bold text-dark">AED {formData.totalPrice.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="d-flex justify-content-between align-items-center mb-2 p-2 bg-info bg-opacity-10 rounded">
+                        <span className="text-muted fw-semibold">Received Amount:</span>
+                        <span className="fw-bold text-info">AED {(formData.receivedAmount || 0).toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="d-flex justify-content-between align-items-center mb-2 p-2 bg-warning bg-opacity-10 rounded">
+                        <span className="text-muted fw-semibold">Remaining Amount:</span>
+                        <span className={`fw-bold ${(remainingAmount || 0) > 0 ? 'text-danger' : 'text-success'}`}>
+                          AED {(remainingAmount || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      <hr className="my-2" />
+                      
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span className="text-muted fw-semibold">Payment Status:</span>
+                        <span className="badge bg-success px-2 py-1">
+                          <i className="ri-check-line me-1"></i>
+                          Paid
+                        </span>
+                      </div>
+                      
+                      {/* Payment Status Alert */}
+                      <div className="alert alert-success mb-2 py-2">
+                        <div className="d-flex align-items-center">
+                          <i className="ri-check-circle-line me-2"></i>
+                          <div>
+                            <strong>Fully Paid</strong><br/>
+                            <small>Membership will be created as paid</small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {formData.paymentMode && (
+                      <div className="mt-3 p-2 bg-light rounded">
+                        <small className="text-muted fw-semibold">Payment Mode: </small>
+                        <span className="badge bg-primary ms-2">
+                          <i className="ri-bank-card-line me-1"></i>
+                          {formData.paymentMode.charAt(0).toUpperCase() + formData.paymentMode.slice(1)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={handleClose} disabled={isLoading || isSubmitting}>
-            Cancel
-          </Button>
-          <Button 
-            variant="primary" 
-            type="submit"
-            disabled={isLoading || isSubmitting || !canManageMembership}
-          >
-            {(isLoading || isSubmitting) ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Creating User Membership...
-              </>
-            ) : (
-              'Create User Membership'
-            )}
-          </Button>
+        <Modal.Footer className="bg-light border-0 p-4">
+          <div className="d-flex justify-content-end gap-3 w-100">
+            <Button 
+              variant="outline-secondary" 
+              onClick={handleClose} 
+              disabled={isLoading || isSubmitting}
+              className="px-4 py-2"
+            >
+              <i className="ri-close-line me-2"></i>
+              Cancel
+            </Button>
+            <Button 
+              variant="success" 
+              type="submit"
+              disabled={isLoading || isSubmitting || !canManageMembership}
+              className="px-4 py-2 fw-semibold"
+            >
+              {(isLoading || isSubmitting) ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Creating Membership...
+                </>
+              ) : (
+                <>
+                  <i className="ri-user-add-line me-2"></i>
+                  Create User Membership
+                </>
+              )}
+            </Button>
+          </div>
         </Modal.Footer>
       </Form>
     </Modal>

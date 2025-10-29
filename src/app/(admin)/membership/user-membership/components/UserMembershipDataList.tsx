@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Table, Badge, Button, Dropdown, Modal, Form, Row, Col, Alert } from 'react-bootstrap'
+import { useRouter } from 'next/navigation'
 import { useGetUserMembershipsQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation } from '@/services/userMembershipApi'
 import { useGetCustomersQuery } from '@/services/customerApi'
 import { useGetMealPlansQuery } from '@/services/mealPlanApi'
@@ -17,6 +18,7 @@ export interface UserMembershipDataListRef {
 }
 
 const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembershipDataListProps>(({ searchQuery }, ref) => {
+  const router = useRouter()
   const { hasAccessToSubModule, isAdmin } = useAccessControl()
   
   const [showEditModal, setShowEditModal] = useState(false)
@@ -43,45 +45,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     }
   }), [refetch])
 
-  // Calculate payment status and remaining amount for edit modal
-  const editPaymentStatus = useMemo(() => {
-    const cumulativePaid = editFormData.cumulativePaid || 0
-    const totalPrice = editFormData.totalPrice || 0
-    if (cumulativePaid >= totalPrice) {
-      return 'paid'
-    } else {
-      return 'unpaid'
-    }
-  }, [editFormData.cumulativePaid, editFormData.totalPrice])
-
-  const editRemainingAmount = useMemo(() => {
-    const totalPrice = editFormData.totalPrice || 0
-    const cumulativePaid = editFormData.cumulativePaid || 0
-    return Math.max(0, totalPrice - cumulativePaid)
-  }, [editFormData.totalPrice, editFormData.cumulativePaid])
-
-  // Handle received amount change in edit modal
-  const handleEditReceivedAmountChange = (value: number) => {
-    setEditFormData((prev: any) => {
-      const previousReceivedAmount = prev.receivedAmount || 0
-      const difference = value - previousReceivedAmount
-      const newCumulativePaid = (prev.cumulativePaid || 0) + difference
-      
-      console.log('Payment calculation:', {
-        previousReceivedAmount,
-        newReceivedAmount: value,
-        difference,
-        previousCumulativePaid: prev.cumulativePaid || 0,
-        newCumulativePaid: Math.max(0, newCumulativePaid)
-      })
-      
-      return {
-        ...prev,
-        receivedAmount: value,
-        cumulativePaid: Math.max(0, newCumulativePaid) // Ensure it doesn't go negative
-      }
-    })
-  }
 
   const userMemberships = useMemo(() => {
     console.log('User memberships response:', userMembershipsRes)
@@ -139,11 +102,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     }
     
     console.log('Editing user membership:', userMembership)
-    console.log('Payment data:', {
-      totalPrice: userMembership.totalPrice,
-      cumulativePaid: userMembership.cumulativePaid,
-      paymentStatus: userMembership.paymentStatus
-    })
     
     setSelectedUserMembership(userMembership)
     setEditFormData({
@@ -152,11 +110,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       remainingMeals: userMembership.remainingMeals || 0,
       status: userMembership.status || 'active',
       isActive: userMembership.isActive !== false,
-      // Payment fields
-      totalPrice: userMembership.totalPrice || 0,
-      receivedAmount: 0, // For new payment, start with 0
-      cumulativePaid: userMembership.cumulativePaid || 0, // Keep existing cumulative paid
-      paymentMode: userMembership.paymentMode || '',
       note: userMembership.note || ''
     })
     setShowEditModal(true)
@@ -204,23 +157,9 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
         updateData.isActive = editFormData.isActive
       }
       
-      // Payment fields
-      if (editFormData.totalPrice !== undefined) {
-        updateData.totalPrice = editFormData.totalPrice
-      }
-      if (editFormData.receivedAmount !== undefined) {
-        updateData.receivedAmount = editFormData.receivedAmount
-      }
-      if (editFormData.cumulativePaid !== undefined) {
-        updateData.cumulativePaid = editFormData.cumulativePaid
-      }
-      if (editFormData.paymentMode !== undefined) {
-        updateData.paymentMode = editFormData.paymentMode || undefined
-      }
       if (editFormData.note !== undefined) {
         updateData.note = editFormData.note
       }
-      updateData.paymentStatus = editPaymentStatus
       
       console.log('Sending update data:', updateData)
       
@@ -288,10 +227,10 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     return <Badge bg={config.variant}>{config.text}</Badge>
   }
 
-  const getPaymentStatusBadge = (paymentStatus: string, cumulativePaid: number = 0, totalPrice: number = 0) => {
-    // Determine payment status based on cumulative paid amount
+  const getPaymentStatusBadge = (paymentStatus: string, receivedAmount: number = 0, totalPrice: number = 0) => {
+    // Determine payment status based on received amount
     let status = paymentStatus
-    if (cumulativePaid >= totalPrice && totalPrice > 0) {
+    if (receivedAmount === totalPrice && totalPrice > 0) {
       status = 'paid'
     } else {
       status = 'unpaid'
@@ -437,7 +376,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                   <td>
                     {getPaymentStatusBadge(
                       userMembership.paymentStatus, 
-                      userMembership.cumulativePaid || 0, 
+                      userMembership.receivedAmount || 0, 
                       userMembership.totalPrice || 0
                     )}
                   </td>
@@ -465,6 +404,13 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                           <>
                         <Dropdown.Item onClick={() => handleEdit(userMembership)}>
                           <i className="ri-edit-line me-2"></i>Punch
+                        </Dropdown.Item>
+                        <Dropdown.Item 
+                          onClick={() => {
+                            router.push(`/membership/membership-meal-selection?id=${userMembership._id}`)
+                          }}
+                        >
+                          <i className="ri-restaurant-line me-2"></i>Membership Meal Selection
                         </Dropdown.Item>
                         <Dropdown.Item 
                           onClick={() => handleDelete(userMembership)}
@@ -497,204 +443,113 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       )}
 
       {/* Edit Modal */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Punch User Membership</Modal.Title>
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="xl" centered>
+        <Modal.Header closeButton className="bg-light border-bottom">
+          <Modal.Title className="fw-semibold text-primary">
+            <i className="ri-user-settings-line me-2"></i>
+            Punch User Membership
+          </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          <Row className="g-3">
-            <Col lg={4} md={6}>
-              <Form.Group>
-                <Form.Label className="text-nowrap">Total Meals</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editFormData.totalMeals}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Total meals in membership
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col lg={4} md={6}>
-              <Form.Group>
-                <Form.Label className="text-nowrap">Consumed Meals</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editFormData.consumedMeals}
-                  onChange={(e) => setEditFormData({ ...editFormData, consumedMeals: Number(e.target.value) })}
-                  min="0"
-                  max={editFormData.totalMeals}
-                />
-                <Form.Text className="text-muted">
-                  Meals already consumed
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col lg={4} md={12}>
-              <Form.Group>
-                <Form.Label className="text-nowrap">Remaining Meals</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editFormData.remainingMeals}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Calculated automatically
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Status</Form.Label>
-                <Form.Select
-                  value={editFormData.status}
-                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                >
-                  <option value="active">Active</option>
-                  <option value="expired">Expired</option>
-                  {/* <option value="cancelled">Cancelled</option> */}
-                  <option value="completed">Completed</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Is Active</Form.Label>
-                <Form.Select
-                  value={editFormData.isActive ? 'true' : 'false'}
-                  onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'true' })}
-                >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
+        <Modal.Body className="p-4">
+          {/* Meal Information Section */}
+          <div className="mb-4">
+            <h6 className="text-primary mb-3 fw-semibold">
+              <i className="ri-restaurant-line me-2"></i>
+              Meal Information
+            </h6>
+            <Row className="g-3">
+              <Col lg={4} md={6}>
+                <Form.Group>
+                  <Form.Label className="text-nowrap fw-medium">Total Meals</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editFormData.totalMeals}
+                    readOnly
+                    className="bg-light border-0"
+                    plaintext
+                  />
+                  <Form.Text className="text-muted small">
+                    Total meals in membership
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+              <Col lg={4} md={6}>
+                <Form.Group>
+                  <Form.Label className="text-nowrap fw-medium">Consumed Meals</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={editFormData.consumedMeals}
+                    onChange={(e) => setEditFormData({ ...editFormData, consumedMeals: Number(e.target.value) })}
+                    min="0"
+                    max={editFormData.totalMeals}
+                    className="border-primary"
+                  />
+                  <Form.Text className="text-muted small">
+                    Meals already consumed
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+              <Col lg={4} md={12}>
+                <Form.Group>
+                  <Form.Label className="text-nowrap fw-medium">Remaining Meals</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editFormData.remainingMeals}
+                    readOnly
+                    className="bg-light border-0"
+                    plaintext
+                  />
+                  <Form.Text className="text-muted small">
+                    Calculated automatically
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+            </Row>
+          </div>
 
-            {/* Payment Fields */}
-            <Col md={12}>
-              <hr className="my-3" />
-              <h6 className="text-primary mb-3">Payment Information</h6>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Total Price (AED)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editFormData.totalPrice}
-                  onChange={(e) => setEditFormData({ ...editFormData, totalPrice: Number(e.target.value) })}
-                  min="0"
-                  step="0.01"
-                  placeholder="Enter total price"
-                />
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Received Amount (AED)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editFormData.receivedAmount}
-                  onChange={(e) => handleEditReceivedAmountChange(Number(e.target.value))}
-                  min="0"
-                  step="0.01"
-                  placeholder="Amount received now"
-                />
-                <Form.Text className="text-muted">
-                  Amount received in this payment
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Cumulative Paid (AED)</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={`AED ${(editFormData.cumulativePaid || 0).toFixed(2)}`}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Total amount paid so far
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Payable Amount (AED)</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={`AED ${(editRemainingAmount || 0).toFixed(2)}`}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Remaining amount to be paid
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Payment Mode</Form.Label>
-                <Form.Select
-                  value={editFormData.paymentMode}
-                  onChange={(e) => setEditFormData({ ...editFormData, paymentMode: e.target.value })}
-                >
-                  <option value="">Select Payment Mode</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="online">Online Transfer</option>
-                  <option value="payment_link">Payment Link</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Payment Status</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editPaymentStatus.charAt(0).toUpperCase() + editPaymentStatus.slice(1)}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Auto-calculated based on received amount
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Note</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={2}
-                  value={editFormData.note}
-                  onChange={(e) => setEditFormData({ ...editFormData, note: e.target.value })}
-                  placeholder="Add any additional notes..."
-                />
-              </Form.Group>
-            </Col>
-          </Row>
+          {/* Status Section */}
+          <div className="mb-4">
+            <h6 className="text-primary mb-3 fw-semibold">
+              <i className="ri-settings-3-line me-2"></i>
+              Status
+            </h6>
+            <Row className="g-3">
+              <Col lg={6} md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-medium">Status</Form.Label>
+                  <Form.Select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="border-primary"
+                  >
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    {/* <option value="cancelled">Cancelled</option> */}
+                    <option value="completed">Completed</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col lg={6} md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-medium">Is Active</Form.Label>
+                  <Form.Select
+                    value={editFormData.isActive ? 'true' : 'false'}
+                    onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'true' })}
+                    className="border-primary"
+                  >
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+          </div>
+
 
           {/* History Section */}
           {selectedUserMembership?.history && selectedUserMembership.history.length > 0 && (
-            <>
-              <hr className="my-4" />
-              <h6>
+            <div className="mb-4">
+              <h6 className="text-primary mb-3 fw-semibold">
                 <i className="ri-history-line me-2"></i>
                 Recent History
               </h6>
@@ -765,20 +620,38 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                   View Full History
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowEditModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleUpdateUserMembership}
-            disabled={isUpdating}
-          >
-            {isUpdating ? 'Updating...' : 'Update Membership'}
-          </Button>
+        <Modal.Footer className="bg-light border-top p-3">
+          <div className="d-flex justify-content-end gap-2 w-100">
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => setShowEditModal(false)}
+              className="px-4"
+            >
+              <i className="ri-close-line me-1"></i>
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleUpdateUserMembership}
+              disabled={isUpdating}
+              className="px-4"
+            >
+              {isUpdating ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <i className="ri-save-line me-1"></i>
+                  Update Membership
+                </>
+              )}
+            </Button>
+          </div>
         </Modal.Footer>
       </Modal>
 
@@ -872,7 +745,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                     <div className="fw-bold">
                       {getPaymentStatusBadge(
                         selectedUserMembership.paymentStatus, 
-                        selectedUserMembership.cumulativePaid || 0, 
+                        selectedUserMembership.receivedAmount || 0, 
                         selectedUserMembership.totalPrice || 0
                       )}
                     </div>
@@ -1029,7 +902,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                                     <div className="fw-semibold">
                                       {getPaymentStatusBadge(
                                         event.paymentStatus, 
-                                        event.cumulativePaid || 0, 
+                                        event.receivedAmount || 0, 
                                         event.totalPrice || 0
                                       )}
                                     </div>

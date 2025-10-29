@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic'
 import { Provider } from 'react-redux'
 import { store } from '@/store'
 import { useSession } from 'next-auth/react'
+import { setAuthToken, removeAuthToken } from '@/utils/auth'
 const LayoutProvider = dynamic(() => import('@/context/useLayoutContext').then((mod) => mod.LayoutProvider), {
   ssr: false,
 })
@@ -21,11 +22,13 @@ const LocalAuthSync = () => {
     try {
       const accessToken = (data as any)?.accessToken
       if (accessToken) {
-        localStorage.setItem('backend_token', accessToken as string)
+        setAuthToken(accessToken as string)
       } else {
-        localStorage.removeItem('backend_token')
+        removeAuthToken()
       }
-    } catch {}
+    } catch (error) {
+      console.error('Error syncing token:', error)
+    }
   }, [data])
   return null
 }

@@ -56,8 +56,17 @@ export const userMembershipApi = baseApi.injectEndpoints({
     }),
     updateUserMembership: build.mutation<UserMembership, { 
       id: string; 
-      remainingMeals?: number;
-      consumedMeals?: number;
+      consumedMeals?: number; // This will be the increment, not total
+      mealItems?: Array<{
+        productId: string;
+        title: string;
+        qty: number;
+        punchingTime: string;
+        mealType: string;
+        moreOptions: Array<{ name: string }>;
+        branchId?: string;
+        createdBy?: string;
+      }>;
       status?: string;
       isActive?: boolean;
     }>({
