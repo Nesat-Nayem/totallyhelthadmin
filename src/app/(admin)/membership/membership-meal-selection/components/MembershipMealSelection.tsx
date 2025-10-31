@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Card, CardBody, CardFooter, CardHeader, CardTitle, Col, Row, Form, Button, InputGroup, FormControl, Badge } from 'react-bootstrap'
+import { Card, CardBody, CardFooter, CardHeader, CardTitle, Col, Row, Form, Button, InputGroup, FormControl } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Calculator from '@/app/pos/components/Calculator'
 import PrintOrder from './PrintOrder'
+import MembershipHistoryModal from './MembershipHistoryModal'
 import ItemMoreOptions from '@/app/pos/components/ItemMoreOptions'
 
 // Product images
@@ -20,7 +21,7 @@ import product4 from '@/assets/images/order-view/4.webp'
 import { useGetMenusQuery } from '@/services/menuApi'
 import { useGetBrandsQuery } from '@/services/brandApi'
 import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
-import { useGetUserMembershipByIdQuery, useUpdateUserMembershipMutation } from '@/services/userMembershipApi'
+import { useGetUserMembershipByIdQuery, useUpdateUserMembershipMutation, useSetMembershipStatusMutation } from '@/services/userMembershipApi'
 import { showSuccess, showError, showMealError } from '@/utils/sweetAlert'
 import { useAccessControl } from '@/hooks/useAccessControl'
 
@@ -38,16 +39,18 @@ const MembershipMealSelection = () => {
   const [selectedBrand, setSelectedBrand] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [itemOptions, setItemOptions] = useState<{ [itemId: string]: string[] }>({})
+  const [itemMealTypes, setItemMealTypes] = useState<{ [itemId: string]: string }>({})
   
   // Membership fields from punch form
   const [totalMeals, setTotalMeals] = useState(0)
   const [consumedMeals, setConsumedMeals] = useState(0)
   const [remainingMeals, setRemainingMeals] = useState(0)
-  const [status, setStatus] = useState<'active' | 'expired' | 'cancelled' | 'completed'>('active')
-  const [isActive, setIsActive] = useState(true)
+  const [status, setStatus] = useState<'active' | 'hold' | 'cancelled' | 'completed'>('active')
   const [mealsToConsume, setMealsToConsume] = useState(0)
 
   const [updateUserMembership, { isLoading: isUpdating }] = useUpdateUserMembershipMutation()
+  const [setMembershipStatus, { isLoading: isSettingStatus }] = useSetMembershipStatusMutation()
+  const [showHistory, setShowHistory] = useState(false)
   
   const { data: membershipData, isLoading: isLoadingMembership, refetch: refetchMembership } = useGetUserMembershipByIdQuery(membershipId || '', {
     skip: !membershipId
@@ -63,8 +66,7 @@ const MembershipMealSelection = () => {
       setTotalMeals(membershipData.totalMeals || 0)
       setConsumedMeals(membershipData.consumedMeals || 0)
       setRemainingMeals(membershipData.remainingMeals || 0)
-      setStatus(membershipData.status || 'active')
-      setIsActive(membershipData.isActive !== false)
+      setStatus((membershipData.status as any) || 'active')
     }
   }, [membershipData])
 
@@ -135,12 +137,24 @@ const MembershipMealSelection = () => {
       delete updated[id]
       return updated
     })
+    setItemMealTypes((prev) => {
+      const updated = { ...prev }
+      delete updated[id]
+      return updated
+    })
   }
 
   const handleItemOptionsChange = (itemId: string, options: string[]) => {
     setItemOptions((prev) => ({
       ...prev,
       [itemId]: options
+    }))
+  }
+
+  const handleMealTypeChange = (itemId: string, mealType: string) => {
+    setItemMealTypes((prev) => ({
+      ...prev,
+      [itemId]: mealType
     }))
   }
 
@@ -159,17 +173,26 @@ const MembershipMealSelection = () => {
     setMealsToConsume(calculatedMealsToConsume)
   }, [calculatedMealsToConsume])
 
-  // Generate order number
-  const generateOrderNumber = () => {
-    return `#${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
-  }
-
-  const [orderNo] = useState(generateOrderNumber())
+  // No order id needed for membership meal selection
 
   // Handle Punch (Save)
   const handlePunch = async () => {
     if (!membershipId) {
       showMealError('Membership ID is required')
+      return
+    }
+
+    // Block punching based on status
+    if (status === 'hold') {
+      showMealError('This membership is on hold. You cannot punch meals while on hold.')
+      return
+    }
+    if (status === 'cancelled') {
+      showMealError('This membership is cancelled. Meal punching is not allowed.')
+      return
+    }
+    if (status === 'completed') {
+      showMealError('This membership is completed. No meals remaining to consume.')
       return
     }
 
@@ -190,7 +213,7 @@ const MembershipMealSelection = () => {
         title: product.title || product.name,
         qty: product.qty,
         punchingTime: new Date().toISOString(),
-        mealType: 'general',
+        mealType: itemMealTypes[uniqueId] || 'general',
         moreOptions: (itemOptions[uniqueId] || []).map((option: string) => ({ name: option })),
         branchId: '', // You can add branch ID if needed
         createdBy: '', // You can add staff ID if needed
@@ -201,8 +224,7 @@ const MembershipMealSelection = () => {
         id: membershipId,
         consumedMeals: mealsToConsume, // Send only the increment, not total
         mealItems: mealItems,
-        status: status,
-        isActive: isActive
+        status: status
       } as any).unwrap()
 
       showSuccess('Membership meal selection punched successfully!')
@@ -227,6 +249,7 @@ const MembershipMealSelection = () => {
   const handleReset = () => {
     setSelectedProducts({})
     setItemOptions({})
+    setItemMealTypes({})
   }
 
   if (isLoadingMembership) {
@@ -373,38 +396,45 @@ const MembershipMealSelection = () => {
                     <Form.Text className="text-muted">Calculated automatically</Form.Text>
                   </Form.Group>
                 </Col>
-                <Col md={4}>
+                <Col md={6}>
                   <Form.Group>
                     <Form.Label>Status</Form.Label>
-                    <Form.Select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as any)}
-                    >
-                      <option value="active">Active</option>
-                      <option value="expired">Expired</option>
-                      <option value="completed">Completed</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col md={4}>
-                  <Form.Group>
-                    <Form.Label>Is Active</Form.Label>
-                    <Form.Select
-                      value={isActive ? 'true' : 'false'}
-                      onChange={(e) => setIsActive(e.target.value === 'true')}
-                    >
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </Form.Select>
+                    <div className="d-flex gap-2">
+                      <Form.Select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as any)}
+                      >
+                        <option value="active">Active</option>
+                        <option value="hold">Hold</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="completed">Completed</option>
+                      </Form.Select>
+                      <Button 
+                        variant="outline-primary"
+                        onClick={async () => {
+                          if (!membershipId) return
+                          try {
+                            if (status === 'completed') {
+                              showError('Completed status is system-managed and cannot be set manually')
+                              return
+                            }
+                            await setMembershipStatus({ id: membershipId, status: status as 'active' | 'hold' | 'cancelled' }).unwrap()
+                            showSuccess('Status updated successfully')
+                            await refetchMembership()
+                          } catch (e: any) {
+                            showError(e?.data?.message || 'Failed to update status')
+                          }
+                        }}
+                        disabled={isSettingStatus}
+                      >
+                        {isSettingStatus ? 'Updating...' : 'Update Status'}
+                      </Button>
+                    </div>
                   </Form.Group>
                 </Col>
               </Row>
 
-              <div className="text-end mb-2">
-                <Badge bg="dark" className="px-3 py-1 fs-6">
-                  Order ID: {orderNo}
-                </Badge>
-              </div>
+              {/* Order ID removed as per requirement */}
 
               {/* Order Table */}
               <div className="table-responsive mb-4" style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -452,6 +482,8 @@ const MembershipMealSelection = () => {
                                 itemName={product.title || product.name}
                                 onOptionsChange={handleItemOptionsChange}
                                 currentOptions={itemOptions[uniqueId] || []}
+                                onMealTypeChange={handleMealTypeChange}
+                                currentMealType={itemMealTypes[uniqueId] || 'general'}
                               />
                               <Button size="sm" variant="danger" onClick={() => handleDelete(uniqueId)}>
                                 <IconifyIcon icon="mdi:delete" />
@@ -494,17 +526,19 @@ const MembershipMealSelection = () => {
               <Button variant="warning" size="lg" onClick={handleReset}>
                 <IconifyIcon icon="mdi:restart" /> Reset
               </Button>
+              <Button variant="secondary" size="lg" onClick={() => setShowHistory(true)}>
+                <IconifyIcon icon="mdi:history" /> View History
+              </Button>
               {hasAccessToPOSButton('print-order') && <PrintOrder 
                 selectedProducts={selectedProducts}
                 itemOptions={itemOptions}
                 membershipData={membershipData}
-                orderNo={orderNo}
               />}
               <Button 
                 variant="primary" 
                 size="lg" 
                 onClick={handlePunch}
-                disabled={isUpdating || mealsToConsume === 0 || mealsToConsume > remainingMeals}
+                disabled={isUpdating || mealsToConsume === 0 || mealsToConsume > remainingMeals || status !== 'active'}
               >
                 {isUpdating ? (
                   <>
@@ -521,6 +555,7 @@ const MembershipMealSelection = () => {
           </Card>
         </Col>
       </Row>
+      <MembershipHistoryModal show={showHistory} onHide={() => setShowHistory(false)} membershipData={membershipData} />
     </>
   )
 }

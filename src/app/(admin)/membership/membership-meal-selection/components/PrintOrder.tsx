@@ -8,17 +8,15 @@ import { printThermalReceipt } from '@/utils/thermalPrint'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 
 interface PrintOrderProps {
-  selectedProducts: { [key: string]: any }
-  itemOptions: { [itemId: string]: string[] }
-  membershipData: any
-  orderNo: string
+  selectedProducts?: { [key: string]: any }
+  itemOptions?: { [itemId: string]: string[] }
+  membershipData?: any
 }
 
 const PrintOrder: React.FC<PrintOrderProps> = ({
-  selectedProducts,
-  itemOptions,
-  membershipData,
-  orderNo
+  selectedProducts = {},
+  itemOptions = {},
+  membershipData
 }) => {
   const [showModal, setShowModal] = useState(false)
   const [showThermalOptions, setShowThermalOptions] = useState(false)
@@ -42,14 +40,13 @@ const PrintOrder: React.FC<PrintOrderProps> = ({
         itemOptions,
         subTotal,
         totalAmount: subTotal,
-        orderNo,
         membershipData,
         mealsToConsume,
         selectedOrderType: 'MembershipMeal',
         invoiceNo: `MEM-${Date.now()}-${Math.floor(Math.random() * 100)}`
       })
     }
-  }, [selectedProducts, itemOptions, subTotal, orderNo, membershipData, mealsToConsume])
+  }, [selectedProducts, itemOptions, subTotal, membershipData, mealsToConsume])
 
   const handleShow = () => setShowModal(true)
   const handleClose = () => setShowModal(false)
@@ -82,7 +79,7 @@ const PrintOrder: React.FC<PrintOrderProps> = ({
     <>
       {/* Trigger Button */}
       <Button variant="info" size="sm" onClick={handleShow} disabled={Object.keys(selectedProducts).length === 0}>
-        🖨 Print Order
+        🖨 Print Membership
       </Button>
 
       {/* Hidden Thermal Receipt Components - Only for printing */}
@@ -123,20 +120,21 @@ const PrintOrder: React.FC<PrintOrderProps> = ({
 
               <hr />
 
-              {/* Bill Info */}
+              {/* Header Info (Membership focused, no bill numbers) */}
               <div className="small mb-2">
-                <div>BillNo: {invoiceNo}</div>
                 <div>Date: {getCurrentDateTime()}</div>
                 <div>Membership</div>
-                <div>Order ID: {orderNo}</div>
                 {membershipData?.userId && typeof membershipData.userId === 'object' && (
-                  <div>Customer: {membershipData.userId.name || 'N/A'}</div>
+                  <>
+                    <div>Member: {membershipData.userId.name || 'N/A'}</div>
+                    {membershipData.userId.phone && <div>Phone: {membershipData.userId.phone}</div>}
+                  </>
                 )}
               </div>
 
               <hr />
 
-              {/* Items */}
+              {/* Items - show item and qty only */}
               <div className="small mb-2">
                 {Object.values(selectedProducts).map((product: any, index: number) => {
                   const productId = Object.keys(selectedProducts)[index]
@@ -145,7 +143,7 @@ const PrintOrder: React.FC<PrintOrderProps> = ({
                     <div key={index}>
                       <div className="d-flex justify-content-between">
                         <span>{product.title || product.name}</span>
-                        <span>{(product.price * product.qty).toFixed(2)}</span>
+                        <span>{product.qty}</span>
                       </div>
                       {options.length > 0 && (
                         <div className="ms-3 text-muted">
@@ -161,23 +159,11 @@ const PrintOrder: React.FC<PrintOrderProps> = ({
 
               <hr />
 
-              {/* Bill Summary */}
+              {/* Summary - membership focused */}
               <div className="small">
                 <div className="d-flex justify-content-between">
                   <strong>MEALS TO CONSUME</strong>
                   <span>{mealsToConsume}</span>
-                </div>
-                <div className="d-flex justify-content-between">
-                  <strong>BILL AMOUNT</strong>
-                  <span>{subTotal.toFixed(2)}</span>
-                </div>
-                <div className="d-flex justify-content-between">
-                  <strong>5 % VAT AMOUNT</strong>
-                  <span>{calculateVAT(subTotal).toFixed(2)}</span>
-                </div>
-                <div className="d-flex justify-content-between">
-                  <strong>GRAND TOTAL</strong>
-                  <span>{subTotal.toFixed(2)}</span>
                 </div>
               </div>
 

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Table, Badge, Button, Dropdown, Modal, Form, Row, Col, Alert } from 'react-bootstrap'
 import { useRouter } from 'next/navigation'
-import { useGetUserMembershipsQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation } from '@/services/userMembershipApi'
+import { useGetUserMembershipsQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation, useSetMembershipStatusMutation } from '@/services/userMembershipApi'
 import { useGetCustomersQuery } from '@/services/customerApi'
 import { useGetMealPlansQuery } from '@/services/mealPlanApi'
 import { showSuccess, showError } from '@/utils/sweetAlert'
@@ -25,6 +25,9 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [showConsumedHistoryModal, setShowConsumedHistoryModal] = useState(false)
+  const [showWeeksModal, setShowWeeksModal] = useState(false)
+  const [showSingleWeekModal, setShowSingleWeekModal] = useState(false)
+  const [selectedWeek, setSelectedWeek] = useState<any>(null)
   const [selectedUserMembership, setSelectedUserMembership] = useState<any>(null)
   const [editFormData, setEditFormData] = useState<any>({})
 
@@ -32,6 +35,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
   const { data: customersRes } = useGetCustomersQuery({ limit: 1000 })
   const { data: mealPlansRes } = useGetMealPlansQuery({ limit: 1000 })
   const [updateUserMembership, { isLoading: isUpdating }] = useUpdateUserMembershipMutation()
+  const [setMembershipStatus, { isLoading: isSettingStatus }] = useSetMembershipStatusMutation()
   const [deleteUserMembership, { isLoading: isDeleting }] = useDeleteUserMembershipMutation()
 
   // Role-based access control
@@ -109,7 +113,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       consumedMeals: userMembership.consumedMeals || 0,
       remainingMeals: userMembership.remainingMeals || 0,
       status: userMembership.status || 'active',
-      isActive: userMembership.isActive !== false,
       note: userMembership.note || ''
     })
     setShowEditModal(true)
@@ -135,6 +138,11 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     setShowConsumedHistoryModal(true)
   }
 
+  const handleViewWeekDetails = (week: any) => {
+    setSelectedWeek(week)
+    setShowSingleWeekModal(true)
+  }
+
   const handleUpdateUserMembership = async () => {
     if (!canManageMembership) {
       showError('You do not have permission to manage user memberships')
@@ -152,9 +160,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       }
       if (editFormData.status !== undefined) {
         updateData.status = editFormData.status
-      }
-      if (editFormData.isActive !== undefined) {
-        updateData.isActive = editFormData.isActive
       }
       
       if (editFormData.note !== undefined) {
@@ -219,7 +224,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       active: { variant: 'success', text: 'Active' },
-      expired: { variant: 'warning', text: 'Expired' },
+      hold: { variant: 'warning', text: 'On Hold' },
       cancelled: { variant: 'danger', text: 'Cancelled' },
       completed: { variant: 'info', text: 'Completed' }
     }
@@ -400,32 +405,68 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                         Actions
                       </Dropdown.Toggle>
                       <Dropdown.Menu>
-                        {canManageMembership && (
-                          <>
-                        <Dropdown.Item onClick={() => handleEdit(userMembership)}>
-                          <i className="ri-edit-line me-2"></i>Punch
-                        </Dropdown.Item>
-                        <Dropdown.Item 
-                          onClick={() => {
-                            router.push(`/membership/membership-meal-selection?id=${userMembership._id}`)
-                          }}
-                        >
-                          <i className="ri-restaurant-line me-2"></i>Membership Meal Selection
-                        </Dropdown.Item>
-                        <Dropdown.Item 
-                          onClick={() => handleDelete(userMembership)}
-                          className="text-danger"
-                        >
-                          <i className="ri-delete-bin-line me-2"></i>Delete
-                            </Dropdown.Item>
-                          </>
-                        )}
+                        {/* History group */}
+                        <Dropdown.Header>History</Dropdown.Header>
                         <Dropdown.Item onClick={() => handleViewHistory(userMembership)}>
                           <i className="ri-history-line me-2"></i>View History
                         </Dropdown.Item>
-                        <Dropdown.Item onClick={() => handleViewConsumedHistory(userMembership)}>
-                          <i className="ri-restaurant-line me-2"></i>View Consumed Meals History
-                        </Dropdown.Item>
+                        {/* Removed duplicate consumed history entry to avoid clutter */}
+                        <Dropdown.Divider />
+                        {/* Manage group */}
+                        {canManageMembership && (
+                          <>
+                            <Dropdown.Header>Manage</Dropdown.Header>
+                            {/* Removed Punch here to avoid duplication with membership page */}
+                            <Dropdown.Item 
+                              onClick={() => {
+                                router.push(`/membership/membership-meal-selection?id=${userMembership._id}`)
+                              }}
+                            >
+                              <i className="ri-restaurant-line me-2"></i>Punch
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                              onClick={() => handleDelete(userMembership)}
+                              className="text-danger"
+                            >
+                              <i className="ri-delete-bin-line me-2"></i>Delete
+                            </Dropdown.Item>
+                            <Dropdown.Divider />
+                            <Dropdown.Header>Set Status</Dropdown.Header>
+                            <Dropdown.Item disabled={isSettingStatus} onClick={async () => {
+                              try {
+                                await setMembershipStatus({ id: userMembership._id, status: 'active' }).unwrap()
+                                showSuccess('Status updated to Active')
+                                refetch()
+                              } catch (e: any) {
+                                showError(e?.data?.message || 'Failed to update status')
+                              }
+                            }}>
+                              <i className="ri-checkbox-circle-line me-2 text-success"></i>Active
+                            </Dropdown.Item>
+                            <Dropdown.Item disabled={isSettingStatus} onClick={async () => {
+                              try {
+                                await setMembershipStatus({ id: userMembership._id, status: 'hold' }).unwrap()
+                                showSuccess('Status updated to Hold')
+                                refetch()
+                              } catch (e: any) {
+                                showError(e?.data?.message || 'Failed to update status')
+                              }
+                            }}>
+                              <i className="ri-pause-circle-line me-2 text-warning"></i>Hold
+                            </Dropdown.Item>
+                            <Dropdown.Item disabled={isSettingStatus} onClick={async () => {
+                              try {
+                                await setMembershipStatus({ id: userMembership._id, status: 'cancelled' }).unwrap()
+                                showSuccess('Status updated to Cancelled')
+                                refetch()
+                              } catch (e: any) {
+                                showError(e?.data?.message || 'Failed to update status')
+                              }
+                            }}>
+                              <i className="ri-close-circle-line me-2 text-danger"></i>Cancelled
+                            </Dropdown.Item>
+                          </>
+                        )}
                       </Dropdown.Menu>
                     </Dropdown>
                   </td>
@@ -523,25 +564,13 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                     className="border-primary"
                   >
                     <option value="active">Active</option>
-                    <option value="expired">Expired</option>
-                    {/* <option value="cancelled">Cancelled</option> */}
+                    <option value="hold">Hold</option>
+                    <option value="cancelled">Cancelled</option>
                     <option value="completed">Completed</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
-              <Col lg={6} md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-medium">Is Active</Form.Label>
-                  <Form.Select
-                    value={editFormData.isActive ? 'true' : 'false'}
-                    onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'true' })}
-                    className="border-primary"
-                  >
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
+              <Col lg={6} md={6}></Col>
             </Row>
           </div>
 
@@ -678,7 +707,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       </Modal>
 
       {/* History Modal */}
-      <Modal show={showHistoryModal} onHide={() => setShowHistoryModal(false)} size="lg">
+      <Modal show={showHistoryModal} onHide={() => setShowHistoryModal(false)} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="ri-history-line me-2"></i>
@@ -787,6 +816,64 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
               </div>
 
               <hr />
+
+              {/* Weeks Data Display - Compact View */}
+              {selectedUserMembership.weeks && selectedUserMembership.weeks.length > 0 && (
+                <div className="mb-4 p-3 bg-light rounded">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 className="text-primary mb-0">
+                      <i className="ri-calendar-line me-2"></i>
+                      Meal Plan Details ({selectedUserMembership.weeks.length} weeks)
+                    </h6>
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm"
+                      onClick={() => setShowWeeksModal(true)}
+                    >
+                      <i className="ri-eye-line me-1"></i>
+                      View All Weeks
+                    </Button>
+                  </div>
+                  
+                  {/* Compact week summary */}
+                  <div className="row g-2">
+                    {selectedUserMembership.weeks.slice(0, 4).map((week: any, weekIndex: number) => (
+                      <div key={weekIndex} className="col-md-3 col-sm-6">
+                        <div 
+                          className="p-2 border rounded bg-white text-center cursor-pointer"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => handleViewWeekDetails(week)}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                        >
+                          <div className="fw-semibold">
+                            Week {week.week}
+                            {week.repeatFromWeek && (
+                              <i className="ri-repeat-line ms-1 text-info" title={`Repeats from Week ${week.repeatFromWeek}`}></i>
+                            )}
+                          </div>
+                          <div className="small text-muted">
+                            {week.days ? week.days.length : 0} days
+                          </div>
+                          <div className="small text-primary mt-1">
+                            <i className="ri-eye-line me-1"></i>
+                            Click to view details
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {selectedUserMembership.weeks.length > 4 && (
+                      <div className="col-md-3 col-sm-6">
+                        <div className="p-2 border rounded bg-light text-center">
+                          <div className="fw-semibold text-muted">
+                            +{selectedUserMembership.weeks.length - 4} more weeks
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <h6>Detailed History Events</h6>
               {selectedUserMembership.history && selectedUserMembership.history.length > 0 ? (
@@ -1088,6 +1175,174 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowConsumedHistoryModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Weeks Details Modal */}
+      <Modal show={showWeeksModal} onHide={() => setShowWeeksModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="ri-calendar-line me-2"></i>
+            Meal Plan Details - All Weeks
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedUserMembership && selectedUserMembership.weeks && (
+            <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {selectedUserMembership.weeks.map((week: any, weekIndex: number) => (
+                <div key={weekIndex} className="mb-4 p-3 border rounded">
+                  <div className="d-flex align-items-center mb-3">
+                    <h6 className="mb-0 me-3">Week {week.week}</h6>
+                    {week.repeatFromWeek && (
+                      <span className="badge bg-info">
+                        <i className="ri-repeat-line me-1"></i>
+                        Repeats from Week {week.repeatFromWeek}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="row g-3">
+                    {week.days && week.days.map((day: any, dayIndex: number) => (
+                      <div key={dayIndex} className="col-lg-3 col-md-4 col-sm-6">
+                        <div className="p-2 border rounded bg-white">
+                          <div className="fw-semibold text-capitalize mb-2">{day.day}</div>
+                          <div className="small">
+                            <div className="mb-1">
+                              <strong>Breakfast:</strong> 
+                              <div className="text-muted">
+                                {day.meals.breakfast && day.meals.breakfast.length > 0 
+                                  ? day.meals.breakfast.join(', ') 
+                                  : 'None selected'
+                                }
+                              </div>
+                            </div>
+                            <div className="mb-1">
+                              <strong>Lunch:</strong> 
+                              <div className="text-muted">
+                                {day.meals.lunch && day.meals.lunch.length > 0 
+                                  ? day.meals.lunch.join(', ') 
+                                  : 'None selected'
+                                }
+                              </div>
+                            </div>
+                            <div className="mb-1">
+                              <strong>Snacks:</strong> 
+                              <div className="text-muted">
+                                {day.meals.snacks && day.meals.snacks.length > 0 
+                                  ? day.meals.snacks.join(', ') 
+                                  : 'None selected'
+                                }
+                              </div>
+                            </div>
+                            <div className="mb-1">
+                              <strong>Dinner:</strong> 
+                              <div className="text-muted">
+                                {day.meals.dinner && day.meals.dinner.length > 0 
+                                  ? day.meals.dinner.join(', ') 
+                                  : 'None selected'
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowWeeksModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Single Week Details Modal */}
+      <Modal show={showSingleWeekModal} onHide={() => setShowSingleWeekModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="ri-calendar-line me-2"></i>
+            Week {selectedWeek?.week} Details
+            {selectedWeek?.repeatFromWeek && (
+              <span className="badge bg-info ms-2">
+                <i className="ri-repeat-line me-1"></i>
+                Repeats from Week {selectedWeek.repeatFromWeek}
+              </span>
+            )}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedWeek && (
+            <div>
+              <div className="row g-3">
+                {selectedWeek.days && selectedWeek.days.map((day: any, dayIndex: number) => (
+                  <div key={dayIndex} className="col-lg-4 col-md-6">
+                    <div className="p-3 border rounded bg-light">
+                      <div className="fw-semibold text-capitalize mb-3 text-primary">{day.day}</div>
+                      <div className="row g-2">
+                        <div className="col-12">
+                          <div className="d-flex align-items-center mb-2">
+                            <i className="ri-sun-line me-2 text-warning"></i>
+                            <strong>Breakfast:</strong>
+                          </div>
+                          <div className="text-muted ms-4">
+                            {day.meals.breakfast && day.meals.breakfast.length > 0 
+                              ? day.meals.breakfast.join(', ') 
+                              : 'None selected'
+                            }
+                          </div>
+                        </div>
+                        <div className="col-12">
+                          <div className="d-flex align-items-center mb-2">
+                            <i className="ri-sun-fill me-2 text-orange"></i>
+                            <strong>Lunch:</strong>
+                          </div>
+                          <div className="text-muted ms-4">
+                            {day.meals.lunch && day.meals.lunch.length > 0 
+                              ? day.meals.lunch.join(', ') 
+                              : 'None selected'
+                            }
+                          </div>
+                        </div>
+                        <div className="col-12">
+                          <div className="d-flex align-items-center mb-2">
+                            <i className="ri-apple-line me-2 text-success"></i>
+                            <strong>Snacks:</strong>
+                          </div>
+                          <div className="text-muted ms-4">
+                            {day.meals.snacks && day.meals.snacks.length > 0 
+                              ? day.meals.snacks.join(', ') 
+                              : 'None selected'
+                            }
+                          </div>
+                        </div>
+                        <div className="col-12">
+                          <div className="d-flex align-items-center mb-2">
+                            <i className="ri-moon-line me-2 text-info"></i>
+                            <strong>Dinner:</strong>
+                          </div>
+                          <div className="text-muted ms-4">
+                            {day.meals.dinner && day.meals.dinner.length > 0 
+                              ? day.meals.dinner.join(', ') 
+                              : 'None selected'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowSingleWeekModal(false)}>
             Close
           </Button>
         </Modal.Footer>

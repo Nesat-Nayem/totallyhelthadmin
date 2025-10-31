@@ -33,6 +33,10 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
   })
   const [errors, setErrors] = useState<any>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showWeekModal, setShowWeekModal] = useState(false)
+  const [activeWeekIndex, setActiveWeekIndex] = useState<number | null>(null)
+  const [weekSelections, setWeekSelections] = useState<Record<number, any>>({})
+  const [modifiedWeeks, setModifiedWeeks] = useState<any[]>([])
 
   const [createUserMembership, { isLoading }] = useCreateUserMembershipMutation()
   const { data: customersRes, refetch: refetchCustomers } = useGetCustomersQuery({ limit: 1000 })
@@ -83,9 +87,10 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
   const handleMealPlanChange = (mealPlanId: string) => {
     const selectedPlan = (mealPlans as any[]).find((plan: any) => plan._id === mealPlanId)
     if (selectedPlan) {
-      // Calculate end date based on start date and duration
+      // Calculate end date based on weeks count (7 days per week)
       const startDate = new Date(formData.startDate)
-      const durationDays = selectedPlan.durationDays || 30
+      const weeksCount = selectedPlan.weeks?.length || 0
+      const durationDays = weeksCount > 0 ? weeksCount * 7 : (selectedPlan.durationDays || 30)
       const endDate = new Date(startDate)
       endDate.setDate(startDate.getDate() + durationDays)
       
@@ -140,9 +145,10 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
   const handleStartDateChange = (startDate: string) => {
     const selectedPlan = (mealPlans as any[]).find((plan: any) => plan._id === formData.mealPlanId)
     if (selectedPlan && startDate) {
-      // Recalculate end date when start date changes
+      // Recalculate end date when start date changes based on weeks count
       const start = new Date(startDate)
-      const durationDays = selectedPlan.durationDays || 30
+      const weeksCount = selectedPlan.weeks?.length || 0
+      const durationDays = weeksCount > 0 ? weeksCount * 7 : (selectedPlan.durationDays || 30)
       const endDate = new Date(start)
       endDate.setDate(start.getDate() + durationDays)
       
@@ -284,7 +290,13 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
       await new Promise(resolve => setTimeout(resolve, 300))
       
       console.log('Making API call now...')
-      const result = await createUserMembership(membershipData).unwrap()
+      // Build weeks data with only selected items
+      const weeks = buildWeeksWithSelections()
+      const payload = { 
+        ...membershipData, 
+        ...(weeks.length > 0 && { weeks })
+      }
+      const result = await createUserMembership(payload as any).unwrap()
       
       console.log('User membership created successfully:', result)
       console.log('API response received:', result)
@@ -355,6 +367,308 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
   const selectedMealPlan = useMemo(() => {
     return mealPlans.find((plan: any) => plan._id === formData.mealPlanId)
   }, [mealPlans, formData.mealPlanId])
+
+  const openWeekModal = (idx: number) => {
+    setActiveWeekIndex(idx)
+    setShowWeekModal(true)
+    
+    // Auto-select items for repeated weeks ONLY if no existing selections
+    const selectedMealPlan = (mealPlans as any[]).find((plan: any) => plan._id === formData.mealPlanId)
+    if (selectedMealPlan?.weeks?.[idx]?.repeatFromWeek) {
+      const currentWeek = selectedMealPlan.weeks[idx]
+      const sourceWeekNum = currentWeek.repeatFromWeek
+      const sourceWeek = selectedMealPlan.weeks.find((w: any) => w.week === sourceWeekNum)
+      
+      // Only auto-select if current week has no existing selections
+      const currentWeekSelections = weekSelections[currentWeek.week]
+      if (!currentWeekSelections && sourceWeek && sourceWeek.days) {
+        // Check if we have selections for the source week
+        const sourceSelections = weekSelections[sourceWeekNum]
+        if (sourceSelections) {
+          // Copy selections from source week to current week
+          const newSelections: any = {}
+          sourceWeek.days.forEach((d: any) => {
+            const daySelections: any = {}
+            ;(['breakfast','lunch','snacks','dinner'] as const).forEach((mealType) => {
+              const selectedItem = sourceSelections[d.day]?.[mealType]
+              if (selectedItem) {
+                daySelections[mealType] = selectedItem
+              }
+            })
+            newSelections[d.day] = daySelections
+          })
+          
+          setWeekSelections((prev) => ({
+            ...prev,
+            [currentWeek.week]: newSelections
+          }))
+
+          // Also update modifiedWeeks with the copied selections
+          setModifiedWeeks((prev) => {
+            const weeks = prev.length > 0 ? prev : (selectedMealPlan as any)?.weeks || []
+            const weekIndex = weeks.findIndex((w: any) => w.week === currentWeek.week)
+            
+            if (weekIndex !== -1) {
+              // Deep clone and update the current week with source week's selections
+              const updatedWeeks = weeks.map((week: any, idx: number) => {
+                if (idx === weekIndex) {
+                  return {
+                    ...week,
+                    days: week.days.map((day: any) => ({
+                      ...day,
+                      meals: {
+                        ...day.meals,
+                        breakfast: [...(day.meals.breakfast || [])],
+                        lunch: [...(day.meals.lunch || [])],
+                        snacks: [...(day.meals.snacks || [])],
+                        dinner: [...(day.meals.dinner || [])]
+                      }
+                    }))
+                  }
+                }
+                return week
+              })
+              
+              // Copy selections from source week
+              sourceWeek.days.forEach((sourceDay: any) => {
+                const dayIndex = updatedWeeks[weekIndex].days.findIndex((d: any) => d.day === sourceDay.day)
+                if (dayIndex !== -1) {
+                  ;(['breakfast','lunch','snacks','dinner'] as const).forEach((mealType) => {
+                    const selectedItem = sourceSelections[sourceDay.day]?.[mealType]
+                    if (selectedItem) {
+                      // Add the selected item to the meals array
+                      const currentMeals = updatedWeeks[weekIndex].days[dayIndex].meals[mealType] || []
+                      if (!currentMeals.includes(selectedItem)) {
+                        updatedWeeks[weekIndex].days[dayIndex].meals[mealType] = [...currentMeals, selectedItem]
+                      }
+                    }
+                  })
+                }
+              })
+              
+              return updatedWeeks
+            }
+            
+            return weeks
+          })
+        }
+      }
+    }
+  }
+
+  const setSelection = (weekNum: number, day: string, mealType: 'breakfast'|'lunch'|'snacks'|'dinner', value: string) => {
+    // Update both weekSelections (for UI) and modifiedWeeks (for backend)
+    setWeekSelections((prev) => {
+      const week = prev[weekNum] || {}
+      const daySel = week[day] || {}
+      return {
+        ...prev,
+        [weekNum]: {
+          ...week,
+          [day]: { ...daySel, [mealType]: value }
+        }
+      }
+    })
+
+    // Update the weeks structure with user selections
+    setModifiedWeeks((prev) => {
+      const weeks = prev.length > 0 ? prev : (selectedMealPlan as any)?.weeks || []
+      const weekIndex = weeks.findIndex((w: any) => w.week === weekNum)
+      
+      if (weekIndex !== -1) {
+        // Deep clone the weeks array to avoid mutation errors
+        const updatedWeeks = weeks.map((week: any) => ({
+          ...week,
+          days: week.days.map((day: any) => ({
+            ...day,
+            meals: {
+              ...day.meals,
+              breakfast: [...(day.meals.breakfast || [])],
+              lunch: [...(day.meals.lunch || [])],
+              snacks: [...(day.meals.snacks || [])],
+              dinner: [...(day.meals.dinner || [])]
+            }
+          }))
+        }))
+        
+        const dayIndex = updatedWeeks[weekIndex].days.findIndex((d: any) => d.day === day)
+        
+        if (dayIndex !== -1) {
+          // Add user selection to the meals array (future-proof for multiple selections)
+          const currentMeals = updatedWeeks[weekIndex].days[dayIndex].meals[mealType] || []
+          const selectedIndex = currentMeals.findIndex((item: string) => item === value)
+          
+          if (selectedIndex === -1) {
+            // Add selection if not already present
+            updatedWeeks[weekIndex].days[dayIndex].meals[mealType] = [...currentMeals, value]
+          } else {
+            // Remove selection if already present (toggle behavior)
+            updatedWeeks[weekIndex].days[dayIndex].meals[mealType] = currentMeals.filter((item: string) => item !== value)
+          }
+        }
+        
+        return updatedWeeks
+      }
+      
+      return weeks
+    })
+  }
+
+  // Pre-select all items for testing
+  const preSelectAll = () => {
+    if (activeWeekIndex === null || !(selectedMealPlan as any)?.weeks?.[activeWeekIndex]) return
+    
+    const week = (selectedMealPlan as any).weeks[activeWeekIndex]
+    const days = week.days || []
+    const newSelections: any = {}
+    
+    days.forEach((d: any) => {
+      const daySelections: any = {}
+      ;(['breakfast','lunch','snacks','dinner'] as const).forEach((mealType) => {
+        const items = d.meals?.[mealType] || []
+        if (items.length > 0) {
+          // Pick first item for each meal type
+          daySelections[mealType] = items[0]
+        }
+      })
+      newSelections[d.day] = daySelections
+    })
+    
+    setWeekSelections((prev) => ({
+      ...prev,
+      [week.week]: newSelections
+    }))
+
+    // Also update modifiedWeeks
+    setModifiedWeeks((prev) => {
+      const weeks = prev.length > 0 ? prev : (selectedMealPlan as any)?.weeks || []
+      const weekIndex = weeks.findIndex((w: any) => w.week === week.week)
+      
+      if (weekIndex !== -1) {
+        // Deep clone and update the current week
+        const updatedWeeks = weeks.map((week: any, idx: number) => {
+          if (idx === weekIndex) {
+            return {
+              ...week,
+              days: week.days.map((day: any) => ({
+                ...day,
+                meals: {
+                  ...day.meals,
+                  breakfast: [...(day.meals.breakfast || [])],
+                  lunch: [...(day.meals.lunch || [])],
+                  snacks: [...(day.meals.snacks || [])],
+                  dinner: [...(day.meals.dinner || [])]
+                }
+              }))
+            }
+          }
+          return week
+        })
+        
+        // Add pre-selected items
+        days.forEach((d: any) => {
+          const dayIndex = updatedWeeks[weekIndex].days.findIndex((day: any) => day.day === d.day)
+          if (dayIndex !== -1) {
+            ;(['breakfast','lunch','snacks','dinner'] as const).forEach((mealType) => {
+              const items = d.meals?.[mealType] || []
+              if (items.length > 0) {
+                // Add first item to selections
+                const currentMeals = updatedWeeks[weekIndex].days[dayIndex].meals[mealType] || []
+                if (!currentMeals.includes(items[0])) {
+                  updatedWeeks[weekIndex].days[dayIndex].meals[mealType] = [...currentMeals, items[0]]
+                }
+              }
+            })
+          }
+        })
+        
+        return updatedWeeks
+      }
+      
+      return weeks
+    })
+  }
+
+  // Get full weeks data from selected meal plan
+  const getWeeksData = () => {
+    return (selectedMealPlan as any)?.weeks || []
+  }
+
+  // Build weeks data with only selected items
+  const buildWeeksWithSelections = () => {
+    const originalWeeks = (selectedMealPlan as any)?.weeks || []
+    
+    return originalWeeks.map((week: any) => {
+      const currentWeekSelections = weekSelections[week.week] || {}
+      
+      return {
+        week: week.week,
+        repeatFromWeek: week.repeatFromWeek,
+        days: week.days.map((day: any) => {
+          const daySelections = currentWeekSelections[day.day] || {}
+          
+          return {
+            day: day.day,
+            meals: {
+              breakfast: daySelections.breakfast ? [daySelections.breakfast] : [],
+              lunch: daySelections.lunch ? [daySelections.lunch] : [],
+              snacks: daySelections.snacks ? [daySelections.snacks] : [],
+              dinner: daySelections.dinner ? [daySelections.dinner] : []
+            }
+          }
+        })
+      }
+    })
+  }
+
+  // Serialize selections to backend shape (for weeksSelections if needed)
+  const buildWeeksSelections = () => {
+    try {
+      const planWeeks = (selectedMealPlan as any)?.weeks || []
+      const result = Object.entries(weekSelections).map(([weekNumStr, daysObj]) => {
+        const weekNum = Number(weekNumStr)
+        const planWeek = planWeeks.find((w: any) => Number(w.week) === weekNum)
+        const daysList = (planWeek?.days || []) as any[]
+        // keep day order (Saturday→Friday) if available from plan
+        const orderedDays = daysList.length
+          ? daysList.map((d: any) => d.day)
+          : Object.keys(daysObj)
+        return {
+          week: weekNum,
+          days: orderedDays.map((dayKey: any) => ({
+            day: dayKey,
+            selections: (daysObj as any)[dayKey] || {}
+          }))
+        }
+      })
+      return result
+    } catch {
+      return []
+    }
+  }
+
+  // Auto-calc totalMeals based on selections (count of chosen items)
+  useEffect(() => {
+    // Count from weekSelections (UI selections) - this is more reliable
+    const count = Object.values(weekSelections).reduce((weekSum: number, days: any) => {
+      return weekSum + Object.values(days || {}).reduce((daySum: number, sel: any) => {
+        const keys: Array<'breakfast'|'lunch'|'snacks'|'dinner'> = ['breakfast','lunch','snacks','dinner']
+        const chosen = keys.reduce((acc, k) => acc + (sel?.[k] ? 1 : 0), 0)
+        return daySum + chosen
+      }, 0)
+    }, 0)
+    
+    // If no selections yet, calculate based on weeks count (4 weeks = 28 days = 112 meals)
+    if (count === 0 && selectedMealPlan?.weeks?.length && selectedMealPlan.weeks.length > 0) {
+      const weeksCount = selectedMealPlan.weeks?.length || 0
+      const daysPerWeek = 7
+      const mealsPerDay = 4 // breakfast, lunch, snacks, dinner
+      const totalPossibleMeals = weeksCount * daysPerWeek * mealsPerDay
+      setFormData((prev: any) => ({ ...prev, totalMeals: totalPossibleMeals }))
+    } else if (count > 0) {
+      setFormData((prev: any) => ({ ...prev, totalMeals: count }))
+    }
+  }, [weekSelections, selectedMealPlan])
 
   return (
     <Modal show={show} onHide={handleClose} size="lg" centered>
@@ -488,10 +802,28 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
                       </div>
                       <div className="mb-1">
                         <strong className="text-dark">Duration:</strong>
-                        <span className="ms-2 text-warning fw-bold">{(selectedMealPlan as any).durationDays} days</span>
+                        <span className="ms-2 text-warning fw-bold">
+                          {(selectedMealPlan as any).weeks?.length > 0 
+                            ? `${(selectedMealPlan as any).weeks.length} weeks (${(selectedMealPlan as any).weeks.length * 7} days)`
+                            : `${(selectedMealPlan as any).durationDays || 30} days`
+                          }
+                        </span>
                       </div>
                     </Col>
                   </Row>
+                  {/* Weeks summary & open buttons */}
+                  {(selectedMealPlan as any).weeks && (selectedMealPlan as any).weeks.length > 0 && (
+                    <div className="mt-2">
+                      <div className="mb-1 small text-muted">Weeks:</div>
+                      <div className="d-flex flex-wrap gap-2">
+                        {(selectedMealPlan as any).weeks.map((w: any, idx: number) => (
+                          <button type="button" key={idx} className="btn btn-sm btn-outline-primary" onClick={() => openWeekModal(idx)}>
+                            Week {w.week}{w.repeatFromWeek ? ` (repeat ${w.repeatFromWeek})` : ''}{w.repeatFromWeek ? ' 🔄' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -546,7 +878,13 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
                   />
                   <Form.Text className="text-muted">
                     <i className="ri-calendar-check-line me-1"></i>
-                    {selectedMealPlan ? `Auto-calculated based on ${selectedMealPlan.durationDays || 30} days duration` : 'Enter end date manually'}
+                    {selectedMealPlan ? 
+                      (selectedMealPlan.weeks?.length && selectedMealPlan.weeks.length > 0 
+                        ? `Auto-calculated based on ${selectedMealPlan.weeks.length} weeks (${selectedMealPlan.weeks.length * 7} days)`
+                        : `Auto-calculated based on ${selectedMealPlan.durationDays || 30} days duration`
+                      ) 
+                      : 'Enter end date manually'
+                    }
                   </Form.Text>
                   <Form.Control.Feedback type="invalid">
                     {errors.endDate}
@@ -752,6 +1090,166 @@ const CreateUserMembershipModal: React.FC<CreateUserMembershipModalProps> = ({ s
           </div>
         </Modal.Footer>
       </Form>
+
+      {/* Week selection modal (one week at a time) */}
+      <Modal show={showWeekModal} onHide={() => setShowWeekModal(false)} size="xl" centered scrollable>
+        <Modal.Header closeButton>
+          <div className="d-flex align-items-center w-100">
+            <Modal.Title className="me-auto">
+              {activeWeekIndex !== null ? (
+                <div>
+                  <div>Select Items - Week {(selectedMealPlan as any)?.weeks?.[activeWeekIndex]?.week || ''}</div>
+                  {(selectedMealPlan as any)?.weeks?.[activeWeekIndex]?.repeatFromWeek && (
+                    <small className="text-muted">
+                      🔄 This week repeats from Week {(selectedMealPlan as any)?.weeks?.[activeWeekIndex]?.repeatFromWeek} 
+                      - You can customize selections below
+                    </small>
+                  )}
+                </div>
+              ) : 'Select Items'}
+            </Modal.Title>
+            {activeWeekIndex !== null && (
+              <div className="d-flex gap-2">
+                {(selectedMealPlan as any)?.weeks?.[activeWeekIndex]?.repeatFromWeek && (
+                  <button 
+                    type="button" 
+                    className="btn btn-sm btn-outline-warning" 
+                    onClick={() => {
+                      const currentWeek = (selectedMealPlan as any).weeks[activeWeekIndex]
+                      const sourceWeekNum = currentWeek.repeatFromWeek
+                      const sourceWeek = (selectedMealPlan as any).weeks.find((w: any) => w.week === sourceWeekNum)
+                      
+                      if (sourceWeek && sourceWeek.days) {
+                        const sourceSelections = weekSelections[sourceWeekNum]
+                        if (sourceSelections) {
+                          const newSelections: any = {}
+                          sourceWeek.days.forEach((d: any) => {
+                            const daySelections: any = {}
+                            ;(['breakfast','lunch','snacks','dinner'] as const).forEach((mealType) => {
+                              const selectedItem = sourceSelections[d.day]?.[mealType]
+                              if (selectedItem) {
+                                daySelections[mealType] = selectedItem
+                              }
+                            })
+                            newSelections[d.day] = daySelections
+                          })
+                          
+                          setWeekSelections((prev) => ({
+                            ...prev,
+                            [currentWeek.week]: newSelections
+                          }))
+
+                          // Also reset modifiedWeeks
+                          setModifiedWeeks((prev) => {
+                            const weeks = prev.length > 0 ? prev : (selectedMealPlan as any)?.weeks || []
+                            const weekIndex = weeks.findIndex((w: any) => w.week === currentWeek.week)
+                            
+                            if (weekIndex !== -1) {
+                              // Deep clone and reset the current week
+                              const updatedWeeks = weeks.map((week: any, idx: number) => {
+                                if (idx === weekIndex) {
+                                  return {
+                                    ...week,
+                                    days: week.days.map((day: any) => ({
+                                      ...day,
+                                      meals: {
+                                        ...day.meals,
+                                        breakfast: [...(day.meals.breakfast || [])],
+                                        lunch: [...(day.meals.lunch || [])],
+                                        snacks: [...(day.meals.snacks || [])],
+                                        dinner: [...(day.meals.dinner || [])]
+                                      }
+                                    }))
+                                  }
+                                }
+                                return week
+                              })
+                              
+                              // Reset selections from source week
+                              sourceWeek.days.forEach((sourceDay: any) => {
+                                const dayIndex = updatedWeeks[weekIndex].days.findIndex((d: any) => d.day === sourceDay.day)
+                                if (dayIndex !== -1) {
+                                  ;(['breakfast','lunch','snacks','dinner'] as const).forEach((mealType) => {
+                                    const selectedItem = sourceSelections[sourceDay.day]?.[mealType]
+                                    if (selectedItem) {
+                                      // Reset to only the selected item
+                                      updatedWeeks[weekIndex].days[dayIndex].meals[mealType] = [selectedItem]
+                                    }
+                                  })
+                                }
+                              })
+                              
+                              return updatedWeeks
+                            }
+                            
+                            return weeks
+                          })
+                        }
+                      }
+                    }}
+                  >
+                    Reset to Week {(selectedMealPlan as any)?.weeks?.[activeWeekIndex]?.repeatFromWeek}
+                  </button>
+                )}
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={preSelectAll}>
+                  Pre-select All
+                </button>
+              </div>
+            )}
+          </div>
+        </Modal.Header>
+        <Modal.Body>
+          {activeWeekIndex !== null && (selectedMealPlan as any)?.weeks?.[activeWeekIndex] ? (
+            (() => {
+              const week = (selectedMealPlan as any).weeks[activeWeekIndex]
+              const days = week.days || []
+              return (
+                <div className="row g-3">
+                  {days.map((d: any) => (
+                    <div className="col-12" key={d.day}>
+                      <div className="border rounded p-2">
+                        <strong className="text-uppercase">{d.day}</strong>
+                        <div className="row g-2 mt-2">
+                          {(['breakfast','lunch','snacks','dinner'] as const).map((mt) => (
+                            <div className="col-12 col-md-6 col-lg-3" key={mt}>
+                              <div className="fw-semibold text-capitalize mb-1">{mt}</div>
+                              {d.meals?.[mt]?.map((item: string, idx: number) => {
+                                const sel = weekSelections[week.week]?.[d.day]?.[mt]
+                                const id = `${week.week}-${d.day}-${mt}-${idx}`
+                                const isSelected = sel === item
+                                return (
+                                  <div className="form-check" key={id}>
+                                    <input
+                                      className="form-check-input"
+                                      type="checkbox"
+                                      id={id}
+                                      checked={isSelected}
+                                      onChange={() => setSelection(week.week, d.day, mt, item)}
+                                    />
+                                    <label className="form-check-label" htmlFor={id}>
+                                      {item}
+                                    </label>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()
+          ) : (
+            <div className="alert alert-info">Select a week</div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowWeekModal(false)}>Close</Button>
+          <Button variant="primary" onClick={() => setShowWeekModal(false)}>Save Selections</Button>
+        </Modal.Footer>
+      </Modal>
     </Modal>
   )
 }
