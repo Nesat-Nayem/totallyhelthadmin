@@ -302,22 +302,49 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
 
   return (
     <>
-      <div className="table-responsive">
-        <Table hover>
+      <div style={{ width: '100%', paddingBottom: '20px', paddingRight: '20px' }}>
+        <style>{`
+          .table-wrapper {
+            overflow: visible !important;
+          }
+          .table-wrapper table {
+            overflow: visible !important;
+          }
+          .dropdown-menu {
+            z-index: 9999 !important;
+            position: absolute !important;
+            overflow: visible !important;
+          }
+          .card-body {
+            overflow: visible !important;
+          }
+          .card {
+            overflow: visible !important;
+          }
+          table {
+            overflow: visible !important;
+          }
+          tbody {
+            overflow: visible !important;
+          }
+          td {
+            overflow: visible !important;
+          }
+        `}</style>
+        <Table hover style={{ width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th>Customer</th>
-              <th>Meal Plan</th>
-              <th>Price</th>
-              <th>Total Meals</th>
-              <th>Remaining</th>
-              <th>Consumed</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Status</th>
-              <th>Payment Status</th>
-              <th>History</th>
-              <th>Actions</th>
+              <th style={{ width: '12%' }}>Customer</th>
+              <th style={{ width: '12%' }}>Meal Plan</th>
+              <th style={{ width: '8%' }}>Total Meals</th>
+              <th style={{ width: '7%' }}>Remaining</th>
+              <th style={{ width: '7%' }}>Consumed</th>
+              <th style={{ width: '9%' }}>Start Date</th>
+              <th style={{ width: '9%' }}>End Date</th>
+              <th style={{ width: '7%' }}>Status</th>
+              <th style={{ width: '9%' }}>Payment Status</th>
+              <th style={{ width: '10%' }}>History</th>
+              <th style={{ width: '10%', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 100, boxShadow: '-2px 0 4px rgba(0,0,0,0.1)' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -360,12 +387,12 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                     </div>
                     )}
                   </td>
-                  <td>
+                  {/* <td>
                     <div className="fw-semibold text-success">₹{userMembership.price || mealPlan?.price || 0}</div>
                     <small className="text-muted">
                       {userMembership.price ? 'Custom Price' : 'Plan Price'}
                     </small>
-                  </td>
+                  </td> */}
                   <td>
                     <Badge bg="primary">{userMembership.totalMeals}</Badge>
                   </td>
@@ -399,71 +426,96 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                       </small>
                     </div>
                   </td>
-                  <td>
-                    <Dropdown>
-                      <Dropdown.Toggle variant="outline-secondary" size="sm">
+                  <td style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 100, boxShadow: '-2px 0 4px rgba(0,0,0,0.1)' }}>
+                    <Dropdown drop="start">
+                      <Dropdown.Toggle variant="outline-secondary" size="sm" id={`actions-dropdown-${userMembership._id}`}>
                         Actions
                       </Dropdown.Toggle>
-                      <Dropdown.Menu>
-                        {/* History group */}
-                        <Dropdown.Header>History</Dropdown.Header>
-                        <Dropdown.Item onClick={() => handleViewHistory(userMembership)}>
-                          <i className="ri-history-line me-2"></i>View History
+                      <Dropdown.Menu 
+                        flip={false}
+                        align="end"
+                        style={{ 
+                          minWidth: '160px', 
+                          zIndex: 9999,
+                          fontSize: '12px',
+                          padding: '2px 0',
+                          maxHeight: 'none'
+                        }}
+                      >
+                        {/* History group - at the top */}
+                        <Dropdown.Header style={{ fontSize: '10px', padding: '2px 10px', fontWeight: '600', lineHeight: '1.3' }}>History</Dropdown.Header>
+                        <Dropdown.Item 
+                          onClick={() => handleViewHistory(userMembership)}
+                          style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                        >
+                          <i className="ri-history-line me-2" style={{ fontSize: '12px' }}></i>View History
                         </Dropdown.Item>
-                        {/* Removed duplicate consumed history entry to avoid clutter */}
-                        <Dropdown.Divider />
+                        <Dropdown.Divider style={{ margin: '2px 0' }} />
                         {/* Manage group */}
                         {canManageMembership && (
                           <>
-                            <Dropdown.Header>Manage</Dropdown.Header>
-                            {/* Removed Punch here to avoid duplication with membership page */}
+                            <Dropdown.Header style={{ fontSize: '10px', padding: '2px 10px', fontWeight: '600', lineHeight: '1.3' }}>Manage</Dropdown.Header>
                             <Dropdown.Item 
                               onClick={() => {
                                 router.push(`/membership/membership-meal-selection?id=${userMembership._id}`)
                               }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
                             >
-                              <i className="ri-restaurant-line me-2"></i>Punch
+                              <i className="ri-restaurant-line me-2" style={{ fontSize: '12px' }}></i>Punch
                             </Dropdown.Item>
                             <Dropdown.Item 
                               onClick={() => handleDelete(userMembership)}
                               className="text-danger"
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
                             >
-                              <i className="ri-delete-bin-line me-2"></i>Delete
+                              <i className="ri-delete-bin-line me-2" style={{ fontSize: '12px' }}></i>Delete
                             </Dropdown.Item>
-                            <Dropdown.Divider />
-                            <Dropdown.Header>Set Status</Dropdown.Header>
-                            <Dropdown.Item disabled={isSettingStatus} onClick={async () => {
-                              try {
-                                await setMembershipStatus({ id: userMembership._id, status: 'active' }).unwrap()
-                                showSuccess('Status updated to Active')
-                                refetch()
-                              } catch (e: any) {
-                                showError(e?.data?.message || 'Failed to update status')
-                              }
-                            }}>
-                              <i className="ri-checkbox-circle-line me-2 text-success"></i>Active
+                            <Dropdown.Divider style={{ margin: '2px 0' }} />
+                            <Dropdown.Header style={{ fontSize: '10px', padding: '2px 10px', fontWeight: '600', lineHeight: '1.3' }}>Set Status</Dropdown.Header>
+                            <Dropdown.Item 
+                              disabled={isSettingStatus} 
+                              onClick={async () => {
+                                try {
+                                  await setMembershipStatus({ id: userMembership._id, status: 'active' }).unwrap()
+                                  showSuccess('Status updated to Active')
+                                  refetch()
+                                } catch (e: any) {
+                                  showError(e?.data?.message || 'Failed to update status')
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-checkbox-circle-line me-2 text-success" style={{ fontSize: '12px' }}></i>Active
                             </Dropdown.Item>
-                            <Dropdown.Item disabled={isSettingStatus} onClick={async () => {
-                              try {
-                                await setMembershipStatus({ id: userMembership._id, status: 'hold' }).unwrap()
-                                showSuccess('Status updated to Hold')
-                                refetch()
-                              } catch (e: any) {
-                                showError(e?.data?.message || 'Failed to update status')
-                              }
-                            }}>
-                              <i className="ri-pause-circle-line me-2 text-warning"></i>Hold
+                            <Dropdown.Item 
+                              disabled={isSettingStatus} 
+                              onClick={async () => {
+                                try {
+                                  await setMembershipStatus({ id: userMembership._id, status: 'hold' }).unwrap()
+                                  showSuccess('Status updated to Hold')
+                                  refetch()
+                                } catch (e: any) {
+                                  showError(e?.data?.message || 'Failed to update status')
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-pause-circle-line me-2 text-warning" style={{ fontSize: '12px' }}></i>Hold
                             </Dropdown.Item>
-                            <Dropdown.Item disabled={isSettingStatus} onClick={async () => {
-                              try {
-                                await setMembershipStatus({ id: userMembership._id, status: 'cancelled' }).unwrap()
-                                showSuccess('Status updated to Cancelled')
-                                refetch()
-                              } catch (e: any) {
-                                showError(e?.data?.message || 'Failed to update status')
-                              }
-                            }}>
-                              <i className="ri-close-circle-line me-2 text-danger"></i>Cancelled
+                            <Dropdown.Item 
+                              disabled={isSettingStatus} 
+                              onClick={async () => {
+                                try {
+                                  await setMembershipStatus({ id: userMembership._id, status: 'cancelled' }).unwrap()
+                                  showSuccess('Status updated to Cancelled')
+                                  refetch()
+                                } catch (e: any) {
+                                  showError(e?.data?.message || 'Failed to update status')
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-close-circle-line me-2 text-danger" style={{ fontSize: '12px' }}></i>Cancelled
                             </Dropdown.Item>
                           </>
                         )}
@@ -914,27 +966,148 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                           </div>
 
                           {/* Meal Details */}
-                          {(event.action === 'consumed' || event.mealsChanged > 0) && (
+                          {(event.action === 'consumed' || event.mealsChanged > 0 || event.currentConsumed !== undefined) && (
                             <div className="mb-3 p-2 bg-light rounded">
                               <h6 className="text-info mb-2">
-                              <i className="ri-restaurant-line me-1"></i>
+                                <i className="ri-restaurant-line me-1"></i>
                                 Meal Details
                               </h6>
                               <div className="row">
                                 <div className="col-md-4">
-                                  <small className="text-muted">Meals Changed:</small>
-                                  <div className="fw-bold text-warning">+{event.mealsChanged || 0}</div>
+                                  <small className="text-muted d-block mb-1">Current Consumed:</small>
+                                  <div className="fw-bold text-primary" style={{ fontSize: '18px' }}>{event.currentConsumed !== undefined && event.currentConsumed !== null ? event.currentConsumed : '-'}</div>
                                 </div>
                                 <div className="col-md-4">
-                                  <small className="text-muted">Total Consumed:</small>
-                                  <div className="fw-bold text-info">{event.consumedMeals || 0}</div>
+                                  <small className="text-muted d-block mb-1">Total Consumed:</small>
+                                  <div className="fw-bold text-info" style={{ fontSize: '18px' }}>{event.consumedMeals || 0}</div>
                                 </div>
                                 <div className="col-md-4">
-                                  <small className="text-muted">Remaining:</small>
-                                  <div className="fw-bold text-success">{event.remainingMeals || 0}</div>
+                                  <small className="text-muted d-block mb-1">Remaining:</small>
+                                  <div className="fw-bold text-success" style={{ fontSize: '18px' }}>{event.remainingMeals || 0}</div>
                                 </div>
                               </div>
-                              {event.mealType && (
+                              
+                              {/* Display Consumed Meal Items with Quantities */}
+                              {event.mealItems && Array.isArray(event.mealItems) && event.mealItems.length > 0 && (
+                                <div className="mt-3">
+                                  <h6 className="text-success mb-3" style={{ fontSize: '15px', fontWeight: '600' }}>
+                                    <i className="ri-restaurant-2-line me-2"></i>
+                                    Consumed Meal Items
+                                  </h6>
+                                  {(() => {
+                                    // Group items by meal type
+                                    const groupedByMealType: { [key: string]: any[] } = {}
+                                    event.mealItems.forEach((item: any) => {
+                                      const mealType = item.mealType || 'general'
+                                      if (!groupedByMealType[mealType]) {
+                                        groupedByMealType[mealType] = []
+                                      }
+                                      groupedByMealType[mealType].push(item)
+                                    })
+                                    
+                                    const mealTypeLabels: { [key: string]: string } = {
+                                      breakfast: 'Breakfast',
+                                      lunch: 'Lunch',
+                                      snacks: 'Snacks',
+                                      dinner: 'Dinner',
+                                      general: 'General'
+                                    }
+                                    
+                                    const mealTypeIcons: { [key: string]: string } = {
+                                      breakfast: 'ri-sun-line',
+                                      lunch: 'ri-restaurant-line',
+                                      snacks: 'ri-cake-line',
+                                      dinner: 'ri-moon-line',
+                                      general: 'ri-restaurant-2-line'
+                                    }
+                                    
+                                    const mealTypeColors: { [key: string]: { bg: string; border: string; badge: string } } = {
+                                      breakfast: { bg: '#fff8e1', border: '#ffc107', badge: '#ff9800' },
+                                      lunch: { bg: '#e3f2fd', border: '#2196f3', badge: '#1976d2' },
+                                      snacks: { bg: '#fce4ec', border: '#e91e63', badge: '#c2185b' },
+                                      dinner: { bg: '#e8f5e9', border: '#4caf50', badge: '#388e3c' },
+                                      general: { bg: '#f5f5f5', border: '#9e9e9e', badge: '#616161' }
+                                    }
+                                    
+                                    return (
+                                      <div className="row g-3">
+                                        {Object.entries(groupedByMealType).map(([mealType, mealItems]) => {
+                                          const colors = mealTypeColors[mealType] || mealTypeColors.general
+                                          const totalQty = mealItems.reduce((sum: number, it: any) => sum + (it.qty || 0), 0)
+                                          
+                                          return (
+                                            <div key={mealType} className="col-md-6 col-lg-3">
+                                              <div 
+                                                className="h-100 p-3 rounded shadow-sm"
+                                                style={{ 
+                                                  backgroundColor: colors.bg,
+                                                  border: `2px solid ${colors.border}`,
+                                                  borderTop: `4px solid ${colors.border}`,
+                                                  transition: 'transform 0.2s, box-shadow 0.2s'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.transform = 'translateY(-2px)'
+                                                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.transform = 'translateY(0)'
+                                                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}
+                                              >
+                                                <div className="d-flex align-items-center justify-content-between mb-3">
+                                                  <div className="d-flex align-items-center">
+                                                    <i className={`${mealTypeIcons[mealType] || 'ri-restaurant-2-line'} me-2`} style={{ fontSize: '18px', color: colors.badge }}></i>
+                                                    <span className="fw-bold" style={{ fontSize: '14px', color: colors.badge }}>
+                                                      {mealTypeLabels[mealType] || mealType}
+                                                    </span>
+                                                  </div>
+                                                  <span className="badge rounded-pill" style={{ backgroundColor: colors.badge, fontSize: '11px' }}>
+                                                    {totalQty} items
+                                                  </span>
+                                                </div>
+                                                
+                                                <div className="d-flex flex-column gap-2">
+                                                  {mealItems.map((item: any, itemIdx: number) => (
+                                                    <div
+                                                      key={itemIdx}
+                                                      className="d-flex align-items-center justify-content-between p-2 rounded"
+                                                      style={{
+                                                        backgroundColor: '#ffffff',
+                                                        border: `1px solid ${colors.border}`,
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                      }}
+                                                    >
+                                                      <div className="d-flex align-items-center flex-grow-1">
+                                                        <i className="ri-checkbox-circle-fill me-2" style={{ fontSize: '14px', color: colors.badge }}></i>
+                                                        <span style={{ fontSize: '13px', fontWeight: '500', color: '#333' }}>
+                                                          {item.title || 'N/A'}
+                                                        </span>
+                                                      </div>
+                                                      <span 
+                                                        className="badge rounded-pill"
+                                                        style={{ 
+                                                          backgroundColor: colors.badge,
+                                                          fontSize: '11px',
+                                                          fontWeight: '600',
+                                                          minWidth: '35px'
+                                                        }}
+                                                      >
+                                                        {item.qty || 0}
+                                                      </span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              )}
+                              
+                              {event.mealType && (!event.mealItems || event.mealItems.length === 0) && (
                                 <div className="mt-2">
                                   <small className="text-muted">Meal Type:</small>
                                   <span className="badge bg-secondary ms-1 text-capitalize">{event.mealType}</span>

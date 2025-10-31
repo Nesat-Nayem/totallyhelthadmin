@@ -17,14 +17,22 @@ export type UserMembership = {
   // Optional embedded weeks copied from plan
   weeks?: Array<{
     week: number
+    isConsumed?: boolean
     repeatFromWeek?: number
     days: Array<{
       day: 'saturday'|'sunday'|'monday'|'tuesday'|'wednesday'|'thursday'|'friday'
+      isConsumed?: boolean
       meals: {
         breakfast: string[]
         lunch: string[]
         snacks: string[]
         dinner: string[]
+      }
+      consumedMeals?: {
+        breakfast?: boolean
+        lunch?: boolean
+        dinner?: boolean
+        snacks?: boolean
       }
     }>
   }>
@@ -110,6 +118,25 @@ export const userMembershipApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: (_r, _e, { id }) => [{ type: 'UserMembership', id }],
     }),
+    punchMeals: build.mutation<any, {
+      id: string;
+      week: number;
+      day: 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+      mealItems: Array<{
+        mealType: 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+        mealItemTitle: string;
+        qty: number;
+      }>;
+      notes?: string;
+    }>({
+      query: ({ id, ...body }) => ({ 
+        url: `/user-memberships/${id}/punch`, 
+        method: 'POST', 
+        body 
+      }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'UserMembership', id }],
+    }),
   }),
   overrideExisting: true,
 })
@@ -121,5 +148,6 @@ export const {
   useCreateUserMembershipMutation,
   useUpdateUserMembershipMutation,
   useDeleteUserMembershipMutation,
-  useSetMembershipStatusMutation
+  useSetMembershipStatusMutation,
+  usePunchMealsMutation
 } = userMembershipApi

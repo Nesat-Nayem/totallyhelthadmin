@@ -40,7 +40,7 @@ const UserMembershipPage = () => {
 
       <Row>
         <Col>
-          <Card>
+          <Card style={{ overflow: 'visible' }}>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <h4 className="mb-0">User Membership Management</h4>
               <Button variant="primary" onClick={handleCreateUserMembership}>
@@ -48,7 +48,7 @@ const UserMembershipPage = () => {
                 Create User Membership
               </Button>
             </Card.Header>
-            <Card.Body>
+            <Card.Body style={{ overflow: 'visible', paddingRight: '0' }}>
               <Row className="mb-3">
                 <Col md={6}>
                   <InputGroup>

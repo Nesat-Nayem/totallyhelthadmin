@@ -71,32 +71,61 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
 
       {/* Bill Info */}
-      <div style={{ marginBottom: '10px' }}>
+      <div style={{ marginBottom: '10px', fontSize: '10px' }}>
         <div>Date : {getCurrentDateTime()}</div>
+        <div>BillNo: {orderData?.invoiceNo || orderData?.orderNo || 'N/A'}</div>
         <div>Membership</div>
-        {orderData?.membershipData?.userId && typeof orderData.membershipData.userId === 'object' && (
-          <>
-            <div>Member: {orderData.membershipData.userId.name || 'N/A'}</div>
-            {orderData.membershipData.userId.phone && <div>Phone: {orderData.membershipData.userId.phone}</div>}
-          </>
-        )}
+        {orderData?.membershipData?.userId && typeof orderData.membershipData.userId === 'object' && (() => {
+          const userId = orderData.membershipData.userId as any
+          return (
+            <>
+              <div>User: {userId.name || 'N/A'}</div>
+              {userId.phone && <div>Phone: {userId.phone}</div>}
+            </>
+          )
+        })()}
       </div>
+      
+      {/* Customer Details Section */}
+      {orderData?.membershipData?.userId && typeof orderData.membershipData.userId === 'object' && (() => {
+        const userId = orderData.membershipData.userId as any
+        const hasAddress = userId.address1 || userId.address || userId.address2 || userId.email
+        if (!hasAddress) return null
+        return (
+          <>
+            <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
+            <div style={{ marginBottom: '10px', fontSize: '10px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>CUST. NAME : {userId.name || 'N/A'}</div>
+              {(userId.address1 || userId.address) && <div>Address 1 {userId.address1 || userId.address}</div>}
+              {userId.address2 && <div>Address 2 {userId.address2}</div>}
+              {userId.phone && <div>MOBILE NO : {userId.phone}</div>}
+              {userId.email && <div>Email: {userId.email}</div>}
+            </div>
+          </>
+        )
+      })()}
 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
 
       {/* Items Header (no Amount column for membership customer) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontWeight: 'bold' }}>
-        <div style={{ width: '70%' }}>Description</div>
+        <div style={{ width: '70%' }}>Items</div>
         <div style={{ width: '30%', textAlign: 'right' }}>Qty</div>
       </div>
 
       {/* Items */}
       {orderData?.selectedProducts && Object.entries(orderData.selectedProducts).map(([uniqueId, product]: [string, any], index: number) => {
         const itemOptions = orderData?.itemOptions?.[uniqueId] || []
+        const mealTypeLabel = product.mealType 
+          ? product.mealType.charAt(0).toUpperCase() + product.mealType.slice(1)
+          : ''
         return (
-          <div key={index} style={{ marginBottom: '2px' }}>
+          <div key={index} style={{ marginBottom: '2px', fontSize: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ width: '70%' }}>{product.title || product.name}</div>
+              <div style={{ width: '70%', wordWrap: 'break-word' }}>
+                {product.title || product.name}
+                {mealTypeLabel && ` - ${mealTypeLabel}`}
+              </div>
               <div style={{ width: '30%', textAlign: 'right' }}>{product.qty}</div>
             </div>
             {itemOptions.length > 0 && (
@@ -112,54 +141,21 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
 
-      {/* Summary (only meals to consume for membership customer) */}
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-          <div>MEALS TO CONSUME</div>
-          <div>{orderData?.mealsToConsume || 0}</div>
-        </div>
-      </div>
-
-      {/* Daily Breakdown (when provided for global print) */}
-      {Array.isArray(orderData?.dailyBreakdown) && orderData.dailyBreakdown.length > 0 && (
-        <>
-          <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
-          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Daily Breakdown</div>
-          {orderData.dailyBreakdown.map((day: any, idx: number) => (
-            <div key={idx} style={{ marginBottom: '6px' }}>
-              <div style={{ fontWeight: 'bold' }}>{day.dateKey} - Consumed: {day.consumed}</div>
-              {day.times.map((t: any, ti: number) => (
-                <div key={ti} style={{ marginLeft: '6px', marginBottom: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ fontWeight: 'bold' }}>{t.timeKey}</div>
-                    <div>Consumed: {t.consumed}</div>
-                  </div>
-                  {t.items.map((it: any, i: number) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginLeft: '6px' }}>
-                      <div style={{ width: '70%' }}>{it.title}</div>
-                      <div style={{ width: '30%', textAlign: 'right' }}>{it.qty}</div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </>
-      )}
-
-      <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
-
-      {/* Membership Info */}
+      {/* Simplified Membership Summary */}
       {orderData?.membershipData && (
         <div style={{ marginBottom: '8px', fontSize: '10px' }}>
-          <div><strong>Membership Summary</strong></div>
-          <div>Total Meals: {orderData.membershipData.totalMeals || 0}</div>
-          <div>Total Consumed: {orderData.membershipData.consumedMeals || 0}</div>
-          <div>Current Consumed: {orderData?.mealsToConsume || 0}</div>
-          <div>Current Remaining: {orderData.membershipData.remainingMeals || 0}</div>
-          <div>Previous Remaining: {(orderData.membershipData.remainingMeals || 0) + (orderData.mealsToConsume || 0)}</div>
-          {orderData.membershipData.startDate && <div>Start: {orderData.membershipData.startDate}</div>}
-          {orderData.membershipData.endDate && <div>End: {orderData.membershipData.endDate}</div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <div>Total Consumed:</div>
+            <div>{orderData.membershipData.consumedMeals || 0}</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <div>Current Consumed:</div>
+            <div>{orderData?.mealsToConsume || 0}</div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <div>Total Remaining:</div>
+            <div>{orderData.membershipData.remainingMeals || 0}</div>
+          </div>
         </div>
       )}
 
@@ -186,27 +182,54 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
         margin: '0 auto'
       }}
     >
-      {/* Header */}
+      {/* Header with Logo */}
       <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>NEW ORDER</div>
-        <div style={{ fontSize: '12px', fontWeight: 'bold' }}>KITCHEN 1</div>
+        <div className="logo-circle" style={{ 
+          border: '2px dashed #000',
+          borderRadius: '50%',
+          width: '60px',
+          height: '60px',
+          display: 'inline-flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 6px auto',
+          padding: '6px'
+        }}>
+          <div style={{ fontSize: '16px', marginBottom: '2px' }}>🍴</div>
+          <div style={{ fontSize: '8px', fontWeight: 'bold', textAlign: 'center', lineHeight: '1.1' }}>Totally<br/>Healthy</div>
+          <div style={{ fontSize: '5px', textAlign: 'center', marginTop: '2px', lineHeight: '1' }}>EAT CLEAN</div>
+        </div>
+        <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '2px' }}>NEW ORDER</div>
+        <div style={{ fontSize: '11px', fontWeight: 'bold' }}>KITCHEN 1</div>
       </div>
 
-      <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '8px 0' }} />
+      <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }} />
 
-      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>MEMBERSHIP MEAL</div>
+      {/* Company Info */}
+      <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+        <div style={{ fontWeight: 'bold', fontSize: '12px' }}>TOTALLY HEALTHY</div>
+        <div style={{ fontSize: '9px' }}>Company Name AL AKL AL SAHI</div>
+        <div style={{ fontSize: '9px' }}>Tel: 065392229 / 509632223</div>
+        <div style={{ fontWeight: 'bold', fontSize: '9px' }}>TRN : 100512693100003</div>
       </div>
 
-      <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '8px 0' }} />
+      <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }} />
+
+      {/* Order Type */}
+      <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+        <div style={{ fontWeight: 'bold', fontSize: '12px' }}>MEMBERSHIP MEAL</div>
+      </div>
+
+      <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }} />
 
       {/* Order Info */}
-      <div style={{ marginBottom: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <div>Date : {getCurrentDateTime()}</div>
-        </div>
+      <div style={{ marginBottom: '10px', fontSize: '10px' }}>
+        <div>Date : {getCurrentDateTime()}</div>
         {orderData?.membershipData?.userId && typeof orderData.membershipData.userId === 'object' && (
-          <div>Member: {orderData.membershipData.userId.name || 'N/A'}</div>
+          <>
+            <div>Member: {orderData.membershipData.userId.name || 'N/A'}</div>
+          </>
         )}
       </div>
 
@@ -221,11 +244,17 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
       {/* Items */}
       {orderData?.selectedProducts && Object.entries(orderData.selectedProducts).map(([uniqueId, product]: [string, any], index: number) => {
         const itemOptions = orderData?.itemOptions?.[uniqueId] || []
+        const mealTypeLabel = product.mealType 
+          ? product.mealType.charAt(0).toUpperCase() + product.mealType.slice(1)
+          : ''
         return (
-          <div key={index} style={{ marginBottom: '3px' }}>
+          <div key={index} style={{ marginBottom: '4px', fontSize: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div style={{ width: '20%', fontWeight: 'bold' }}>{product.qty}</div>
-              <div style={{ width: '80%' }}>{product.title || product.name}</div>
+              <div style={{ width: '80%', wordWrap: 'break-word' }}>
+                {product.title || product.name}
+                {mealTypeLabel && ` (${mealTypeLabel})`}
+              </div>
             </div>
             {itemOptions.length > 0 && (
               <div style={{ marginLeft: '25px', fontSize: '9px', color: '#666' }}>
@@ -240,15 +269,22 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
 
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '10px 0' }} />
 
-      {/* Membership Info (Kitchen: show consumed only summary requested) */}
-      {orderData?.membershipData && (
-        <div style={{ marginBottom: '8px', fontSize: '10px' }}>
-          <div>Total Consumed: {orderData.membershipData.consumedMeals || 0}</div>
-          <div>Current Consumed: {orderData?.mealsToConsume || 0}</div>
-          <div>Current Remaining: {orderData.membershipData.remainingMeals || 0}</div>
-          <div>Previous Remaining: {(orderData.membershipData.remainingMeals || 0) + (orderData.mealsToConsume || 0)}</div>
-        </div>
-      )}
+      {/* User Details (instead of consumption details) */}
+      {orderData?.membershipData?.userId && typeof orderData.membershipData.userId === 'object' && (() => {
+        const userId = orderData.membershipData.userId as any
+        return (
+          <div style={{ marginBottom: '8px', fontSize: '10px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>CUSTOMER DETAILS</div>
+            {userId.name && <div><strong>Name:</strong> {userId.name}</div>}
+            {userId.phone && <div><strong>Phone:</strong> {userId.phone}</div>}
+            {userId.email && <div><strong>Email:</strong> {userId.email}</div>}
+            {(userId.address1 || userId.address) && (
+              <div><strong>Address 1:</strong> {userId.address1 || userId.address}</div>
+            )}
+            {userId.address2 && <div><strong>Address 2:</strong> {userId.address2}</div>}
+          </div>
+        )
+      })()}
 
       {/* Footer */}
       <div style={{ textAlign: 'center', marginTop: '10px' }}>

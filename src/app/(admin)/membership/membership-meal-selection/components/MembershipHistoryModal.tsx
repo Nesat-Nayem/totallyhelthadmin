@@ -9,6 +9,7 @@ type HistoryItem = {
   action: string
   consumedMeals?: number
   remainingMeals?: number
+  currentConsumed?: number
   mealsChanged?: number
   mealType?: string
   timestamp?: string
@@ -133,7 +134,8 @@ const MembershipHistoryModal: React.FC<MembershipHistoryModalProps> = ({ show, o
                   <th>Date/Time</th>
                   <th>Action</th>
                   <th>Meals +/-</th>
-                  <th>Consumed</th>
+                  <th>Current Consumed</th>
+                  <th>Total Consumed</th>
                   <th>Remaining</th>
                   <th>Items</th>
                   <th>Print</th>
@@ -144,24 +146,116 @@ const MembershipHistoryModal: React.FC<MembershipHistoryModalProps> = ({ show, o
                   <>
                     <tr key={`row-${idx}`}>
                       <td>{formatDateTime(entry.timestamp)}</td>
-                      <td>{entry.action}</td>
-                      <td>{entry.mealsChanged ?? 0}</td>
-                      <td>{entry.consumedMeals ?? '-'}</td>
-                      <td>{entry.remainingMeals ?? '-'}</td>
                       <td>
-                        <div className="d-flex align-items-center gap-2">
+                        <Badge bg={entry.action === 'consumed' ? 'primary' : entry.action === 'created' ? 'success' : 'secondary'}>
+                          {entry.action}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge bg={entry.mealsChanged && entry.mealsChanged > 0 ? 'success' : entry.mealsChanged && entry.mealsChanged < 0 ? 'danger' : 'secondary'}>
+                          {entry.mealsChanged && entry.mealsChanged > 0 ? '+' : ''}{entry.mealsChanged ?? 0}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge bg="info" text="dark" style={{ fontSize: '12px', fontWeight: '600' }}>
+                          {entry.currentConsumed !== undefined && entry.currentConsumed !== null ? entry.currentConsumed : '-'}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge bg="warning" text="dark" style={{ fontSize: '12px', fontWeight: '600' }}>
+                          {entry.consumedMeals ?? '-'}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge bg="success" style={{ fontSize: '12px', fontWeight: '600' }}>
+                          {entry.remainingMeals ?? '-'}
+                        </Badge>
+                      </td>
+                      <td>
+                        <div className="d-flex flex-column gap-2">
                           {(() => {
                             const items = (entry.mealItems && entry.mealItems.length > 0)
                               ? entry.mealItems
                               : (dayItemsMap[toKey(entry.timestamp)] || [])
                             const totalQty = items.reduce((s: number, it: any) => s + (it.qty || 0), 0)
+                            
+                            // Group items by meal type for better display
+                            const groupedByMealType: { [key: string]: any[] } = {}
+                            items.forEach((it: any) => {
+                              const mealType = it.mealType || 'general'
+                              if (!groupedByMealType[mealType]) {
+                                groupedByMealType[mealType] = []
+                              }
+                              groupedByMealType[mealType].push(it)
+                            })
+                            
+                            const mealTypeLabels: { [key: string]: string } = {
+                              breakfast: 'Breakfast',
+                              lunch: 'Lunch',
+                              snacks: 'Snacks',
+                              dinner: 'Dinner',
+                              general: 'General'
+                            }
+                            
                             return (
                               <>
-                                <span>{totalQty} items</span>
+                                <div className="d-flex align-items-center gap-2">
+                                  <span><strong>{totalQty}</strong> items</span>
+                                  {items.length > 0 && (
+                                    <Button size="sm" variant="outline-primary" onClick={() => setExpanded((p) => ({ ...p, [idx]: !p[idx] }))}>
+                                      {expanded[idx] ? 'Hide' : 'View'} Details
+                                    </Button>
+                                  )}
+                                </div>
+                                {/* Show consumed items grouped by meal type - Always visible */}
                                 {items.length > 0 && (
-                                  <Button size="sm" variant="outline-primary" onClick={() => setExpanded((p) => ({ ...p, [idx]: !p[idx] }))}>
-                                    {expanded[idx] ? 'Hide' : 'View'} Items
-                                  </Button>
+                                  <div className="mt-2">
+                                    {Object.entries(groupedByMealType).map(([mealType, mealItems]) => (
+                                      <div key={mealType} className="mb-2" style={{ 
+                                        padding: '10px', 
+                                        backgroundColor: mealType === 'breakfast' ? '#fff3cd' : 
+                                                        mealType === 'lunch' ? '#d1ecf1' : 
+                                                        mealType === 'snacks' ? '#f8d7da' : 
+                                                        mealType === 'dinner' ? '#d4edda' : '#e7f5ff', 
+                                        borderRadius: '6px',
+                                        border: '2px solid #28a745',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                      }}>
+                                        <div className="d-flex align-items-center mb-2">
+                                          <Badge bg="primary" style={{ fontSize: '12px', padding: '5px 10px' }}>
+                                            {mealTypeLabels[mealType] || mealType}
+                                          </Badge>
+                                          <span className="ms-2" style={{ fontSize: '11px', fontWeight: '600', color: '#495057' }}>
+                                            ({mealItems.length} item{mealItems.length !== 1 ? 's' : ''})
+                                          </span>
+                                        </div>
+                                        <div className="d-flex flex-wrap gap-2">
+                                          {mealItems.map((item: any, itemIdx: number) => (
+                                            <div
+                                              key={itemIdx}
+                                              style={{
+                                                backgroundColor: '#ffffff',
+                                                border: '2px solid #28a745',
+                                                borderRadius: '4px',
+                                                padding: '6px 10px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                color: '#28a745',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                              }}
+                                            >
+                                              {item.title || 'N/A'} <Badge bg="success" style={{ fontSize: '10px', marginLeft: '4px' }}>{item.qty || 0}</Badge>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {items.length === 0 && (
+                                  <div className="text-muted" style={{ fontSize: '12px', fontStyle: 'italic', marginTop: '8px' }}>
+                                    No meal items
+                                  </div>
                                 )}
                               </>
                             )
@@ -208,31 +302,107 @@ const MembershipHistoryModal: React.FC<MembershipHistoryModalProps> = ({ show, o
                     </tr>
                     {expanded[idx] && (
                       <tr key={`expand-${idx}`}>
-                        <td colSpan={7}>
-                          <Table bordered size="sm" className="mb-0">
-                            <thead>
-                              <tr>
-                                <th>Item</th>
-                                <th>Meal Type</th>
-                                <th>Qty</th>
-                                <th>Options</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(((entry.mealItems && entry.mealItems.length > 0) ? entry.mealItems : (dayItemsMap[toKey(entry.timestamp)] || []))).map((mi, miIdx) => (
-                                <tr key={miIdx}>
-                                  <td>{mi.title || '-'}</td>
-                                  <td><Badge bg="info" text="dark">{mi.mealType || 'general'}</Badge></td>
-                                  <td>{mi.qty || 0}</td>
-                                  <td>
-                                    {(mi.moreOptions || []).map((o: any, oi: number) => (
-                                      <Badge key={oi} bg="light" text="dark" className="me-1">{o.name}</Badge>
-                                    ))}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </Table>
+                        <td colSpan={8} style={{ backgroundColor: '#f8f9fa', padding: '16px' }}>
+                          {(() => {
+                            const items = (entry.mealItems && entry.mealItems.length > 0)
+                              ? entry.mealItems
+                              : (dayItemsMap[toKey(entry.timestamp)] || [])
+                            
+                            // Group items by meal type
+                            const groupedByMealType: { [key: string]: any[] } = {}
+                            items.forEach((it: any) => {
+                              const mealType = it.mealType || 'general'
+                              if (!groupedByMealType[mealType]) {
+                                groupedByMealType[mealType] = []
+                              }
+                              groupedByMealType[mealType].push(it)
+                            })
+                            
+                            const mealTypeLabels: { [key: string]: string } = {
+                              breakfast: 'Breakfast',
+                              lunch: 'Lunch',
+                              snacks: 'Snacks',
+                              dinner: 'Dinner',
+                              general: 'General'
+                            }
+                            
+                            const mealTypeColors: { [key: string]: string } = {
+                              breakfast: '#fff3cd',
+                              lunch: '#d1ecf1',
+                              snacks: '#f8d7da',
+                              dinner: '#d4edda',
+                              general: '#e2e3e5'
+                            }
+                            
+                            return (
+                              <div>
+                                <h6 className="mb-3" style={{ color: '#495057' }}>
+                                  <i className="ri-restaurant-line me-2"></i>
+                                  Consumed Meal Items
+                                </h6>
+                                {Object.entries(groupedByMealType).map(([mealType, mealItems]) => (
+                                  <div 
+                                    key={mealType} 
+                                    className="mb-3 p-3 rounded"
+                                    style={{ 
+                                      backgroundColor: mealTypeColors[mealType] || '#f8f9fa',
+                                      border: '2px solid #dee2e6'
+                                    }}
+                                  >
+                                    <div className="d-flex align-items-center mb-2">
+                                      <Badge 
+                                        bg="primary" 
+                                        style={{ fontSize: '13px', padding: '6px 12px' }}
+                                      >
+                                        {mealTypeLabels[mealType] || mealType}
+                                      </Badge>
+                                      <span className="ms-2 text-muted">
+                                        ({mealItems.length} item{mealItems.length !== 1 ? 's' : ''}, 
+                                        Qty: {mealItems.reduce((sum, it) => sum + (it.qty || 0), 0)})
+                                      </span>
+                                    </div>
+                                    <div className="d-flex flex-wrap gap-2">
+                                      {mealItems.map((item: any, itemIdx: number) => (
+                                        <div
+                                          key={itemIdx}
+                                          className="p-2 rounded"
+                                          style={{
+                                            backgroundColor: '#ffffff',
+                                            border: '2px solid #28a745',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                            minWidth: '150px'
+                                          }}
+                                        >
+                                          <div style={{ fontWeight: '600', color: '#28a745', marginBottom: '4px' }}>
+                                            {item.title || 'N/A'}
+                                          </div>
+                                          <div className="d-flex justify-content-between align-items-center">
+                                            <Badge bg="success" style={{ fontSize: '11px' }}>
+                                              Qty: {item.qty || 0}
+                                            </Badge>
+                                            {(item.moreOptions || []).length > 0 && (
+                                              <div className="ms-2">
+                                                {(item.moreOptions || []).map((o: any, oi: number) => (
+                                                  <Badge key={oi} bg="secondary" className="me-1" style={{ fontSize: '10px' }}>
+                                                    {o.name}
+                                                  </Badge>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                                {items.length === 0 && (
+                                  <div className="text-center text-muted py-3">
+                                    No meal items found for this entry
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </td>
                       </tr>
                     )}
