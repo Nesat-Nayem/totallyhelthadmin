@@ -21,10 +21,16 @@ export const showSuccess = (message: string) => {
 export const showError = (message: string) => {
   Swal.fire({
     icon: 'error',
-    title: 'Error!',
+    title: 'Error',
     text: message,
+    confirmButtonText: 'OK',
     confirmButtonColor: '#dc3545',
-    confirmButtonText: 'OK'
+    allowOutsideClick: true,
+    allowEscapeKey: true,
+    customClass: {
+      popup: 'swal2-popup-custom',
+      title: 'swal2-title-custom'
+    }
   })
 }
 
@@ -60,6 +66,22 @@ export const showCustomerRequiredAlert = (): Promise<boolean> => {
     }
   }).then((result) => {
     return result.isConfirmed
+  })
+}
+
+export const showMealError = (message: string) => {
+  Swal.fire({
+    icon: 'error',
+    title: 'Meal Selection Error',
+    text: message,
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#dc3545',
+    allowOutsideClick: true,
+    allowEscapeKey: true,
+    customClass: {
+      popup: 'swal2-popup-custom',
+      title: 'swal2-title-custom'
+    }
   })
 }
 

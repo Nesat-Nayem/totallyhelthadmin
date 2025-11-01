@@ -1,12 +1,14 @@
 'use client'
 
-import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { Table, Badge, Button, Dropdown, Modal, Form, Row, Col, Alert } from 'react-bootstrap'
-import { useGetUserMembershipsQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation } from '@/services/userMembershipApi'
+import { useRouter } from 'next/navigation'
+import { useGetUserMembershipsQuery, useGetUserMembershipByIdQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation, useSetMembershipStatusMutation } from '@/services/userMembershipApi'
 import { useGetCustomersQuery } from '@/services/customerApi'
 import { useGetMealPlansQuery } from '@/services/mealPlanApi'
 import { showSuccess, showError } from '@/utils/sweetAlert'
 import { useAccessControl } from '@/hooks/useAccessControl'
+import EditMealModal from './EditMealModal'
 
 interface UserMembershipDataListProps {
   searchQuery: string
@@ -17,19 +19,30 @@ export interface UserMembershipDataListRef {
 }
 
 const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembershipDataListProps>(({ searchQuery }, ref) => {
+  const router = useRouter()
   const { hasAccessToSubModule, isAdmin } = useAccessControl()
   
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [showConsumedHistoryModal, setShowConsumedHistoryModal] = useState(false)
+  const [showWeeksModal, setShowWeeksModal] = useState(false)
+  const [showSingleWeekModal, setShowSingleWeekModal] = useState(false)
+  const [showEditMealModal, setShowEditMealModal] = useState(false)
+  const [selectedWeek, setSelectedWeek] = useState<any>(null)
+  const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedUserMembership, setSelectedUserMembership] = useState<any>(null)
+  const [selectedUserMembershipId, setSelectedUserMembershipId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<any>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const [limit] = useState(10)
 
-  const { data: userMembershipsRes, isLoading, error, refetch } = useGetUserMembershipsQuery({ limit: 100 })
+  const { data: userMembershipsRes, isLoading, error, refetch } = useGetUserMembershipsQuery({ page: currentPage, limit: limit })
   const { data: customersRes } = useGetCustomersQuery({ limit: 1000 })
   const { data: mealPlansRes } = useGetMealPlansQuery({ limit: 1000 })
+  const { data: singleUserMembershipData, refetch: refetchSingleMembership } = useGetUserMembershipByIdQuery(selectedUserMembershipId || '', { skip: !selectedUserMembershipId })
   const [updateUserMembership, { isLoading: isUpdating }] = useUpdateUserMembershipMutation()
+  const [setMembershipStatus, { isLoading: isSettingStatus }] = useSetMembershipStatusMutation()
   const [deleteUserMembership, { isLoading: isDeleting }] = useDeleteUserMembershipMutation()
 
   // Role-based access control
@@ -43,51 +56,34 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     }
   }), [refetch])
 
-  // Calculate payment status and remaining amount for edit modal
-  const editPaymentStatus = useMemo(() => {
-    const cumulativePaid = editFormData.cumulativePaid || 0
-    const totalPrice = editFormData.totalPrice || 0
-    if (cumulativePaid >= totalPrice) {
-      return 'paid'
-    } else {
-      return 'unpaid'
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  // Update selected membership when single membership data is fetched
+  useEffect(() => {
+    if (singleUserMembershipData && selectedUserMembershipId) {
+      setSelectedUserMembership(singleUserMembershipData)
     }
-  }, [editFormData.cumulativePaid, editFormData.totalPrice])
-
-  const editRemainingAmount = useMemo(() => {
-    const totalPrice = editFormData.totalPrice || 0
-    const cumulativePaid = editFormData.cumulativePaid || 0
-    return Math.max(0, totalPrice - cumulativePaid)
-  }, [editFormData.totalPrice, editFormData.cumulativePaid])
-
-  // Handle received amount change in edit modal
-  const handleEditReceivedAmountChange = (value: number) => {
-    setEditFormData((prev: any) => {
-      const previousReceivedAmount = prev.receivedAmount || 0
-      const difference = value - previousReceivedAmount
-      const newCumulativePaid = (prev.cumulativePaid || 0) + difference
-      
-      console.log('Payment calculation:', {
-        previousReceivedAmount,
-        newReceivedAmount: value,
-        difference,
-        previousCumulativePaid: prev.cumulativePaid || 0,
-        newCumulativePaid: Math.max(0, newCumulativePaid)
-      })
-      
-      return {
-        ...prev,
-        receivedAmount: value,
-        cumulativePaid: Math.max(0, newCumulativePaid) // Ensure it doesn't go negative
-      }
-    })
-  }
+  }, [singleUserMembershipData, selectedUserMembershipId])
 
   const userMemberships = useMemo(() => {
     console.log('User memberships response:', userMembershipsRes)
     console.log('User memberships array:', userMembershipsRes?.memberships)
     return userMembershipsRes?.memberships || []
   }, [userMembershipsRes])
+
+  const pagination = useMemo(() => {
+    return userMembershipsRes?.pagination || null
+  }, [userMembershipsRes])
+
+  const totalPages = useMemo(() => {
+    if (pagination?.totalPages) {
+      return pagination.totalPages
+    }
+    return 1
+  }, [pagination])
   const customers = useMemo(() => customersRes?.data || [], [customersRes])
   const mealPlans = useMemo(() => mealPlansRes?.data || [], [mealPlansRes])
 
@@ -132,6 +128,10 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     })
   }, [userMemberships, searchQuery, customerMap, mealPlanMap])
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
   const handleEdit = (userMembership: any) => {
     if (!canManageMembership) {
       showError('You do not have permission to manage user memberships')
@@ -139,11 +139,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     }
     
     console.log('Editing user membership:', userMembership)
-    console.log('Payment data:', {
-      totalPrice: userMembership.totalPrice,
-      cumulativePaid: userMembership.cumulativePaid,
-      paymentStatus: userMembership.paymentStatus
-    })
     
     setSelectedUserMembership(userMembership)
     setEditFormData({
@@ -151,12 +146,6 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       consumedMeals: userMembership.consumedMeals || 0,
       remainingMeals: userMembership.remainingMeals || 0,
       status: userMembership.status || 'active',
-      isActive: userMembership.isActive !== false,
-      // Payment fields
-      totalPrice: userMembership.totalPrice || 0,
-      receivedAmount: 0, // For new payment, start with 0
-      cumulativePaid: userMembership.cumulativePaid || 0, // Keep existing cumulative paid
-      paymentMode: userMembership.paymentMode || '',
       note: userMembership.note || ''
     })
     setShowEditModal(true)
@@ -172,14 +161,129 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     setShowDeleteModal(true)
   }
 
-  const handleViewHistory = (userMembership: any) => {
+  const handleViewHistory = async (userMembership: any) => {
+    // Set the ID to trigger the query
+    setSelectedUserMembershipId(userMembership._id)
+    // Use existing data immediately, will update when query completes
     setSelectedUserMembership(userMembership)
     setShowHistoryModal(true)
+    // Refetch the specific membership by ID
+    if (userMembership._id) {
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          setSelectedUserMembership(result.data)
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+      }
+    }
   }
 
-  const handleViewConsumedHistory = (userMembership: any) => {
+  const handleViewConsumedHistory = async (userMembership: any) => {
+    // Set the ID to trigger the query
+    setSelectedUserMembershipId(userMembership._id)
+    // Use existing data immediately, will update when query completes
     setSelectedUserMembership(userMembership)
     setShowConsumedHistoryModal(true)
+    // Refetch the specific membership by ID
+    if (userMembership._id) {
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          setSelectedUserMembership(result.data)
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+      }
+    }
+  }
+
+  const handleViewWeekDetails = async (week: any) => {
+    // Refresh the selected membership data if we have an ID
+    if (selectedUserMembership?._id) {
+      setSelectedUserMembershipId(selectedUserMembership._id)
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          const freshWeek = result.data.weeks?.find((w: any) => w.week === week.week)
+          if (freshWeek) {
+            setSelectedWeek(freshWeek)
+            setSelectedUserMembership(result.data)
+          } else {
+            setSelectedWeek(week)
+          }
+        } else {
+          setSelectedWeek(week)
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+        setSelectedWeek(week)
+      }
+    } else {
+      setSelectedWeek(week)
+    }
+    
+    setShowSingleWeekModal(true)
+  }
+
+  const handleEditDayMeals = async (week: any, day: any) => {
+    // Fetch fresh data for the selected membership by ID before editing
+    if (selectedUserMembership?._id) {
+      setSelectedUserMembershipId(selectedUserMembership._id)
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          const freshWeek = result.data.weeks?.find((w: any) => w.week === week.week)
+          if (freshWeek) {
+            const freshDay = freshWeek.days?.find((d: any) => d.day === day.day)
+            if (freshDay) {
+              week = freshWeek
+              day = freshDay
+              setSelectedUserMembership(result.data)
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+        // Continue with existing data if fetch fails
+      }
+    }
+    
+    // Check if day/week is consumed
+    if (day.isConsumed || week.isConsumed) {
+      showError('Cannot edit consumed meals. This day/week has already been consumed.')
+      return
+    }
+
+    // Check if any meal type in the day is consumed
+    if (day.consumedMeals && (
+      day.consumedMeals.breakfast || 
+      day.consumedMeals.lunch || 
+      day.consumedMeals.snacks || 
+      day.consumedMeals.dinner
+    )) {
+      showError('Cannot edit consumed meals. Some meals for this day have already been consumed.')
+      return
+    }
+
+    setSelectedWeek(week)
+    setSelectedDay(day)
+    setShowEditMealModal(true)
+  }
+
+  const handleMealEditSuccess = (updatedMembership?: any) => {
+    // Close other modals if open
+    setShowSingleWeekModal(false)
+    setShowWeeksModal(false)
+    
+    // Update the selected membership with fresh data if provided
+    if (updatedMembership) {
+      setSelectedUserMembership(updatedMembership)
+    }
+    
+    // Refetch the full list to ensure all data is fresh
+    refetch()
   }
 
   const handleUpdateUserMembership = async () => {
@@ -200,27 +304,10 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       if (editFormData.status !== undefined) {
         updateData.status = editFormData.status
       }
-      if (editFormData.isActive !== undefined) {
-        updateData.isActive = editFormData.isActive
-      }
       
-      // Payment fields
-      if (editFormData.totalPrice !== undefined) {
-        updateData.totalPrice = editFormData.totalPrice
-      }
-      if (editFormData.receivedAmount !== undefined) {
-        updateData.receivedAmount = editFormData.receivedAmount
-      }
-      if (editFormData.cumulativePaid !== undefined) {
-        updateData.cumulativePaid = editFormData.cumulativePaid
-      }
-      if (editFormData.paymentMode !== undefined) {
-        updateData.paymentMode = editFormData.paymentMode || undefined
-      }
       if (editFormData.note !== undefined) {
         updateData.note = editFormData.note
       }
-      updateData.paymentStatus = editPaymentStatus
       
       console.log('Sending update data:', updateData)
       
@@ -280,7 +367,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       active: { variant: 'success', text: 'Active' },
-      expired: { variant: 'warning', text: 'Expired' },
+      hold: { variant: 'warning', text: 'On Hold' },
       cancelled: { variant: 'danger', text: 'Cancelled' },
       completed: { variant: 'info', text: 'Completed' }
     }
@@ -288,10 +375,10 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     return <Badge bg={config.variant}>{config.text}</Badge>
   }
 
-  const getPaymentStatusBadge = (paymentStatus: string, cumulativePaid: number = 0, totalPrice: number = 0) => {
-    // Determine payment status based on cumulative paid amount
+  const getPaymentStatusBadge = (paymentStatus: string, receivedAmount: number = 0, totalPrice: number = 0) => {
+    // Determine payment status based on received amount
     let status = paymentStatus
-    if (cumulativePaid >= totalPrice && totalPrice > 0) {
+    if (receivedAmount === totalPrice && totalPrice > 0) {
       status = 'paid'
     } else {
       status = 'unpaid'
@@ -358,22 +445,49 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
 
   return (
     <>
-      <div className="table-responsive">
-        <Table hover>
+      <div style={{ width: '100%', paddingBottom: '20px', paddingRight: '20px' }}>
+        <style>{`
+          .table-wrapper {
+            overflow: visible !important;
+          }
+          .table-wrapper table {
+            overflow: visible !important;
+          }
+          .dropdown-menu {
+            z-index: 9999 !important;
+            position: absolute !important;
+            overflow: visible !important;
+          }
+          .card-body {
+            overflow: visible !important;
+          }
+          .card {
+            overflow: visible !important;
+          }
+          table {
+            overflow: visible !important;
+          }
+          tbody {
+            overflow: visible !important;
+          }
+          td {
+            overflow: visible !important;
+          }
+        `}</style>
+        <Table hover style={{ width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th>Customer</th>
-              <th>Meal Plan</th>
-              <th>Price</th>
-              <th>Total Meals</th>
-              <th>Remaining</th>
-              <th>Consumed</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Status</th>
-              <th>Payment Status</th>
-              <th>History</th>
-              <th>Actions</th>
+              <th style={{ width: '12%' }}>Customer</th>
+              <th style={{ width: '12%' }}>Meal Plan</th>
+              <th style={{ width: '8%' }}>Total Meals</th>
+              <th style={{ width: '7%' }}>Remaining</th>
+              <th style={{ width: '7%' }}>Consumed</th>
+              <th style={{ width: '9%' }}>Start Date</th>
+              <th style={{ width: '9%' }}>End Date</th>
+              <th style={{ width: '7%' }}>Status</th>
+              <th style={{ width: '9%' }}>Payment Status</th>
+              <th style={{ width: '10%' }}>History</th>
+              <th style={{ width: '10%', position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 100, boxShadow: '-2px 0 4px rgba(0,0,0,0.1)' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -416,12 +530,12 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                     </div>
                     )}
                   </td>
-                  <td>
+                  {/* <td>
                     <div className="fw-semibold text-success">₹{userMembership.price || mealPlan?.price || 0}</div>
                     <small className="text-muted">
                       {userMembership.price ? 'Custom Price' : 'Plan Price'}
                     </small>
-                  </td>
+                  </td> */}
                   <td>
                     <Badge bg="primary">{userMembership.totalMeals}</Badge>
                   </td>
@@ -437,7 +551,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                   <td>
                     {getPaymentStatusBadge(
                       userMembership.paymentStatus, 
-                      userMembership.cumulativePaid || 0, 
+                      userMembership.receivedAmount || 0, 
                       userMembership.totalPrice || 0
                     )}
                   </td>
@@ -455,31 +569,99 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                       </small>
                     </div>
                   </td>
-                  <td>
-                    <Dropdown>
-                      <Dropdown.Toggle variant="outline-secondary" size="sm">
+                  <td style={{ position: 'sticky', right: 0, backgroundColor: 'white', zIndex: 100, boxShadow: '-2px 0 4px rgba(0,0,0,0.1)' }}>
+                    <Dropdown drop="start">
+                      <Dropdown.Toggle variant="outline-secondary" size="sm" id={`actions-dropdown-${userMembership._id}`}>
                         Actions
                       </Dropdown.Toggle>
-                      <Dropdown.Menu>
+                      <Dropdown.Menu 
+                        flip={false}
+                        align="end"
+                        style={{ 
+                          minWidth: '160px', 
+                          zIndex: 9999,
+                          fontSize: '12px',
+                          padding: '2px 0',
+                          maxHeight: 'none'
+                        }}
+                      >
+                        {/* History group - at the top */}
+                        <Dropdown.Header style={{ fontSize: '10px', padding: '2px 10px', fontWeight: '600', lineHeight: '1.3' }}>History</Dropdown.Header>
+                        <Dropdown.Item 
+                          onClick={() => handleViewHistory(userMembership)}
+                          style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                        >
+                          <i className="ri-history-line me-2" style={{ fontSize: '12px' }}></i>View History
+                        </Dropdown.Item>
+                        <Dropdown.Divider style={{ margin: '2px 0' }} />
+                        {/* Manage group */}
                         {canManageMembership && (
                           <>
-                        <Dropdown.Item onClick={() => handleEdit(userMembership)}>
-                          <i className="ri-edit-line me-2"></i>Punch
-                        </Dropdown.Item>
-                        <Dropdown.Item 
-                          onClick={() => handleDelete(userMembership)}
-                          className="text-danger"
-                        >
-                          <i className="ri-delete-bin-line me-2"></i>Delete
+                            <Dropdown.Header style={{ fontSize: '10px', padding: '2px 10px', fontWeight: '600', lineHeight: '1.3' }}>Manage</Dropdown.Header>
+                            <Dropdown.Item 
+                              onClick={() => {
+                                router.push(`/membership/membership-meal-selection?id=${userMembership._id}`)
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-restaurant-line me-2" style={{ fontSize: '12px' }}></i>Punch
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                              onClick={() => handleDelete(userMembership)}
+                              className="text-danger"
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-delete-bin-line me-2" style={{ fontSize: '12px' }}></i>Delete
+                            </Dropdown.Item>
+                            <Dropdown.Divider style={{ margin: '2px 0' }} />
+                            <Dropdown.Header style={{ fontSize: '10px', padding: '2px 10px', fontWeight: '600', lineHeight: '1.3' }}>Set Status</Dropdown.Header>
+                            <Dropdown.Item 
+                              disabled={isSettingStatus} 
+                              onClick={async () => {
+                                try {
+                                  await setMembershipStatus({ id: userMembership._id, status: 'active' }).unwrap()
+                                  showSuccess('Status updated to Active')
+                                  refetch()
+                                } catch (e: any) {
+                                  showError(e?.data?.message || 'Failed to update status')
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-checkbox-circle-line me-2 text-success" style={{ fontSize: '12px' }}></i>Active
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                              disabled={isSettingStatus} 
+                              onClick={async () => {
+                                try {
+                                  await setMembershipStatus({ id: userMembership._id, status: 'hold' }).unwrap()
+                                  showSuccess('Status updated to Hold')
+                                  refetch()
+                                } catch (e: any) {
+                                  showError(e?.data?.message || 'Failed to update status')
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-pause-circle-line me-2 text-warning" style={{ fontSize: '12px' }}></i>Hold
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                              disabled={isSettingStatus} 
+                              onClick={async () => {
+                                try {
+                                  await setMembershipStatus({ id: userMembership._id, status: 'cancelled' }).unwrap()
+                                  showSuccess('Status updated to Cancelled')
+                                  refetch()
+                                } catch (e: any) {
+                                  showError(e?.data?.message || 'Failed to update status')
+                                }
+                              }}
+                              style={{ fontSize: '12px', padding: '4px 10px', lineHeight: '1.3' }}
+                            >
+                              <i className="ri-close-circle-line me-2 text-danger" style={{ fontSize: '12px' }}></i>Cancelled
                             </Dropdown.Item>
                           </>
                         )}
-                        <Dropdown.Item onClick={() => handleViewHistory(userMembership)}>
-                          <i className="ri-history-line me-2"></i>View History
-                        </Dropdown.Item>
-                        <Dropdown.Item onClick={() => handleViewConsumedHistory(userMembership)}>
-                          <i className="ri-restaurant-line me-2"></i>View Consumed Meals History
-                        </Dropdown.Item>
                       </Dropdown.Menu>
                     </Dropdown>
                   </td>
@@ -496,205 +678,143 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
         </div>
       )}
 
-      {/* Edit Modal */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Punch User Membership</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Row className="g-3">
-            <Col lg={4} md={6}>
-              <Form.Group>
-                <Form.Label className="text-nowrap">Total Meals</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editFormData.totalMeals}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Total meals in membership
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col lg={4} md={6}>
-              <Form.Group>
-                <Form.Label className="text-nowrap">Consumed Meals</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editFormData.consumedMeals}
-                  onChange={(e) => setEditFormData({ ...editFormData, consumedMeals: Number(e.target.value) })}
-                  min="0"
-                  max={editFormData.totalMeals}
-                />
-                <Form.Text className="text-muted">
-                  Meals already consumed
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col lg={4} md={12}>
-              <Form.Group>
-                <Form.Label className="text-nowrap">Remaining Meals</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editFormData.remainingMeals}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Calculated automatically
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Status</Form.Label>
-                <Form.Select
-                  value={editFormData.status}
-                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+      {/* Pagination */}
+      {pagination && totalPages > 0 && (
+        <div className="border-top mt-3 pt-3">
+          <nav aria-label="Page navigation example">
+            <ul className="pagination justify-content-end mb-0">
+              <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                <Button 
+                  variant="link" 
+                  className="page-link"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
                 >
-                  <option value="active">Active</option>
-                  <option value="expired">Expired</option>
-                  {/* <option value="cancelled">Cancelled</option> */}
-                  <option value="completed">Completed</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Is Active</Form.Label>
-                <Form.Select
-                  value={editFormData.isActive ? 'true' : 'false'}
-                  onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'true' })}
+                  Previous
+                </Button>
+              </li>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                  <Button 
+                    variant="link" 
+                    className="page-link"
+                    onClick={() => handlePageChange(page)}
+                  >
+                    {page}
+                  </Button>
+                </li>
+              ))}
+              <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                <Button 
+                  variant="link" 
+                  className="page-link"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
                 >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
+                  Next
+                </Button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      )}
 
-            {/* Payment Fields */}
-            <Col md={12}>
-              <hr className="my-3" />
-              <h6 className="text-primary mb-3">Payment Information</h6>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Total Price (AED)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editFormData.totalPrice}
-                  onChange={(e) => setEditFormData({ ...editFormData, totalPrice: Number(e.target.value) })}
-                  min="0"
-                  step="0.01"
-                  placeholder="Enter total price"
-                />
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Received Amount (AED)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={editFormData.receivedAmount}
-                  onChange={(e) => handleEditReceivedAmountChange(Number(e.target.value))}
-                  min="0"
-                  step="0.01"
-                  placeholder="Amount received now"
-                />
-                <Form.Text className="text-muted">
-                  Amount received in this payment
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Cumulative Paid (AED)</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={`AED ${(editFormData.cumulativePaid || 0).toFixed(2)}`}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Total amount paid so far
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Payable Amount (AED)</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={`AED ${(editRemainingAmount || 0).toFixed(2)}`}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Remaining amount to be paid
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Payment Mode</Form.Label>
-                <Form.Select
-                  value={editFormData.paymentMode}
-                  onChange={(e) => setEditFormData({ ...editFormData, paymentMode: e.target.value })}
-                >
-                  <option value="">Select Payment Mode</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="online">Online Transfer</option>
-                  <option value="payment_link">Payment Link</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Payment Status</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={editPaymentStatus.charAt(0).toUpperCase() + editPaymentStatus.slice(1)}
-                  readOnly
-                  className="bg-light"
-                  plaintext
-                />
-                <Form.Text className="text-muted">
-                  Auto-calculated based on received amount
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Note</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={2}
-                  value={editFormData.note}
-                  onChange={(e) => setEditFormData({ ...editFormData, note: e.target.value })}
-                  placeholder="Add any additional notes..."
-                />
-              </Form.Group>
-            </Col>
-          </Row>
+      {/* Edit Modal */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="xl" centered>
+        <Modal.Header closeButton className="bg-light border-bottom">
+          <Modal.Title className="fw-semibold text-primary">
+            <i className="ri-user-settings-line me-2"></i>
+            Punch User Membership
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          {/* Meal Information Section */}
+          <div className="mb-4">
+            <h6 className="text-primary mb-3 fw-semibold">
+              <i className="ri-restaurant-line me-2"></i>
+              Meal Information
+            </h6>
+            <Row className="g-3">
+              <Col lg={4} md={6}>
+                <Form.Group>
+                  <Form.Label className="text-nowrap fw-medium">Total Meals</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editFormData.totalMeals}
+                    readOnly
+                    className="bg-light border-0"
+                    plaintext
+                  />
+                  <Form.Text className="text-muted small">
+                    Total meals in membership
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+              <Col lg={4} md={6}>
+                <Form.Group>
+                  <Form.Label className="text-nowrap fw-medium">Consumed Meals</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={editFormData.consumedMeals}
+                    onChange={(e) => setEditFormData({ ...editFormData, consumedMeals: Number(e.target.value) })}
+                    min="0"
+                    max={editFormData.totalMeals}
+                    className="border-primary"
+                  />
+                  <Form.Text className="text-muted small">
+                    Meals already consumed
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+              <Col lg={4} md={12}>
+                <Form.Group>
+                  <Form.Label className="text-nowrap fw-medium">Remaining Meals</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editFormData.remainingMeals}
+                    readOnly
+                    className="bg-light border-0"
+                    plaintext
+                  />
+                  <Form.Text className="text-muted small">
+                    Calculated automatically
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Status Section */}
+          <div className="mb-4">
+            <h6 className="text-primary mb-3 fw-semibold">
+              <i className="ri-settings-3-line me-2"></i>
+              Status
+            </h6>
+            <Row className="g-3">
+              <Col lg={6} md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-medium">Status</Form.Label>
+                  <Form.Select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="border-primary"
+                  >
+                    <option value="active">Active</option>
+                    <option value="hold">Hold</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="completed">Completed</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col lg={6} md={6}></Col>
+            </Row>
+          </div>
+
 
           {/* History Section */}
           {selectedUserMembership?.history && selectedUserMembership.history.length > 0 && (
-            <>
-              <hr className="my-4" />
-              <h6>
+            <div className="mb-4">
+              <h6 className="text-primary mb-3 fw-semibold">
                 <i className="ri-history-line me-2"></i>
                 Recent History
               </h6>
@@ -765,20 +885,38 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                   View Full History
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowEditModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleUpdateUserMembership}
-            disabled={isUpdating}
-          >
-            {isUpdating ? 'Updating...' : 'Update Membership'}
-          </Button>
+        <Modal.Footer className="bg-light border-top p-3">
+          <div className="d-flex justify-content-end gap-2 w-100">
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => setShowEditModal(false)}
+              className="px-4"
+            >
+              <i className="ri-close-line me-1"></i>
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleUpdateUserMembership}
+              disabled={isUpdating}
+              className="px-4"
+            >
+              {isUpdating ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <i className="ri-save-line me-1"></i>
+                  Update Membership
+                </>
+              )}
+            </Button>
+          </div>
         </Modal.Footer>
       </Modal>
 
@@ -805,7 +943,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
       </Modal>
 
       {/* History Modal */}
-      <Modal show={showHistoryModal} onHide={() => setShowHistoryModal(false)} size="lg">
+      <Modal show={showHistoryModal} onHide={() => setShowHistoryModal(false)} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="ri-history-line me-2"></i>
@@ -872,7 +1010,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                     <div className="fw-bold">
                       {getPaymentStatusBadge(
                         selectedUserMembership.paymentStatus, 
-                        selectedUserMembership.cumulativePaid || 0, 
+                        selectedUserMembership.receivedAmount || 0, 
                         selectedUserMembership.totalPrice || 0
                       )}
                     </div>
@@ -915,6 +1053,77 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
 
               <hr />
 
+              {/* Weeks Data Display - Compact View */}
+              {selectedUserMembership.weeks && selectedUserMembership.weeks.length > 0 && (
+                <div className="mb-4 p-3 bg-light rounded">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 className="text-primary mb-0">
+                      <i className="ri-calendar-line me-2"></i>
+                      Meal Plan Details ({selectedUserMembership.weeks.length} weeks)
+                    </h6>
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm"
+                      onClick={async () => {
+                        if (selectedUserMembership?._id) {
+                          setSelectedUserMembershipId(selectedUserMembership._id)
+                          try {
+                            const result = await refetchSingleMembership()
+                            if (result.data) {
+                              setSelectedUserMembership(result.data)
+                            }
+                          } catch (error: any) {
+                            console.error('Error fetching user membership by ID:', error)
+                          }
+                        }
+                        setShowWeeksModal(true)
+                      }}
+                    >
+                      <i className="ri-eye-line me-1"></i>
+                      View All Weeks
+                    </Button>
+                  </div>
+                  
+                  {/* Compact week summary */}
+                  <div className="row g-2">
+                    {selectedUserMembership.weeks.slice(0, 4).map((week: any, weekIndex: number) => (
+                      <div key={weekIndex} className="col-md-3 col-sm-6">
+                        <div 
+                          className="p-2 border rounded bg-white text-center cursor-pointer"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => handleViewWeekDetails(week)}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                        >
+                          <div className="fw-semibold">
+                            Week {week.week}
+                            {week.repeatFromWeek && (
+                              <i className="ri-repeat-line ms-1 text-info" title={`Repeats from Week ${week.repeatFromWeek}`}></i>
+                            )}
+                          </div>
+                          <div className="small text-muted">
+                            {week.days ? week.days.length : 0} days
+                          </div>
+                          <div className="small text-primary mt-1">
+                            <i className="ri-eye-line me-1"></i>
+                            Click to view details
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {selectedUserMembership.weeks.length > 4 && (
+                      <div className="col-md-3 col-sm-6">
+                        <div className="p-2 border rounded bg-light text-center">
+                          <div className="fw-semibold text-muted">
+                            +{selectedUserMembership.weeks.length - 4} more weeks
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <h6>Detailed History Events</h6>
               {selectedUserMembership.history && selectedUserMembership.history.length > 0 ? (
                 <div className="detailed-history" style={{ maxHeight: '500px', overflowY: 'auto' }}>
@@ -953,28 +1162,239 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                             {event.notes}
                           </div>
 
+                          {/* Meal Changes Display - Show before/after for updated actions */}
+                          {event.action === 'updated' && event.mealChanges && Array.isArray(event.mealChanges) && event.mealChanges.length > 0 && (
+                            <div className="mb-3 p-3 bg-light rounded border-start border-warning border-3">
+                              <h6 className="text-warning mb-3" style={{ fontSize: '15px', fontWeight: '600' }}>
+                                <i className="ri-refresh-line me-2"></i>
+                                Meal Changes
+                                {event.week && event.day && (
+                                  <span className="text-muted small ms-2">
+                                    (Week {event.week}, {event.day.charAt(0).toUpperCase() + event.day.slice(1)})
+                                  </span>
+                                )}
+                              </h6>
+                              <div className="d-flex flex-column gap-2">
+                                {event.mealChanges.map((change: any, changeIdx: number) => {
+                                  const mealTypeLabels: { [key: string]: string } = {
+                                    breakfast: 'Breakfast',
+                                    lunch: 'Lunch',
+                                    snacks: 'Snacks',
+                                    dinner: 'Dinner'
+                                  }
+                                  const mealTypeColors: { [key: string]: string } = {
+                                    breakfast: '#ff9800',
+                                    lunch: '#2196f3',
+                                    snacks: '#e91e63',
+                                    dinner: '#4caf50'
+                                  }
+                                  const mealTypeIcons: { [key: string]: string } = {
+                                    breakfast: 'ri-sun-line',
+                                    lunch: 'ri-restaurant-line',
+                                    snacks: 'ri-apple-line',
+                                    dinner: 'ri-moon-line'
+                                  }
+                                  const mealType = change.mealType || 'general'
+                                  const beforeItems = Array.isArray(change.before) ? change.before : []
+                                  const afterItems = Array.isArray(change.after) ? change.after : []
+                                  
+                                  return (
+                                    <div
+                                      key={changeIdx}
+                                      className="p-3 rounded"
+                                      style={{
+                                        backgroundColor: '#ffffff',
+                                        border: `2px solid ${mealTypeColors[mealType] || '#6c757d'}`,
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                      }}
+                                    >
+                                      <div className="d-flex align-items-center mb-2">
+                                        <i className={`${mealTypeIcons[mealType] || 'ri-restaurant-2-line'} me-2`} style={{ fontSize: '18px', color: mealTypeColors[mealType] || '#6c757d' }}></i>
+                                        <span className="fw-bold" style={{ fontSize: '15px', color: mealTypeColors[mealType] || '#6c757d' }}>
+                                          {mealTypeLabels[mealType] || mealType}
+                                        </span>
+                                      </div>
+                                      <div className="d-flex align-items-center flex-wrap gap-2">
+                                        <div className="d-flex align-items-center">
+                                          <span className="text-muted small me-2">Before:</span>
+                                          {beforeItems.length > 0 ? (
+                                            <div className="d-flex flex-wrap gap-1">
+                                              {beforeItems.map((item: string, itemIdx: number) => (
+                                                <span key={itemIdx} className="badge bg-secondary">
+                                                  {item}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted small fst-italic">No items</span>
+                                          )}
+                                        </div>
+                                        <i className="ri-arrow-right-line mx-2" style={{ color: '#6c757d' }}></i>
+                                        <div className="d-flex align-items-center">
+                                          <span className="text-muted small me-2">After:</span>
+                                          {afterItems.length > 0 ? (
+                                            <div className="d-flex flex-wrap gap-1">
+                                              {afterItems.map((item: string, itemIdx: number) => (
+                                                <span key={itemIdx} className="badge bg-success">
+                                                  {item}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted small fst-italic">No items</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Meal Details */}
-                          {(event.action === 'consumed' || event.mealsChanged > 0) && (
+                          {(event.action === 'consumed' || event.mealsChanged > 0 || event.currentConsumed !== undefined) && (
                             <div className="mb-3 p-2 bg-light rounded">
                               <h6 className="text-info mb-2">
-                              <i className="ri-restaurant-line me-1"></i>
+                                <i className="ri-restaurant-line me-1"></i>
                                 Meal Details
                               </h6>
                               <div className="row">
                                 <div className="col-md-4">
-                                  <small className="text-muted">Meals Changed:</small>
-                                  <div className="fw-bold text-warning">+{event.mealsChanged || 0}</div>
+                                  <small className="text-muted d-block mb-1">Current Consumed:</small>
+                                  <div className="fw-bold text-primary" style={{ fontSize: '18px' }}>{event.currentConsumed !== undefined && event.currentConsumed !== null ? event.currentConsumed : '-'}</div>
                                 </div>
                                 <div className="col-md-4">
-                                  <small className="text-muted">Total Consumed:</small>
-                                  <div className="fw-bold text-info">{event.consumedMeals || 0}</div>
+                                  <small className="text-muted d-block mb-1">Total Consumed:</small>
+                                  <div className="fw-bold text-info" style={{ fontSize: '18px' }}>{event.consumedMeals || 0}</div>
                                 </div>
                                 <div className="col-md-4">
-                                  <small className="text-muted">Remaining:</small>
-                                  <div className="fw-bold text-success">{event.remainingMeals || 0}</div>
+                                  <small className="text-muted d-block mb-1">Remaining:</small>
+                                  <div className="fw-bold text-success" style={{ fontSize: '18px' }}>{event.remainingMeals || 0}</div>
                                 </div>
                               </div>
-                              {event.mealType && (
+                              
+                              {/* Display Consumed Meal Items with Quantities */}
+                              {event.mealItems && Array.isArray(event.mealItems) && event.mealItems.length > 0 && (
+                                <div className="mt-3">
+                                  <h6 className="text-success mb-3" style={{ fontSize: '15px', fontWeight: '600' }}>
+                                    <i className="ri-restaurant-2-line me-2"></i>
+                                    Consumed Meal Items
+                                  </h6>
+                                  {(() => {
+                                    // Group items by meal type
+                                    const groupedByMealType: { [key: string]: any[] } = {}
+                                    event.mealItems.forEach((item: any) => {
+                                      const mealType = item.mealType || 'general'
+                                      if (!groupedByMealType[mealType]) {
+                                        groupedByMealType[mealType] = []
+                                      }
+                                      groupedByMealType[mealType].push(item)
+                                    })
+                                    
+                                    const mealTypeLabels: { [key: string]: string } = {
+                                      breakfast: 'Breakfast',
+                                      lunch: 'Lunch',
+                                      snacks: 'Snacks',
+                                      dinner: 'Dinner',
+                                      general: 'General'
+                                    }
+                                    
+                                    const mealTypeIcons: { [key: string]: string } = {
+                                      breakfast: 'ri-sun-line',
+                                      lunch: 'ri-restaurant-line',
+                                      snacks: 'ri-cake-line',
+                                      dinner: 'ri-moon-line',
+                                      general: 'ri-restaurant-2-line'
+                                    }
+                                    
+                                    const mealTypeColors: { [key: string]: { bg: string; border: string; badge: string } } = {
+                                      breakfast: { bg: '#fff8e1', border: '#ffc107', badge: '#ff9800' },
+                                      lunch: { bg: '#e3f2fd', border: '#2196f3', badge: '#1976d2' },
+                                      snacks: { bg: '#fce4ec', border: '#e91e63', badge: '#c2185b' },
+                                      dinner: { bg: '#e8f5e9', border: '#4caf50', badge: '#388e3c' },
+                                      general: { bg: '#f5f5f5', border: '#9e9e9e', badge: '#616161' }
+                                    }
+                                    
+                                    return (
+                                      <div className="row g-3">
+                                        {Object.entries(groupedByMealType).map(([mealType, mealItems]) => {
+                                          const colors = mealTypeColors[mealType] || mealTypeColors.general
+                                          const totalQty = mealItems.reduce((sum: number, it: any) => sum + (it.qty || 0), 0)
+                                          
+                                          return (
+                                            <div key={mealType} className="col-md-6 col-lg-3">
+                                              <div 
+                                                className="h-100 p-3 rounded shadow-sm"
+                                                style={{ 
+                                                  backgroundColor: colors.bg,
+                                                  border: `2px solid ${colors.border}`,
+                                                  borderTop: `4px solid ${colors.border}`,
+                                                  transition: 'transform 0.2s, box-shadow 0.2s'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.transform = 'translateY(-2px)'
+                                                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.transform = 'translateY(0)'
+                                                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}
+                                              >
+                                                <div className="d-flex align-items-center justify-content-between mb-3">
+                                                  <div className="d-flex align-items-center">
+                                                    <i className={`${mealTypeIcons[mealType] || 'ri-restaurant-2-line'} me-2`} style={{ fontSize: '18px', color: colors.badge }}></i>
+                                                    <span className="fw-bold" style={{ fontSize: '14px', color: colors.badge }}>
+                                                      {mealTypeLabels[mealType] || mealType}
+                                                    </span>
+                                                  </div>
+                                                  <span className="badge rounded-pill" style={{ backgroundColor: colors.badge, fontSize: '11px' }}>
+                                                    {totalQty} items
+                                                  </span>
+                                                </div>
+                                                
+                                                <div className="d-flex flex-column gap-2">
+                                                  {mealItems.map((item: any, itemIdx: number) => (
+                                                    <div
+                                                      key={itemIdx}
+                                                      className="d-flex align-items-center justify-content-between p-2 rounded"
+                                                      style={{
+                                                        backgroundColor: '#ffffff',
+                                                        border: `1px solid ${colors.border}`,
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                      }}
+                                                    >
+                                                      <div className="d-flex align-items-center flex-grow-1">
+                                                        <i className="ri-checkbox-circle-fill me-2" style={{ fontSize: '14px', color: colors.badge }}></i>
+                                                        <span style={{ fontSize: '13px', fontWeight: '500', color: '#333' }}>
+                                                          {item.title || 'N/A'}
+                                                        </span>
+                                                      </div>
+                                                      <span 
+                                                        className="badge rounded-pill"
+                                                        style={{ 
+                                                          backgroundColor: colors.badge,
+                                                          fontSize: '11px',
+                                                          fontWeight: '600',
+                                                          minWidth: '35px'
+                                                        }}
+                                                      >
+                                                        {item.qty || 0}
+                                                      </span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              )}
+                              
+                              {event.mealType && (!event.mealItems || event.mealItems.length === 0) && (
                                 <div className="mt-2">
                                   <small className="text-muted">Meal Type:</small>
                                   <span className="badge bg-secondary ms-1 text-capitalize">{event.mealType}</span>
@@ -1029,7 +1449,7 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                                     <div className="fw-semibold">
                                       {getPaymentStatusBadge(
                                         event.paymentStatus, 
-                                        event.cumulativePaid || 0, 
+                                        event.receivedAmount || 0, 
                                         event.totalPrice || 0
                                       )}
                                     </div>
@@ -1219,6 +1639,243 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Weeks Details Modal */}
+      <Modal show={showWeeksModal} onHide={() => setShowWeeksModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="ri-calendar-line me-2"></i>
+            Meal Plan Details - All Weeks
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedUserMembership && selectedUserMembership.weeks && (
+            <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {selectedUserMembership.weeks.map((week: any, weekIndex: number) => (
+                <div key={weekIndex} className="mb-4 p-3 border rounded">
+                  <div className="d-flex align-items-center mb-3">
+                    <h6 className="mb-0 me-3">Week {week.week}</h6>
+                    {week.repeatFromWeek && (
+                      <span className="badge bg-info">
+                        <i className="ri-repeat-line me-1"></i>
+                        Repeats from Week {week.repeatFromWeek}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="row g-3">
+                    {week.days && week.days.map((day: any, dayIndex: number) => {
+                      const isConsumed = day.isConsumed || week.isConsumed || 
+                        (day.consumedMeals && (
+                          day.consumedMeals.breakfast || 
+                          day.consumedMeals.lunch || 
+                          day.consumedMeals.snacks || 
+                          day.consumedMeals.dinner
+                        ))
+                      
+                      return (
+                        <div key={dayIndex} className="col-lg-3 col-md-4 col-sm-6">
+                          <div className="p-2 border rounded bg-white">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <div className="fw-semibold text-capitalize">{day.day}</div>
+                              {canManageMembership && !isConsumed && (
+                                <Button
+                                  variant="outline-primary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedWeek(week)
+                                    handleEditDayMeals(week, day)
+                                  }}
+                                >
+                                  <i className="ri-edit-line me-1"></i>
+                                  Edit
+                                </Button>
+                              )}
+                              {isConsumed && (
+                                <Badge bg="warning" className="text-dark" style={{ fontSize: '10px' }}>
+                                  Consumed
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="small">
+                              <div className="mb-1">
+                                <strong>Breakfast:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.breakfast && day.meals.breakfast.length > 0 
+                                    ? day.meals.breakfast.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
+                              </div>
+                              <div className="mb-1">
+                                <strong>Lunch:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.lunch && day.meals.lunch.length > 0 
+                                    ? day.meals.lunch.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
+                              </div>
+                              <div className="mb-1">
+                                <strong>Snacks:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.snacks && day.meals.snacks.length > 0 
+                                    ? day.meals.snacks.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
+                              </div>
+                              <div className="mb-1">
+                                <strong>Dinner:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.dinner && day.meals.dinner.length > 0 
+                                    ? day.meals.dinner.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowWeeksModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Single Week Details Modal */}
+      <Modal show={showSingleWeekModal} onHide={() => setShowSingleWeekModal(false)} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="ri-calendar-line me-2"></i>
+            Week {selectedWeek?.week} Details
+            {selectedWeek?.repeatFromWeek && (
+              <span className="badge bg-info ms-2">
+                <i className="ri-repeat-line me-1"></i>
+                Repeats from Week {selectedWeek.repeatFromWeek}
+              </span>
+            )}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedWeek && (
+            <div>
+              <div className="row g-3">
+                {selectedWeek.days && selectedWeek.days.map((day: any, dayIndex: number) => {
+                  const isConsumed = day.isConsumed || selectedWeek.isConsumed || 
+                    (day.consumedMeals && (
+                      day.consumedMeals.breakfast || 
+                      day.consumedMeals.lunch || 
+                      day.consumedMeals.snacks || 
+                      day.consumedMeals.dinner
+                    ))
+                  
+                  return (
+                    <div key={dayIndex} className="col-lg-4 col-md-6">
+                      <div className="p-3 border rounded bg-light">
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <div className="fw-semibold text-capitalize text-primary">{day.day}</div>
+                          {canManageMembership && !isConsumed && (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={() => handleEditDayMeals(selectedWeek, day)}
+                            >
+                              <i className="ri-edit-line me-1"></i>
+                              Edit
+                            </Button>
+                          )}
+                          {isConsumed && (
+                            <Badge bg="warning" className="text-dark">
+                              <i className="ri-check-line me-1"></i>
+                              Consumed
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="row g-2">
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-sun-line me-2 text-warning"></i>
+                              <strong>Breakfast:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.breakfast && day.meals.breakfast.length > 0 
+                                ? day.meals.breakfast.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
+                          </div>
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-sun-fill me-2 text-orange"></i>
+                              <strong>Lunch:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.lunch && day.meals.lunch.length > 0 
+                                ? day.meals.lunch.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
+                          </div>
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-apple-line me-2 text-success"></i>
+                              <strong>Snacks:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.snacks && day.meals.snacks.length > 0 
+                                ? day.meals.snacks.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
+                          </div>
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-moon-line me-2 text-info"></i>
+                              <strong>Dinner:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.dinner && day.meals.dinner.length > 0 
+                                ? day.meals.dinner.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowSingleWeekModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Edit Meal Modal */}
+      <EditMealModal
+        show={showEditMealModal}
+        onHide={() => setShowEditMealModal(false)}
+        userMembership={selectedUserMembership}
+        week={selectedWeek}
+        day={selectedDay}
+        onSuccess={handleMealEditSuccess}
+        canManageMembership={canManageMembership}
+      />
     </>
   )
 })

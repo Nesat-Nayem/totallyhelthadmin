@@ -50,6 +50,18 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
       return
     }
     
+    // Special handling for Membership Meal - redirect to user membership management
+    if (orderType === 'MembershipMeal') {
+      // Simulate loading for better UX
+      setTimeout(() => {
+        dispatch(setLoading(false))
+        onClose()
+        // Redirect to user membership management page
+        router.push('/membership/user-membership')
+      }, 500)
+      return
+    }
+    
     // Simulate loading for better UX
     setTimeout(() => {
       dispatch(setOrderType({ orderType, priceType }))
@@ -140,7 +152,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({ show, onClose }) => {
                 disabled={isLoading}
               >
                 <FaIdBadge /> Membership Meal
-                <small className="d-block">Master Menu</small>
+                <small className="d-block">Meal Plan Menu</small>
               </Button>
             </Col>
 

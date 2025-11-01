@@ -19,6 +19,20 @@ export type MealPlan = {
   thumbnail?: string
   totalMeals?: number
   durationDays?: number
+  // Structured meal plan weeks
+  weeks?: Array<{
+    week: number
+    days?: Array<{
+      day: 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+      meals: {
+        breakfast: string[]
+        lunch: string[]
+        snacks: string[]
+        dinner: string[]
+      }
+    }>
+    repeatFromWeek?: number
+  }>
   status: 'active' | 'inactive'
   isDeleted?: boolean
   createdAt: string

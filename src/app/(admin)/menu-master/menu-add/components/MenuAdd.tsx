@@ -12,6 +12,7 @@ import Select from 'react-select'
 import { useGetMenuCategoriesQuery } from '@/services/menuCategoryApi'
 import { useGetBrandsQuery } from '@/services/brandApi'
 import { useGetBranchesQuery } from '@/services/branchApi'
+import { useSession } from 'next-auth/react'
 import { uploadSingle } from '@/services/upload'
 import { useCreateMenuMutation } from '@/services/menuApi'
 import { useRouter } from 'next/navigation'
@@ -416,15 +417,27 @@ const MenuAdd: React.FC = () => {
     defaultValues: { status: 'active', orderTypes: [] },
   })
   const router = useRouter()
-  const { data: categories = [] } = useGetMenuCategoriesQuery()
-  const { data: brands = [] } = useGetBrandsQuery()
-  const { data: branches = [] } = useGetBranchesQuery()
+  const { data: session, status: sessionStatus } = useSession()
+  
+  // Only make API calls when session is authenticated and token is available
+  const shouldFetch = sessionStatus === 'authenticated' && (session as any)?.accessToken
+  
+  const { data: categories = [], isLoading: categoriesLoading } = useGetMenuCategoriesQuery(undefined, {
+    skip: !shouldFetch
+  })
+  const { data: brands = [], isLoading: brandsLoading } = useGetBrandsQuery(undefined, {
+    skip: !shouldFetch
+  })
+  const { data: branches = [], isLoading: branchesLoading } = useGetBranchesQuery(undefined, {
+    skip: !shouldFetch
+  })
   const [createMenu, { isLoading }] = useCreateMenuMutation()
 
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedBrands, setSelectedBrands] = useState<any[]>([])
   const [selectedBranches, setSelectedBranches] = useState<any[]>([])
   const [file, setFile] = useState<File | null>(null)
+
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -486,6 +499,20 @@ const MenuAdd: React.FC = () => {
     } catch (e: any) {
       toast.error(e?.data?.message || e?.message || 'Failed to create menu')
     }
+  }
+
+  // Show loading state while data is being fetched
+  if (sessionStatus === 'loading' || (shouldFetch && (categoriesLoading || brandsLoading || branchesLoading))) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3">Loading form data...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
