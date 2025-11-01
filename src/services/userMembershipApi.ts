@@ -103,6 +103,16 @@ export const userMembershipApi = baseApi.injectEndpoints({
       }>;
       status?: string;
       isActive?: boolean;
+      weeks?: Array<any>; // Support updating weeks (full array)
+      // Support updating single week/day
+      week?: number;
+      day?: string;
+      meals?: {
+        breakfast?: string[];
+        lunch?: string[];
+        snacks?: string[];
+        dinner?: string[];
+      };
     }>({
       query: ({ id, ...data }) => ({ url: `/user-memberships/${id}`, method: 'PUT', body: data }),
       transformResponse: (res: any) => res?.data,
@@ -137,6 +147,28 @@ export const userMembershipApi = baseApi.injectEndpoints({
       transformResponse: (res: any) => res?.data,
       invalidatesTags: (_r, _e, { id }) => [{ type: 'UserMembership', id }],
     }),
+    updateMealSelections: build.mutation<UserMembership, {
+      id: string;
+      week: number;
+      day: 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+      meals: {
+        breakfast?: string[];
+        lunch?: string[];
+        snacks?: string[];
+        dinner?: string[];
+      };
+    }>({
+      query: ({ id, ...body }) => ({ 
+        url: `/user-memberships/${id}/update-meal-selections`, 
+        method: 'PATCH', 
+        body 
+      }),
+      transformResponse: (res: any) => res?.data,
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'UserMembership', id },
+        { type: 'UserMembership', id: 'LIST' } // Also invalidate list to refresh when reopening
+      ],
+    }),
   }),
   overrideExisting: true,
 })
@@ -149,5 +181,6 @@ export const {
   useUpdateUserMembershipMutation,
   useDeleteUserMembershipMutation,
   useSetMembershipStatusMutation,
-  usePunchMealsMutation
+  usePunchMealsMutation,
+  useUpdateMealSelectionsMutation
 } = userMembershipApi

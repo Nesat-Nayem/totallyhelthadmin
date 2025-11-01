@@ -1,13 +1,14 @@
 'use client'
 
-import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react'
+import React, { useState, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react'
 import { Table, Badge, Button, Dropdown, Modal, Form, Row, Col, Alert } from 'react-bootstrap'
 import { useRouter } from 'next/navigation'
-import { useGetUserMembershipsQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation, useSetMembershipStatusMutation } from '@/services/userMembershipApi'
+import { useGetUserMembershipsQuery, useGetUserMembershipByIdQuery, useUpdateUserMembershipMutation, useDeleteUserMembershipMutation, useSetMembershipStatusMutation } from '@/services/userMembershipApi'
 import { useGetCustomersQuery } from '@/services/customerApi'
 import { useGetMealPlansQuery } from '@/services/mealPlanApi'
 import { showSuccess, showError } from '@/utils/sweetAlert'
 import { useAccessControl } from '@/hooks/useAccessControl'
+import EditMealModal from './EditMealModal'
 
 interface UserMembershipDataListProps {
   searchQuery: string
@@ -27,13 +28,19 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
   const [showConsumedHistoryModal, setShowConsumedHistoryModal] = useState(false)
   const [showWeeksModal, setShowWeeksModal] = useState(false)
   const [showSingleWeekModal, setShowSingleWeekModal] = useState(false)
+  const [showEditMealModal, setShowEditMealModal] = useState(false)
   const [selectedWeek, setSelectedWeek] = useState<any>(null)
+  const [selectedDay, setSelectedDay] = useState<any>(null)
   const [selectedUserMembership, setSelectedUserMembership] = useState<any>(null)
+  const [selectedUserMembershipId, setSelectedUserMembershipId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<any>({})
+  const [currentPage, setCurrentPage] = useState(1)
+  const [limit] = useState(10)
 
-  const { data: userMembershipsRes, isLoading, error, refetch } = useGetUserMembershipsQuery({ limit: 100 })
+  const { data: userMembershipsRes, isLoading, error, refetch } = useGetUserMembershipsQuery({ page: currentPage, limit: limit })
   const { data: customersRes } = useGetCustomersQuery({ limit: 1000 })
   const { data: mealPlansRes } = useGetMealPlansQuery({ limit: 1000 })
+  const { data: singleUserMembershipData, refetch: refetchSingleMembership } = useGetUserMembershipByIdQuery(selectedUserMembershipId || '', { skip: !selectedUserMembershipId })
   const [updateUserMembership, { isLoading: isUpdating }] = useUpdateUserMembershipMutation()
   const [setMembershipStatus, { isLoading: isSettingStatus }] = useSetMembershipStatusMutation()
   const [deleteUserMembership, { isLoading: isDeleting }] = useDeleteUserMembershipMutation()
@@ -49,12 +56,34 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     }
   }), [refetch])
 
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  // Update selected membership when single membership data is fetched
+  useEffect(() => {
+    if (singleUserMembershipData && selectedUserMembershipId) {
+      setSelectedUserMembership(singleUserMembershipData)
+    }
+  }, [singleUserMembershipData, selectedUserMembershipId])
 
   const userMemberships = useMemo(() => {
     console.log('User memberships response:', userMembershipsRes)
     console.log('User memberships array:', userMembershipsRes?.memberships)
     return userMembershipsRes?.memberships || []
   }, [userMembershipsRes])
+
+  const pagination = useMemo(() => {
+    return userMembershipsRes?.pagination || null
+  }, [userMembershipsRes])
+
+  const totalPages = useMemo(() => {
+    if (pagination?.totalPages) {
+      return pagination.totalPages
+    }
+    return 1
+  }, [pagination])
   const customers = useMemo(() => customersRes?.data || [], [customersRes])
   const mealPlans = useMemo(() => mealPlansRes?.data || [], [mealPlansRes])
 
@@ -99,6 +128,10 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     })
   }, [userMemberships, searchQuery, customerMap, mealPlanMap])
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
   const handleEdit = (userMembership: any) => {
     if (!canManageMembership) {
       showError('You do not have permission to manage user memberships')
@@ -128,19 +161,129 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
     setShowDeleteModal(true)
   }
 
-  const handleViewHistory = (userMembership: any) => {
+  const handleViewHistory = async (userMembership: any) => {
+    // Set the ID to trigger the query
+    setSelectedUserMembershipId(userMembership._id)
+    // Use existing data immediately, will update when query completes
     setSelectedUserMembership(userMembership)
     setShowHistoryModal(true)
+    // Refetch the specific membership by ID
+    if (userMembership._id) {
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          setSelectedUserMembership(result.data)
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+      }
+    }
   }
 
-  const handleViewConsumedHistory = (userMembership: any) => {
+  const handleViewConsumedHistory = async (userMembership: any) => {
+    // Set the ID to trigger the query
+    setSelectedUserMembershipId(userMembership._id)
+    // Use existing data immediately, will update when query completes
     setSelectedUserMembership(userMembership)
     setShowConsumedHistoryModal(true)
+    // Refetch the specific membership by ID
+    if (userMembership._id) {
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          setSelectedUserMembership(result.data)
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+      }
+    }
   }
 
-  const handleViewWeekDetails = (week: any) => {
-    setSelectedWeek(week)
+  const handleViewWeekDetails = async (week: any) => {
+    // Refresh the selected membership data if we have an ID
+    if (selectedUserMembership?._id) {
+      setSelectedUserMembershipId(selectedUserMembership._id)
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          const freshWeek = result.data.weeks?.find((w: any) => w.week === week.week)
+          if (freshWeek) {
+            setSelectedWeek(freshWeek)
+            setSelectedUserMembership(result.data)
+          } else {
+            setSelectedWeek(week)
+          }
+        } else {
+          setSelectedWeek(week)
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+        setSelectedWeek(week)
+      }
+    } else {
+      setSelectedWeek(week)
+    }
+    
     setShowSingleWeekModal(true)
+  }
+
+  const handleEditDayMeals = async (week: any, day: any) => {
+    // Fetch fresh data for the selected membership by ID before editing
+    if (selectedUserMembership?._id) {
+      setSelectedUserMembershipId(selectedUserMembership._id)
+      try {
+        const result = await refetchSingleMembership()
+        if (result.data) {
+          const freshWeek = result.data.weeks?.find((w: any) => w.week === week.week)
+          if (freshWeek) {
+            const freshDay = freshWeek.days?.find((d: any) => d.day === day.day)
+            if (freshDay) {
+              week = freshWeek
+              day = freshDay
+              setSelectedUserMembership(result.data)
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('Error fetching user membership by ID:', error)
+        // Continue with existing data if fetch fails
+      }
+    }
+    
+    // Check if day/week is consumed
+    if (day.isConsumed || week.isConsumed) {
+      showError('Cannot edit consumed meals. This day/week has already been consumed.')
+      return
+    }
+
+    // Check if any meal type in the day is consumed
+    if (day.consumedMeals && (
+      day.consumedMeals.breakfast || 
+      day.consumedMeals.lunch || 
+      day.consumedMeals.snacks || 
+      day.consumedMeals.dinner
+    )) {
+      showError('Cannot edit consumed meals. Some meals for this day have already been consumed.')
+      return
+    }
+
+    setSelectedWeek(week)
+    setSelectedDay(day)
+    setShowEditMealModal(true)
+  }
+
+  const handleMealEditSuccess = (updatedMembership?: any) => {
+    // Close other modals if open
+    setShowSingleWeekModal(false)
+    setShowWeeksModal(false)
+    
+    // Update the selected membership with fresh data if provided
+    if (updatedMembership) {
+      setSelectedUserMembership(updatedMembership)
+    }
+    
+    // Refetch the full list to ensure all data is fresh
+    refetch()
   }
 
   const handleUpdateUserMembership = async () => {
@@ -535,6 +678,47 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
         </div>
       )}
 
+      {/* Pagination */}
+      {pagination && totalPages > 0 && (
+        <div className="border-top mt-3 pt-3">
+          <nav aria-label="Page navigation example">
+            <ul className="pagination justify-content-end mb-0">
+              <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                <Button 
+                  variant="link" 
+                  className="page-link"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+              </li>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                  <Button 
+                    variant="link" 
+                    className="page-link"
+                    onClick={() => handlePageChange(page)}
+                  >
+                    {page}
+                  </Button>
+                </li>
+              ))}
+              <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                <Button 
+                  variant="link" 
+                  className="page-link"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      )}
+
       {/* Edit Modal */}
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="xl" centered>
         <Modal.Header closeButton className="bg-light border-bottom">
@@ -880,7 +1064,20 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                     <Button 
                       variant="outline-primary" 
                       size="sm"
-                      onClick={() => setShowWeeksModal(true)}
+                      onClick={async () => {
+                        if (selectedUserMembership?._id) {
+                          setSelectedUserMembershipId(selectedUserMembership._id)
+                          try {
+                            const result = await refetchSingleMembership()
+                            if (result.data) {
+                              setSelectedUserMembership(result.data)
+                            }
+                          } catch (error: any) {
+                            console.error('Error fetching user membership by ID:', error)
+                          }
+                        }
+                        setShowWeeksModal(true)
+                      }}
                     >
                       <i className="ri-eye-line me-1"></i>
                       View All Weeks
@@ -964,6 +1161,96 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                           <div className="text-muted small mb-3">
                             {event.notes}
                           </div>
+
+                          {/* Meal Changes Display - Show before/after for updated actions */}
+                          {event.action === 'updated' && event.mealChanges && Array.isArray(event.mealChanges) && event.mealChanges.length > 0 && (
+                            <div className="mb-3 p-3 bg-light rounded border-start border-warning border-3">
+                              <h6 className="text-warning mb-3" style={{ fontSize: '15px', fontWeight: '600' }}>
+                                <i className="ri-refresh-line me-2"></i>
+                                Meal Changes
+                                {event.week && event.day && (
+                                  <span className="text-muted small ms-2">
+                                    (Week {event.week}, {event.day.charAt(0).toUpperCase() + event.day.slice(1)})
+                                  </span>
+                                )}
+                              </h6>
+                              <div className="d-flex flex-column gap-2">
+                                {event.mealChanges.map((change: any, changeIdx: number) => {
+                                  const mealTypeLabels: { [key: string]: string } = {
+                                    breakfast: 'Breakfast',
+                                    lunch: 'Lunch',
+                                    snacks: 'Snacks',
+                                    dinner: 'Dinner'
+                                  }
+                                  const mealTypeColors: { [key: string]: string } = {
+                                    breakfast: '#ff9800',
+                                    lunch: '#2196f3',
+                                    snacks: '#e91e63',
+                                    dinner: '#4caf50'
+                                  }
+                                  const mealTypeIcons: { [key: string]: string } = {
+                                    breakfast: 'ri-sun-line',
+                                    lunch: 'ri-restaurant-line',
+                                    snacks: 'ri-apple-line',
+                                    dinner: 'ri-moon-line'
+                                  }
+                                  const mealType = change.mealType || 'general'
+                                  const beforeItems = Array.isArray(change.before) ? change.before : []
+                                  const afterItems = Array.isArray(change.after) ? change.after : []
+                                  
+                                  return (
+                                    <div
+                                      key={changeIdx}
+                                      className="p-3 rounded"
+                                      style={{
+                                        backgroundColor: '#ffffff',
+                                        border: `2px solid ${mealTypeColors[mealType] || '#6c757d'}`,
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                      }}
+                                    >
+                                      <div className="d-flex align-items-center mb-2">
+                                        <i className={`${mealTypeIcons[mealType] || 'ri-restaurant-2-line'} me-2`} style={{ fontSize: '18px', color: mealTypeColors[mealType] || '#6c757d' }}></i>
+                                        <span className="fw-bold" style={{ fontSize: '15px', color: mealTypeColors[mealType] || '#6c757d' }}>
+                                          {mealTypeLabels[mealType] || mealType}
+                                        </span>
+                                      </div>
+                                      <div className="d-flex align-items-center flex-wrap gap-2">
+                                        <div className="d-flex align-items-center">
+                                          <span className="text-muted small me-2">Before:</span>
+                                          {beforeItems.length > 0 ? (
+                                            <div className="d-flex flex-wrap gap-1">
+                                              {beforeItems.map((item: string, itemIdx: number) => (
+                                                <span key={itemIdx} className="badge bg-secondary">
+                                                  {item}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted small fst-italic">No items</span>
+                                          )}
+                                        </div>
+                                        <i className="ri-arrow-right-line mx-2" style={{ color: '#6c757d' }}></i>
+                                        <div className="d-flex align-items-center">
+                                          <span className="text-muted small me-2">After:</span>
+                                          {afterItems.length > 0 ? (
+                                            <div className="d-flex flex-wrap gap-1">
+                                              {afterItems.map((item: string, itemIdx: number) => (
+                                                <span key={itemIdx} className="badge bg-success">
+                                                  {item}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted small fst-italic">No items</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Meal Details */}
                           {(event.action === 'consumed' || event.mealsChanged > 0 || event.currentConsumed !== undefined) && (
@@ -1377,51 +1664,81 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
                   </div>
                   
                   <div className="row g-3">
-                    {week.days && week.days.map((day: any, dayIndex: number) => (
-                      <div key={dayIndex} className="col-lg-3 col-md-4 col-sm-6">
-                        <div className="p-2 border rounded bg-white">
-                          <div className="fw-semibold text-capitalize mb-2">{day.day}</div>
-                          <div className="small">
-                            <div className="mb-1">
-                              <strong>Breakfast:</strong> 
-                              <div className="text-muted">
-                                {day.meals.breakfast && day.meals.breakfast.length > 0 
-                                  ? day.meals.breakfast.join(', ') 
-                                  : 'None selected'
-                                }
-                              </div>
+                    {week.days && week.days.map((day: any, dayIndex: number) => {
+                      const isConsumed = day.isConsumed || week.isConsumed || 
+                        (day.consumedMeals && (
+                          day.consumedMeals.breakfast || 
+                          day.consumedMeals.lunch || 
+                          day.consumedMeals.snacks || 
+                          day.consumedMeals.dinner
+                        ))
+                      
+                      return (
+                        <div key={dayIndex} className="col-lg-3 col-md-4 col-sm-6">
+                          <div className="p-2 border rounded bg-white">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <div className="fw-semibold text-capitalize">{day.day}</div>
+                              {canManageMembership && !isConsumed && (
+                                <Button
+                                  variant="outline-primary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedWeek(week)
+                                    handleEditDayMeals(week, day)
+                                  }}
+                                >
+                                  <i className="ri-edit-line me-1"></i>
+                                  Edit
+                                </Button>
+                              )}
+                              {isConsumed && (
+                                <Badge bg="warning" className="text-dark" style={{ fontSize: '10px' }}>
+                                  Consumed
+                                </Badge>
+                              )}
                             </div>
-                            <div className="mb-1">
-                              <strong>Lunch:</strong> 
-                              <div className="text-muted">
-                                {day.meals.lunch && day.meals.lunch.length > 0 
-                                  ? day.meals.lunch.join(', ') 
-                                  : 'None selected'
-                                }
+                            <div className="small">
+                              <div className="mb-1">
+                                <strong>Breakfast:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.breakfast && day.meals.breakfast.length > 0 
+                                    ? day.meals.breakfast.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
                               </div>
-                            </div>
-                            <div className="mb-1">
-                              <strong>Snacks:</strong> 
-                              <div className="text-muted">
-                                {day.meals.snacks && day.meals.snacks.length > 0 
-                                  ? day.meals.snacks.join(', ') 
-                                  : 'None selected'
-                                }
+                              <div className="mb-1">
+                                <strong>Lunch:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.lunch && day.meals.lunch.length > 0 
+                                    ? day.meals.lunch.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
                               </div>
-                            </div>
-                            <div className="mb-1">
-                              <strong>Dinner:</strong> 
-                              <div className="text-muted">
-                                {day.meals.dinner && day.meals.dinner.length > 0 
-                                  ? day.meals.dinner.join(', ') 
-                                  : 'None selected'
-                                }
+                              <div className="mb-1">
+                                <strong>Snacks:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.snacks && day.meals.snacks.length > 0 
+                                    ? day.meals.snacks.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
+                              </div>
+                              <div className="mb-1">
+                                <strong>Dinner:</strong> 
+                                <div className="text-muted">
+                                  {day.meals.dinner && day.meals.dinner.length > 0 
+                                    ? day.meals.dinner.join(', ') 
+                                    : 'None selected'
+                                  }
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               ))}
@@ -1453,63 +1770,91 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
           {selectedWeek && (
             <div>
               <div className="row g-3">
-                {selectedWeek.days && selectedWeek.days.map((day: any, dayIndex: number) => (
-                  <div key={dayIndex} className="col-lg-4 col-md-6">
-                    <div className="p-3 border rounded bg-light">
-                      <div className="fw-semibold text-capitalize mb-3 text-primary">{day.day}</div>
-                      <div className="row g-2">
-                        <div className="col-12">
-                          <div className="d-flex align-items-center mb-2">
-                            <i className="ri-sun-line me-2 text-warning"></i>
-                            <strong>Breakfast:</strong>
-                          </div>
-                          <div className="text-muted ms-4">
-                            {day.meals.breakfast && day.meals.breakfast.length > 0 
-                              ? day.meals.breakfast.join(', ') 
-                              : 'None selected'
-                            }
-                          </div>
+                {selectedWeek.days && selectedWeek.days.map((day: any, dayIndex: number) => {
+                  const isConsumed = day.isConsumed || selectedWeek.isConsumed || 
+                    (day.consumedMeals && (
+                      day.consumedMeals.breakfast || 
+                      day.consumedMeals.lunch || 
+                      day.consumedMeals.snacks || 
+                      day.consumedMeals.dinner
+                    ))
+                  
+                  return (
+                    <div key={dayIndex} className="col-lg-4 col-md-6">
+                      <div className="p-3 border rounded bg-light">
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <div className="fw-semibold text-capitalize text-primary">{day.day}</div>
+                          {canManageMembership && !isConsumed && (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={() => handleEditDayMeals(selectedWeek, day)}
+                            >
+                              <i className="ri-edit-line me-1"></i>
+                              Edit
+                            </Button>
+                          )}
+                          {isConsumed && (
+                            <Badge bg="warning" className="text-dark">
+                              <i className="ri-check-line me-1"></i>
+                              Consumed
+                            </Badge>
+                          )}
                         </div>
-                        <div className="col-12">
-                          <div className="d-flex align-items-center mb-2">
-                            <i className="ri-sun-fill me-2 text-orange"></i>
-                            <strong>Lunch:</strong>
+                        <div className="row g-2">
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-sun-line me-2 text-warning"></i>
+                              <strong>Breakfast:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.breakfast && day.meals.breakfast.length > 0 
+                                ? day.meals.breakfast.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
                           </div>
-                          <div className="text-muted ms-4">
-                            {day.meals.lunch && day.meals.lunch.length > 0 
-                              ? day.meals.lunch.join(', ') 
-                              : 'None selected'
-                            }
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-sun-fill me-2 text-orange"></i>
+                              <strong>Lunch:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.lunch && day.meals.lunch.length > 0 
+                                ? day.meals.lunch.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
                           </div>
-                        </div>
-                        <div className="col-12">
-                          <div className="d-flex align-items-center mb-2">
-                            <i className="ri-apple-line me-2 text-success"></i>
-                            <strong>Snacks:</strong>
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-apple-line me-2 text-success"></i>
+                              <strong>Snacks:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.snacks && day.meals.snacks.length > 0 
+                                ? day.meals.snacks.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
                           </div>
-                          <div className="text-muted ms-4">
-                            {day.meals.snacks && day.meals.snacks.length > 0 
-                              ? day.meals.snacks.join(', ') 
-                              : 'None selected'
-                            }
-                          </div>
-                        </div>
-                        <div className="col-12">
-                          <div className="d-flex align-items-center mb-2">
-                            <i className="ri-moon-line me-2 text-info"></i>
-                            <strong>Dinner:</strong>
-                          </div>
-                          <div className="text-muted ms-4">
-                            {day.meals.dinner && day.meals.dinner.length > 0 
-                              ? day.meals.dinner.join(', ') 
-                              : 'None selected'
-                            }
+                          <div className="col-12">
+                            <div className="d-flex align-items-center mb-2">
+                              <i className="ri-moon-line me-2 text-info"></i>
+                              <strong>Dinner:</strong>
+                            </div>
+                            <div className="text-muted ms-4">
+                              {day.meals.dinner && day.meals.dinner.length > 0 
+                                ? day.meals.dinner.join(', ') 
+                                : 'None selected'
+                              }
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -1520,6 +1865,17 @@ const UserMembershipDataList = forwardRef<UserMembershipDataListRef, UserMembers
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Edit Meal Modal */}
+      <EditMealModal
+        show={showEditMealModal}
+        onHide={() => setShowEditMealModal(false)}
+        userMembership={selectedUserMembership}
+        week={selectedWeek}
+        day={selectedDay}
+        onSuccess={handleMealEditSuccess}
+        canManageMembership={canManageMembership}
+      />
     </>
   )
 })

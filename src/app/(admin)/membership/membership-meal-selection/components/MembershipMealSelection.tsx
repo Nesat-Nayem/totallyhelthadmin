@@ -165,8 +165,14 @@ const MembershipMealSelection = () => {
   }
 
   // Generate and download Kitchen KOT Receipt
-  const downloadKitchenKOT = (punchData: typeof selectedMealsForPunch, totalQty: number) => {
+  const downloadKitchenKOT = (punchData: typeof selectedMealsForPunch, totalQty: number, membershipStats?: { consumedMeals: number; remainingMeals: number; totalMeals: number }) => {
     if (!punchData || !membershipData) return
+    
+    // Get membership statistics - use provided stats or fallback to membershipData
+    const consumedMealsTotal = membershipStats?.consumedMeals ?? membershipData.consumedMeals ?? 0
+    const remainingMealsCount = membershipStats?.remainingMeals ?? membershipData.remainingMeals ?? 0
+    const totalMealsCount = membershipStats?.totalMeals ?? membershipData.totalMeals ?? 0
+    const currentConsumed = totalQty
 
     const getCurrentDateTime = () => {
       const now = new Date()
@@ -245,6 +251,29 @@ const MembershipMealSelection = () => {
             </div>
           </div>
         `).join('')}
+
+        <hr style="border: none; border-top: 1px dashed #000; margin: 8px 0;" />
+
+        <!-- Membership Summary -->
+        <div style="margin-bottom: 8px; font-size: 10px;">
+          <div style="font-weight: bold; margin-bottom: 4px;">MEMBERSHIP SUMMARY</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <div><strong>Total Meals:</strong></div>
+            <div>${totalMealsCount}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <div><strong>Current Consumed:</strong></div>
+            <div>${currentConsumed}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <div><strong>Consumed Total:</strong></div>
+            <div>${consumedMealsTotal}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <div><strong>Remaining:</strong></div>
+            <div>${remainingMealsCount}</div>
+          </div>
+        </div>
 
         <hr style="border: none; border-top: 1px dashed #000; margin: 8px 0;" />
 
@@ -431,7 +460,7 @@ const MembershipMealSelection = () => {
     }
 
     try {
-      await punchMeals({
+      const updatedMembership = await punchMeals({
         id: membershipId,
         week: selectedMealsForPunch.week,
         day: selectedMealsForPunch.day,
@@ -440,8 +469,12 @@ const MembershipMealSelection = () => {
 
       showSuccess(`Successfully punched ${totalQty} meal(s) for ${dayLabels[selectedMealsForPunch.day]}`)
       
-      // Download Kitchen KOT Receipt
-      downloadKitchenKOT(selectedMealsForPunch, totalQty)
+      // Download Kitchen KOT Receipt with updated membership statistics
+      downloadKitchenKOT(selectedMealsForPunch, totalQty, {
+        consumedMeals: updatedMembership.consumedMeals ?? 0,
+        remainingMeals: updatedMembership.remainingMeals ?? 0,
+        totalMeals: updatedMembership.totalMeals ?? 0
+      })
       
       // Reset selection
       setSelectedMealsForPunch(null)
