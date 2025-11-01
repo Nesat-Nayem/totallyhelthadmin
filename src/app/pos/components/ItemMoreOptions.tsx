@@ -2,7 +2,7 @@
 
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import React, { useState, useEffect } from 'react'
-import { Modal, Button, Row, Col, Form } from 'react-bootstrap'
+import { Modal, Button, Row, Col } from 'react-bootstrap'
 import { useGetMoreOptionsQuery } from '@/services/moreOptionApi'
 
 interface ItemMoreOptionsProps {
@@ -10,22 +10,16 @@ interface ItemMoreOptionsProps {
   itemName: string
   onOptionsChange?: (itemId: string, options: string[]) => void
   currentOptions?: string[]
-  onMealTypeChange?: (itemId: string, mealType: string) => void
-  currentMealType?: string
 }
 
 const ItemMoreOptions: React.FC<ItemMoreOptionsProps> = ({ 
   itemId, 
   itemName, 
   onOptionsChange, 
-  currentOptions = [],
-  onMealTypeChange,
-  currentMealType = 'general'
+  currentOptions = []
 }) => {
   const [showOptions, setShowOptions] = useState(false)
-  const [showMealTypeModal, setShowMealTypeModal] = useState(false)
   const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: any }>({})
-  const [selectedMealType, setSelectedMealType] = useState(currentMealType)
   
   const { data: moreOptionsData } = useGetMoreOptionsQuery()
   const allOptions = moreOptionsData ?? []
@@ -41,8 +35,7 @@ const ItemMoreOptions: React.FC<ItemMoreOptionsProps> = ({
       }
     })
     setSelectedOptions(initialSelected)
-    setSelectedMealType(currentMealType)
-  }, [currentOptions, allOptions, currentMealType])
+  }, [currentOptions, allOptions])
   
   // Group options by stored category
   const optionGroups = {
@@ -65,13 +58,6 @@ const ItemMoreOptions: React.FC<ItemMoreOptionsProps> = ({
       }
     })
     setSelectedOptions(initialSelected)
-    setSelectedMealType(currentMealType)
-  }
-
-  const handleShowMealTypeModal = () => setShowMealTypeModal(true)
-  const handleCloseMealTypeModal = () => {
-    setShowMealTypeModal(false)
-    setSelectedMealType(currentMealType)
   }
 
   const handleSelect = (option: any) => {
@@ -98,23 +84,8 @@ const ItemMoreOptions: React.FC<ItemMoreOptionsProps> = ({
     setShowOptions(false)
   }
 
-  const handleMealTypeSave = () => {
-    onMealTypeChange?.(itemId, selectedMealType)
-    setShowMealTypeModal(false)
-  }
-
   // Check if item has any options
   const hasOptions = currentOptions && currentOptions.length > 0
-  const currentMealTypeDisplay = currentMealType.charAt(0).toUpperCase() + currentMealType.slice(1)
-
-  // Dynamic button variant for meal type visualization
-  const mealTypeVariant: any = {
-    breakfast: 'info',
-    lunch: 'warning',
-    dinner: 'dark',
-    snacks: 'secondary',
-    general: 'secondary'
-  }
 
   return (
     <>
@@ -131,18 +102,6 @@ const ItemMoreOptions: React.FC<ItemMoreOptionsProps> = ({
         <IconifyIcon icon="mdi:plus" className="me-1" />
         More Options
         {hasOptions && <span className="ms-1">({currentOptions.length})</span>}
-      </Button>
-
-      {/* Meal Type Button */}
-      <Button 
-        size="sm" 
-        variant={mealTypeVariant[currentMealType] || 'secondary'}
-        onClick={handleShowMealTypeModal}
-        className="me-1"
-        title={`Selected: ${currentMealTypeDisplay}`}
-      >
-        <IconifyIcon icon="mdi:food-variant" className="me-1" />
-        {currentMealTypeDisplay}
       </Button>
 
       {/* Modal */}
@@ -184,50 +143,6 @@ const ItemMoreOptions: React.FC<ItemMoreOptionsProps> = ({
           </Button>
           <Button variant="primary" onClick={handleSave}>
             Save Options
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Meal Type Modal */}
-      <Modal show={showMealTypeModal} onHide={handleCloseMealTypeModal} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Select Meal Type - {itemName}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Row>
-            {[
-              { key: 'breakfast', label: 'Breakfast', icon: '🍳' },
-              { key: 'lunch', label: 'Lunch', icon: '🍽️' },
-              { key: 'dinner', label: 'Dinner', icon: '🌙' },
-              { key: 'snacks', label: 'Snacks', icon: '🍿' },
-              { key: 'general', label: 'General', icon: '🍴' },
-            ].map((opt) => {
-              const isSelected = selectedMealType === opt.key
-              return (
-                <Col key={opt.key} md={4} className="mb-3">
-                  <div
-                    onClick={() => setSelectedMealType(opt.key)}
-                    className={`p-3 text-center rounded cursor-pointer border ${
-                      isSelected ? 'bg-warning text-dark' : 'bg-light'
-                    }`}
-                    style={{ userSelect: 'none' }}
-                  >
-                    <div className="fw-semibold">{opt.icon} {opt.label}</div>
-                  </div>
-                </Col>
-              )
-            })}
-          </Row>
-          <Form.Text className="text-muted">
-            Select one meal type for this item
-          </Form.Text>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseMealTypeModal}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleMealTypeSave}>
-            Save Meal Type
           </Button>
         </Modal.Footer>
       </Modal>
