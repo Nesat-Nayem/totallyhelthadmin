@@ -161,9 +161,9 @@ export const AccessControlDemo: React.FC = () => {
                     </Badge>
                   </div>
                   <div className="col-md-3">
-                    <h6>/role-management</h6>
-                    <Badge bg={canAccess('/role-management') ? 'success' : 'danger'}>
-                      {canAccess('/role-management') ? 'Access' : 'No Access'}
+                    <h6>/role-management-v2</h6>
+                    <Badge bg={canAccess('/role-management-v2') ? 'success' : 'danger'}>
+                      {canAccess('/role-management-v2') ? 'Access' : 'No Access'}
                     </Badge>
                   </div>
                 </div>

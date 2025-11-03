@@ -60,7 +60,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
   const [createRole, { isLoading: isCreating }] = useCreateRoleMutation()
 
   // Role-based access control
-  const canManageRole = isAdmin || hasAccessToSubModule('role-management', 'manage')
+  const canManageRole = isAdmin || hasAccessToSubModule('role-management-v2', 'manage')
 
   const {
     control,
