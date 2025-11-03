@@ -74,7 +74,7 @@ const RoleList: React.FC<RoleListProps> = ({
   const [selectedRoleName, setSelectedRoleName] = useState<string>('')
 
   // Role-based access control
-  const canManageRole = isAdmin || hasAccessToSubModule('role-management', 'manage')
+  const canManageRole = isAdmin || hasAccessToSubModule('role-management-v2', 'manage')
 
   // Use external search if provided, otherwise use local state
   const searchTerm = search?.value || ''

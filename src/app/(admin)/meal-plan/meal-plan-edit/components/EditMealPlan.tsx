@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import Link from 'next/link'
-import { Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { Card, CardBody, CardHeader, CardTitle, Col, Row, Modal } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import { useGetMealPlanByIdQuery, mealPlanApi } from '@/services/mealPlanApi'
@@ -24,6 +24,11 @@ type MealPlanFormData = {
 type SingleValue = { value: string }
 type WeekOffer = { week: string; offer: string }
 
+type DayOfWeek = 'saturday' | 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+type MealTypeMeals = { breakfast: string[]; lunch: string[]; snacks: string[]; dinner: string[] }
+type WeekDayPlan = { day: DayOfWeek; meals: MealTypeMeals }
+type WeekMealPlan = { week: number; days?: WeekDayPlan[]; repeatFromWeek?: number }
+
 interface EditMealPlanProps {
   id: string
 }
@@ -32,7 +37,7 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
   const { register, handleSubmit, formState: { isSubmitting }, setValue } = useForm<MealPlanFormData>()
   const router = useRouter()
 
-  const { data: mealPlan, isLoading, error } = useGetMealPlanByIdQuery(id)
+  const { data: mealPlan, isLoading, error, refetch } = useGetMealPlanByIdQuery(id)
 
   const [kcalList, setKcalList] = useState<SingleValue[]>([{ value: '' }])
   const [deliveredList, setDeliveredList] = useState<SingleValue[]>([{ value: '' }])
@@ -44,6 +49,24 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [existingImages, setExistingImages] = useState<string[]>([])
+  const [weeks, setWeeks] = useState<WeekMealPlan[]>([])
+  const [showWeeksModal, setShowWeeksModal] = useState(false)
+  const [activeWeekIndex, setActiveWeekIndex] = useState<number | null>(null)
+
+  const weekDays: DayOfWeek[] = ['saturday','sunday','monday','tuesday','wednesday','thursday','friday']
+  const emptyMeals = (): MealTypeMeals => ({ breakfast: ['', '', ''], lunch: ['', '', ''], snacks: ['', '', ''], dinner: ['', '', ''] })
+
+  // Force refetch when component mounts or id changes to get latest data from server
+  useEffect(() => {
+    const fetchLatestData = async () => {
+      try {
+        await refetch()
+      } catch (error) {
+        console.error('Error refetching meal plan data:', error)
+      }
+    }
+    fetchLatestData()
+  }, [id, refetch])
 
   // Load existing data when mealPlan is available
   useEffect(() => {
@@ -81,6 +104,74 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
       } else if (mealPlan.thumbnail) {
         setExistingImages([mealPlan.thumbnail])
       }
+      
+      // Load existing weeks data - IMPORTANT: Load ALL weeks from API
+      if (mealPlan.weeks && Array.isArray(mealPlan.weeks) && mealPlan.weeks.length > 0) {
+        // Ensure weeks with repeatFromWeek have days data populated from source
+        // Create deep mutable copies to avoid read-only property errors
+        const processedWeeks = mealPlan.weeks.map((week, idx) => {
+          try {
+            // Create a deep copy of the week - preserve all weeks including those with repeatFromWeek
+            let processedWeek = {
+              week: week.week || (idx + 1),
+              repeatFromWeek: week.repeatFromWeek,
+              days: week.days && week.days.length > 0 ? week.days.map(day => ({
+                day: day.day,
+                meals: {
+                  breakfast: Array.isArray(day.meals?.breakfast) ? [...day.meals.breakfast] : ['', '', ''],
+                  lunch: Array.isArray(day.meals?.lunch) ? [...day.meals.lunch] : ['', '', ''],
+                  snacks: Array.isArray(day.meals?.snacks) ? [...day.meals.snacks] : ['', '', ''],
+                  dinner: Array.isArray(day.meals?.dinner) ? [...day.meals.dinner] : ['', '', '']
+                }
+              })) : undefined
+            }
+            
+            // If week has repeatFromWeek but no days (or empty days), copy from source
+            if (processedWeek.repeatFromWeek && (!processedWeek.days || processedWeek.days.length === 0)) {
+              // Find source week
+              const sourceWeek = mealPlan.weeks?.find(w => w.week === processedWeek.repeatFromWeek)
+              if (sourceWeek?.days) {
+                // Copy days from source week with deep copy
+                processedWeek = {
+                  ...processedWeek,
+                  days: sourceWeek.days.map(day => ({
+                    day: day.day,
+                    meals: {
+                      breakfast: Array.isArray(day.meals?.breakfast) ? [...day.meals.breakfast] : ['', '', ''],
+                      lunch: Array.isArray(day.meals?.lunch) ? [...day.meals.lunch] : ['', '', ''],
+                      snacks: Array.isArray(day.meals?.snacks) ? [...day.meals.snacks] : ['', '', ''],
+                      dinner: Array.isArray(day.meals?.dinner) ? [...day.meals.dinner] : ['', '', '']
+                    }
+                  }))
+                }
+              }
+            }
+            
+            // Ensure all weeks have days array initialized (only if missing)
+            if (!processedWeek.days || processedWeek.days.length === 0) {
+              processedWeek = {
+                ...processedWeek,
+                days: weekDays.map(d => ({ day: d, meals: emptyMeals() }))
+              }
+            }
+            
+            return processedWeek
+          } catch (error) {
+            // Return a fallback week if processing fails - but still include it!
+            return {
+              week: week.week || (idx + 1),
+              repeatFromWeek: week.repeatFromWeek,
+              days: weekDays.map(d => ({ day: d, meals: emptyMeals() }))
+            }
+          }
+        })
+        
+        // IMPORTANT: Set ALL processed weeks, don't filter anything
+        setWeeks(processedWeeks)
+      } else {
+        // Reset weeks if no weeks data in mealPlan
+        setWeeks([])
+      }
     }
   }, [mealPlan, setValue])
 
@@ -98,6 +189,202 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
     const updated = [...list]
     updated.splice(index, 1)
     setList(updated)
+  }
+
+  // Weeks management functions
+  const addWeek = () => {
+    // Week numbers should always be sequential: 1, 2, 3, 4, 5...
+    const nextWeekNum = weeks.length > 0 ? Math.max(...weeks.map(w => w.week)) + 1 : 1
+    const newWeeks = [...weeks, { week: nextWeekNum, days: weekDays.map(d => ({ day: d, meals: emptyMeals() })) }]
+    setWeeks(newWeeks)
+    setActiveWeekIndex(newWeeks.length - 1)
+    setShowWeeksModal(true)
+  }
+
+  const openWeek = (index: number) => {
+    setActiveWeekIndex(index)
+    setShowWeeksModal(true)
+  }
+
+  const removeWeek = (index: number) => {
+    if (index < 0 || index >= weeks.length) return
+    
+    // Store the week being removed for reference
+    const removedWeek = weeks[index]
+    
+    // Create a map of old week numbers to new positions before removal
+    const weekNumberMap = new Map<number, number>()
+    weeks.forEach((week, i) => {
+      if (i !== index) {
+        // Calculate new position: if i < index, position stays same, else decreases by 1
+        const newPosition = i < index ? i : i - 1
+        weekNumberMap.set(week.week, newPosition + 1) // +1 because week numbers start at 1
+      }
+    })
+    
+    const copy = [...weeks]
+    copy.splice(index, 1)
+    
+    // Renumber weeks sequentially: 1, 2, 3, 4...
+    const renumberedWeeks = copy.map((week, idx) => {
+      const newWeekNumber = idx + 1
+      
+      // Update repeatFromWeek if it exists
+      let updatedRepeatFromWeek: number | undefined = undefined
+      if (week.repeatFromWeek) {
+        // If repeating from the removed week, clear it
+        if (week.repeatFromWeek === removedWeek.week) {
+          updatedRepeatFromWeek = undefined
+        } else {
+          // Find the new week number for the source week
+          const newSourceWeekNumber = weekNumberMap.get(week.repeatFromWeek)
+          if (newSourceWeekNumber !== undefined) {
+            updatedRepeatFromWeek = newSourceWeekNumber
+          }
+        }
+      }
+      
+      return {
+        ...week,
+        week: newWeekNumber,
+        repeatFromWeek: updatedRepeatFromWeek
+      }
+    })
+    
+    setWeeks(renumberedWeeks)
+    
+    // Close modal if removing the currently active week
+    if (activeWeekIndex === index) {
+      setActiveWeekIndex(null)
+      setShowWeeksModal(false)
+    } else if (activeWeekIndex !== null && activeWeekIndex > index) {
+      // Adjust active index if the removed week was before the active one
+      setActiveWeekIndex(activeWeekIndex - 1)
+    }
+  }
+
+  const setRepeatFromWeek = (index: number, repeatFromWeek?: number) => {
+    const copy = [...weeks]
+    if (repeatFromWeek) {
+      // Find the week to repeat from
+      const sourceWeek = copy.find(w => w.week === repeatFromWeek)
+      if (sourceWeek && sourceWeek.days) {
+        // Copy the exact meal data from the source week
+        const copiedDays = sourceWeek.days.map(day => ({
+          day: day.day,
+          meals: {
+            breakfast: [...day.meals.breakfast],
+            lunch: [...day.meals.lunch],
+            snacks: [...day.meals.snacks],
+            dinner: [...day.meals.dinner]
+          }
+        }))
+        
+        copy[index] = { 
+          week: copy[index].week, 
+          repeatFromWeek, 
+          days: copiedDays
+        }
+      } else {
+        // Fallback if source week not found
+        copy[index] = { 
+          week: copy[index].week, 
+          repeatFromWeek, 
+          days: weekDays.map(d => ({ day: d, meals: emptyMeals() }))
+        }
+      }
+    } else {
+      // When not repeating, ensure days data exists
+      copy[index] = { 
+        week: copy[index].week, 
+        repeatFromWeek: undefined, 
+        days: copy[index].days || weekDays.map(d => ({ day: d, meals: emptyMeals() })) 
+      }
+    }
+    setWeeks(copy)
+  }
+
+  const updateMealItem = (wIdx: number, day: DayOfWeek, mealType: keyof MealTypeMeals, itemIdx: number, value: string) => {
+    // Create a deep copy of weeks to avoid read-only property errors
+    const copy = weeks.map(week => ({
+      ...week,
+      days: week.days ? week.days.map(d => ({
+        ...d,
+        meals: {
+          breakfast: [...(d.meals.breakfast || [])],
+          lunch: [...(d.meals.lunch || [])],
+          snacks: [...(d.meals.snacks || [])],
+          dinner: [...(d.meals.dinner || [])]
+        }
+      })) : undefined
+    }))
+    
+    if (!copy[wIdx]) return
+    
+    // Ensure days array exists
+    if (!copy[wIdx].days) {
+      copy[wIdx].days = weekDays.map(d => ({ day: d, meals: emptyMeals() }))
+    }
+    
+    // Find or create the day
+    let dayIdx = copy[wIdx].days!.findIndex(d => d.day === day)
+    if (dayIdx === -1) {
+      // Day doesn't exist, create it
+      copy[wIdx].days!.push({ day, meals: emptyMeals() })
+      dayIdx = copy[wIdx].days!.length - 1
+    }
+    
+    // Ensure meal type array exists and has enough items - create new array to avoid read-only
+    const currentMeals = copy[wIdx].days![dayIdx].meals[mealType] || []
+    let items = Array.isArray(currentMeals) ? [...currentMeals] : []
+    
+    // Ensure array has enough items
+    while (items.length <= itemIdx) {
+      items.push('')
+    }
+    
+    // Update the item
+    items[itemIdx] = value
+    
+    // Create new day object with updated meals
+    copy[wIdx].days![dayIdx] = {
+      ...copy[wIdx].days![dayIdx],
+      meals: {
+        ...copy[wIdx].days![dayIdx].meals,
+        [mealType]: items
+      }
+    }
+    
+    // When editing, remove repeatFromWeek to allow independent editing
+    if (copy[wIdx].repeatFromWeek) {
+      copy[wIdx].repeatFromWeek = undefined
+    }
+    
+    setWeeks(copy)
+  }
+
+  const randomFrom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+  const sampleItems = {
+    breakfast: ['Oats', 'Pancakes', 'Eggs', 'Smoothie', 'Paratha', 'Idli', 'Poha'],
+    lunch: ['Chicken Bowl', 'Paneer Wrap', 'Rice & Dal', 'Quinoa Salad', 'Pasta', 'Grilled Fish'],
+    snacks: ['Nuts Mix', 'Fruit Cup', 'Yogurt', 'Protein Bar', 'Hummus'],
+    dinner: ['Grilled Chicken', 'Veg Curry', 'Soup Bowl', 'Stir Fry', 'Biryani']
+  }
+
+  const prefillWeekRandom = (wIdx: number) => {
+    const copy = [...weeks]
+    if (!copy[wIdx]) return
+    copy[wIdx].repeatFromWeek = undefined
+    copy[wIdx].days = weekDays.map((d) => ({
+      day: d,
+      meals: {
+        breakfast: [0,1,2].map(i => `${randomFrom(sampleItems.breakfast)} ${i + 1}`),
+        lunch: [0,1,2].map(i => `${randomFrom(sampleItems.lunch)} ${i + 1}`),
+        snacks: [0,1,2].map(i => `${randomFrom(sampleItems.snacks)} ${i + 1}`),
+        dinner: [0,1,2].map(i => `${randomFrom(sampleItems.dinner)} ${i + 1}`),
+      }
+    }))
+    setWeeks(copy)
   }
 
   // Custom update function using fetch API
@@ -166,6 +453,25 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
         formDataObj.append('weeksOffers', JSON.stringify(filteredWeeksOffers))
       }
 
+      // Weeks: send only if user added/edited
+      if (weeks.length > 0) {
+        // Clean up: trim items and keep only non-empty strings; still keep array length at 3 for UX
+        const cleanedWeeks = weeks.map(w => ({
+          week: w.week,
+          repeatFromWeek: w.repeatFromWeek || undefined,
+          days: (w.days || []).map(d => ({
+            day: d.day,
+            meals: {
+              breakfast: d.meals.breakfast.map(s => s.trim()),
+              lunch: d.meals.lunch.map(s => s.trim()),
+              snacks: d.meals.snacks.map(s => s.trim()),
+              dinner: d.meals.dinner.map(s => s.trim()),
+            }
+          }))
+        }))
+        formDataObj.append('weeks', JSON.stringify(cleanedWeeks))
+      }
+
       // Add existing images (keep current ones)
       existingImages.forEach(image => {
         formDataObj.append('existingImages', image)
@@ -183,6 +489,8 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
       mealPlanApi.util.invalidateTags([{ type: 'MealPlan', id: 'LIST' }])
       
       showSuccess('Meal plan updated successfully.')
+      
+      // Redirect to list page after successful update
       router.push('/meal-plan/meal-plan-list')
     } catch (error: any) {
       if (error?.status === 400) {
@@ -561,6 +869,138 @@ const EditMealPlan = ({ id }: EditMealPlanProps) => {
             ))}
           </CardBody>
         </Card>
+
+        {/* Weeks (Modal trigger + summary) */}
+        <Card>
+          <CardHeader className="d-flex justify-content-between align-items-center">
+            <CardTitle as="h4">Weeks</CardTitle>
+            <div className="d-flex gap-2">
+              <button type="button" className="btn btn-sm btn-outline-primary" onClick={addWeek}>
+                + Add Week
+              </button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {weeks.length === 0 ? (
+              <div className="text-muted">No weeks configured yet.</div>
+            ) : (
+              <div key={`weeks-count-${weeks.length}`}>
+                <div className="mb-2"><strong>{weeks.length}</strong> week(s) configured.</div>
+                <div className="row g-2">
+                  {weeks.map((w, i) => (
+                    <div key={`week-${w.week}-${i}`} className="col-auto">
+                      <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => openWeek(i)}>
+                        Week {w.week}{w.repeatFromWeek ? ` (repeat ${w.repeatFromWeek})` : ''}{w.repeatFromWeek ? ' 🔄' : ''}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Modal show={showWeeksModal} onHide={() => setShowWeeksModal(false)} size="xl" centered scrollable>
+          <Modal.Header closeButton>
+            <div className="d-flex align-items-center w-100">
+              <Modal.Title className="me-auto">
+                {activeWeekIndex !== null ? `Configure Week ${weeks[activeWeekIndex]?.week ?? ''}` : 'Configure Week'}
+              </Modal.Title>
+              {activeWeekIndex !== null && (
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => prefillWeekRandom(activeWeekIndex!)}>
+                  Prefill Random
+                </button>
+              )}
+            </div>
+          </Modal.Header>
+          <Modal.Body>
+            {activeWeekIndex === null || !weeks[activeWeekIndex] ? (
+              <div className="alert alert-info">Select a week to configure.</div>
+            ) : (
+              <div className="border rounded p-3 mb-4">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h5 className="mb-0">Week {weeks[activeWeekIndex].week}</h5>
+                  <div className="d-flex gap-2">
+                    <select
+                      className="form-control"
+                      style={{ width: 160 }}
+                      value={weeks[activeWeekIndex].repeatFromWeek || ''}
+                      onChange={(e) => setRepeatFromWeek(activeWeekIndex, e.target.value ? Number(e.target.value) : undefined)}
+                    >
+                      <option value="">Repeat from week</option>
+                      {weeks
+                        .filter((_, idx) => idx < activeWeekIndex) // Only show previous weeks
+                        .map((w) => (
+                          <option key={w.week} value={w.week}>
+                            Week {w.week}
+                          </option>
+                        ))}
+                    </select>
+                    <button type="button" className="btn btn-outline-danger" onClick={() => { 
+                      if (activeWeekIndex !== null) {
+                        removeWeek(activeWeekIndex)
+                      }
+                    }}>Remove</button>
+                  </div>
+                </div>
+                {weeks[activeWeekIndex].repeatFromWeek && (
+                  <div className="text-muted mb-3">
+                    This week reuses meals from week {weeks[activeWeekIndex].repeatFromWeek}.
+                    <span className="ms-2">🔄 Repeated data</span>
+                  </div>
+                )}
+                <div className="row g-3">
+                    {weekDays.map((d) => (
+                      <div key={d} className="col-12">
+                        <div className="border rounded p-2">
+                          <strong className="text-uppercase">{d}</strong>
+                          <div className="row g-2 mt-2">
+                            {(['breakfast','lunch','snacks','dinner'] as Array<keyof MealTypeMeals>).map((mt) => (
+                              <div key={mt} className="col-12 col-md-6 col-lg-3">
+                                <label className="form-label text-capitalize">{mt}</label>
+                                {[0,1,2].map((idx) => (
+                                  <input
+                                    key={idx}
+                                    type="text"
+                                    className="form-control mb-1"
+                                    placeholder={`${mt} item ${idx + 1}`}
+                                    value={(() => {
+                                      const week = weeks[activeWeekIndex]
+                                      if (!week) return ''
+                                      
+                                      // If repeating from another week, get from source
+                                      if (week.repeatFromWeek) {
+                                        const sourceWeek = weeks.find(w => w.week === week.repeatFromWeek)
+                                        if (sourceWeek?.days) {
+                                          const sourceDay = sourceWeek.days.find(dd => dd.day === d)
+                                          if (sourceDay?.meals?.[mt]?.[idx]) {
+                                            return sourceDay.meals[mt][idx]
+                                          }
+                                        }
+                                      }
+                                      
+                                      // Otherwise get from current week
+                                      const day = week.days?.find(dd => dd.day === d)
+                                      return day?.meals?.[mt]?.[idx] || ''
+                                    })()}
+                                    onChange={(e) => updateMealItem(activeWeekIndex, d, mt, idx, e.target.value)}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <button type="button" className="btn btn-light" onClick={() => setShowWeeksModal(false)}>Close</button>
+            <button type="button" className="btn btn-primary" onClick={() => setShowWeeksModal(false)}>Done</button>
+          </Modal.Footer>
+        </Modal>
 
         {/* Pricing */}
         <Card>

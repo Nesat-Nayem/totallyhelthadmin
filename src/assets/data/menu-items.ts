@@ -640,12 +640,6 @@ export const MENU_ITEMS: MenuItemType[] = [
     isTitle: true,
   },
   {
-    key: 'role-management',
-    label: 'Role Management',
-    icon: 'solar:users-group-two-rounded-bold-duotone',
-    url: '/role-management',
-  },
-  {
     key: 'role-management-v2',
     label: 'Role Management V2',
     icon: 'solar:users-group-two-rounded-bold-duotone',
