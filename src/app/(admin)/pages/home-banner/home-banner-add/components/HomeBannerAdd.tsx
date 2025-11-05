@@ -1,5 +1,4 @@
 'use client'
-import ChoicesFormInput from '@/components/form/ChoicesFormInput'
 import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -8,8 +7,13 @@ import * as yup from 'yup'
 import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useDispatch } from 'react-redux'
+import { showSuccess, showError } from '@/utils/sweetAlert'
+import { API_BASE_URL } from '@/utils/env'
+import { getAuthToken } from '@/utils/auth'
+import { bannerApi } from '@/services/bannerApi'
 
-/** FORM DATA TYPE **/
 type FormData = {
   title: string
   file: FileList
@@ -22,12 +26,10 @@ type FormData = {
   status: string
 }
 
-/** PROP TYPE FOR CHILD COMPONENTS **/
 type ControlType = {
   control: Control<FormData>
 }
 
-/** VALIDATION SCHEMA WITH STRONG TYPES **/
 const messageSchema: yup.ObjectSchema<FormData> = yup.object({
   title: yup.string().required('Please enter title'),
   file: yup
@@ -46,7 +48,6 @@ const messageSchema: yup.ObjectSchema<FormData> = yup.object({
   status: yup.string().required('Please select a status'),
 })
 
-/** GENERAL INFORMATION CARD **/
 const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
   return (
     <Card>
@@ -62,7 +63,28 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="file" label="Banner Image" />
+              <Controller
+                control={control}
+                name="file"
+                rules={{ required: 'Please upload a banner image' }}
+                render={({ field: { onChange, value, ...field }, fieldState }) => (
+                  <div>
+                    <label className="form-label">Banner Image</label>
+                    <input
+                      {...field}
+                      type="file"
+                      onChange={(e) => {
+                        const files = e.target.files
+                        onChange(files)
+                      }}
+                      className={`form-control ${fieldState.error ? 'is-invalid' : ''}`}
+                    />
+                    {fieldState.error && (
+                      <div className="invalid-feedback">{fieldState.error.message}</div>
+                    )}
+                  </div>
+                )}
+              />
             </div>
           </Col>
 
@@ -73,7 +95,28 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="file" name="tag" label="Certification Logo" />
+              <Controller
+                control={control}
+                name="tag"
+                rules={{ required: 'Please upload a certification logo' }}
+                render={({ field: { onChange, value, ...field }, fieldState }) => (
+                  <div>
+                    <label className="form-label">Certification Logo</label>
+                    <input
+                      {...field}
+                      type="file"
+                      onChange={(e) => {
+                        const files = e.target.files
+                        onChange(files)
+                      }}
+                      className={`form-control ${fieldState.error ? 'is-invalid' : ''}`}
+                    />
+                    {fieldState.error && (
+                      <div className="invalid-feedback">{fieldState.error.message}</div>
+                    )}
+                  </div>
+                )}
+              />
             </div>
           </Col>
           <Col lg={12}>
@@ -82,7 +125,6 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
             </div>
           </Col>
 
-          {/* STATUS FIELD */}
           <Col lg={6}>
             <label className="form-label">Status</label>
             <Controller
@@ -130,7 +172,6 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
   )
 }
 
-/** META OPTIONS CARD **/
 const MetaOptionsCard: React.FC<ControlType> = ({ control }) => {
   return (
     <Card>
@@ -160,16 +201,116 @@ const MetaOptionsCard: React.FC<ControlType> = ({ control }) => {
   )
 }
 
-/** MAIN COMPONENT **/
 const HomeBannerAdd: React.FC = () => {
-  const { reset, handleSubmit, control } = useForm<FormData>({
+  const { handleSubmit, control, formState: { isSubmitting } } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
     defaultValues: { status: 'active' },
   })
+  
+  const router = useRouter()
+  const dispatch = useDispatch()
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  const onSubmit = async (data: FormData) => {
+    try {
+      const fileList = data.file as FileList | undefined
+      const tagList = data.tag as FileList | undefined
+      
+      if (!fileList || fileList.length === 0 || !fileList[0]) {
+        showError('Please upload a banner image')
+        return
+      }
+      if (!tagList || tagList.length === 0 || !tagList[0]) {
+        showError('Please upload a certification logo')
+        return
+      }
+
+      const bannerFile = fileList[0]
+      const certLogoFile = tagList[0]
+      
+      if (!bannerFile || !(bannerFile instanceof File)) {
+        showError('Invalid banner image file. Please select a valid image file.')
+        return
+      }
+      if (!certLogoFile || !(certLogoFile instanceof File)) {
+        showError('Invalid certification logo file. Please select a valid image file.')
+        return
+      }
+
+      const formDataObj = new FormData()
+      
+      const title = String(data.title || '').trim()
+      const description = String(data.description || '').trim()
+      const meta = String(data.meta || '').trim()
+      const description2 = String(data.description2 || '').trim()
+      const metaTag = String(data.metaTag || '').trim()
+      const stock = String(data.stock || '0').trim()
+      const status = String(data.status || 'active').trim()
+      
+      if (!title) {
+        showError('Please enter a title')
+        return
+      }
+      if (!description) {
+        showError('Please enter a description')
+        return
+      }
+      if (!meta) {
+        showError('Please enter a meta title')
+        return
+      }
+      if (!description2) {
+        showError('Please enter a meta description')
+        return
+      }
+      if (!metaTag) {
+        showError('Please enter meta tags')
+        return
+      }
+      
+      formDataObj.append('title', title)
+      formDataObj.append('description', description)
+      formDataObj.append('meta', meta)
+      formDataObj.append('description2', description2)
+      formDataObj.append('metaTag', metaTag)
+      formDataObj.append('stock', stock)
+      formDataObj.append('status', status)
+      formDataObj.append('order', '0')
+      
+      formDataObj.append('file', bannerFile, bannerFile.name)
+      formDataObj.append('tag', certLogoFile, certLogoFile.name)
+      
+      const token = getAuthToken()
+      if (!token) {
+        showError('Authentication token not found. Please login again.')
+        return
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/banners`, {
+        method: 'POST',
+        headers: {
+          'authorization': `Bearer ${token}`,
+        },
+        body: formDataObj,
+      })
+      
+      const responseData = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(responseData.message || `HTTP error! status: ${response.status}`)
+      }
+      
+      if (!responseData.success) {
+        throw new Error(responseData.message || 'Failed to create banner')
+      }
+      
+      dispatch(bannerApi.util.invalidateTags([{ type: 'Banner', id: 'LIST' }]))
+      
+      showSuccess('Banner created successfully')
+      router.push('/pages/home-banner')
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create banner'
+      showError(errorMessage)
+    }
   }
 
   return (
@@ -179,12 +320,12 @@ const HomeBannerAdd: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
-              Save Change
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Save Change'}
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/pages/home-banner" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>
