@@ -6,12 +6,13 @@ export interface MenuAccess {
 }
 
 // Backend API Role structure
+// Note: Backend returns "super admin" (two words), not "superadmin"
 export interface Role {
   _id: string
   name: string
   email: string
   phone: string
-  role: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff'
+  role: 'super admin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff'
   menuAccess: MenuAccess
   status: 'active' | 'inactive'
   createdAt: string

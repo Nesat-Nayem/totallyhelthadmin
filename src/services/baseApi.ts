@@ -16,15 +16,18 @@ const baseQuery = fetchBaseQuery({
       console.error('Error preparing headers:', error)
     }
     
-    // Don't set content-type here - we'll handle it in fetchFn
-    // For FormData, browser needs to set multipart/form-data with boundary
-    // For JSON, we'll set application/json in fetchFn
+    // Don't set content-type in prepareHeaders
+    // We'll handle it in fetchFn based on the actual request body and method
     
     return headers
   },
   fetchFn: async (input, init) => {
+    if (!init) {
+      return fetch(input)
+    }
+    
     // Custom fetch to handle FormData and preserve headers properly
-    const headers = new Headers(init?.headers)
+    const headers = new Headers(init.headers)
     
     // Ensure authorization token is set
     if (typeof window !== 'undefined') {
@@ -38,25 +41,41 @@ const baseQuery = fetchBaseQuery({
       }
     }
     
-    // Handle content-type based on body type
-    if (init?.body instanceof FormData) {
+    // Handle content-type based on body type and method
+    const method = (init.method || 'GET').toUpperCase()
+    const body = init.body
+    
+    // CRITICAL FIX: Always set Content-Type for POST, PUT, PATCH, DELETE with body
+    if (body instanceof FormData) {
       // Remove content-type for FormData - browser will set it with boundary automatically
       headers.delete('content-type')
-    } else if (init?.body && !headers.has('content-type')) {
-      // Set content-type for non-FormData requests
+    } else if (method === 'GET' || !body || body === '') {
+      // Remove content-type for GET requests or requests without body
+      headers.delete('content-type')
+    } else {
+      // FORCE Content-Type to application/json for all JSON requests
+      // This MUST be set for backend to parse the body correctly
       headers.set('content-type', 'application/json')
     }
     
-    return fetch(input, {
+    // Debug log to verify Content-Type is set
+    if (method !== 'GET' && body && !(body instanceof FormData)) {
+      console.log('[baseApi] Setting Content-Type for', method, 'request:', headers.get('content-type'))
+    }
+    
+    // Create new request init with proper headers
+    const requestInit: RequestInit = {
       ...init,
-      headers,
-    })
+      headers: headers,
+    }
+    
+    return fetch(input, requestInit)
   },
 })
 
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Branch', 'MealPlan', 'Category', 'Brand', 'Aggregator', 'PaymentMethod', 'MoreOption', 'Customer', 'Order', 'Menu', 'MenuCategory', 'DayClose', 'Shift', 'Role', 'UserMembership', 'Banner'],
+  tagTypes: ['Branch', 'MealPlan', 'Category', 'Brand', 'Aggregator', 'PaymentMethod', 'MoreOption', 'Customer', 'Order', 'Menu', 'MenuCategory', 'DayClose', 'Shift', 'Role', 'UserMembership', 'Banner', 'IncludedMeal'],
   endpoints: () => ({}),
 })

@@ -398,6 +398,12 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
         parentKey: 'pages',
       },
       {
+        key: 'included-meals',
+        label: 'Included Meals',
+        url: '/pages/included-meals',
+        parentKey: 'pages',
+      },
+      {
         key: 'goal',
         label: 'Goal',
         url: '/pages/goal',
