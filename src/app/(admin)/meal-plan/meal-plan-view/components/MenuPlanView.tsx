@@ -183,6 +183,9 @@ const MenuPlanView = ({ id }: MenuPlanViewProps) => {
                   <ListGroup.Item className="d-flex justify-content-between align-items-center">
                     <span>Status</span> :<span className={`badge ${mealPlan.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>{mealPlan.status}</span>
                   </ListGroup.Item>
+                  <ListGroup.Item className="d-flex justify-content-between align-items-center">
+                    <span>Show on Client</span> :<span className={`badge ${mealPlan.showOnClient ? 'bg-success' : 'bg-secondary'}`}>{mealPlan.showOnClient ? 'Yes' : 'No'}</span>
+                  </ListGroup.Item>
                 </ListGroup>
               </div>
 
