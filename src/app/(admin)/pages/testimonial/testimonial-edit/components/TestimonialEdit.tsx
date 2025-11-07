@@ -1,33 +1,41 @@
 'use client'
-import ChoicesFormInput from '@/components/form/ChoicesFormInput'
 import TextAreaFormInput from '@/components/form/TextAreaFormInput'
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
-import React from 'react'
+import React, { useEffect } from 'react'
 import * as yup from 'yup'
-import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row, Spinner } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
+import { useGetTestimonialByIdQuery, useUpdateTestimonialMutation } from '@/services/testimonialApi'
+import { toast } from 'react-toastify'
+import { useRouter } from 'next/navigation'
 
 /** FORM DATA TYPE **/
-type FormData = {
-  title: string
-  designation: string
-  description: string
-  status: string
+type TestimonialFormData = {
+  authorName: string
+  authorProfession: string
+  quote: string
+  order: number
+  status: 'active' | 'inactive'
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
 type ControlType = {
-  control: Control<FormData>
+  control: Control<TestimonialFormData>
+}
+
+interface TestimonialEditProps {
+  id: string
 }
 
 /** VALIDATION SCHEMA WITH STRONG TYPES **/
-const messageSchema: yup.ObjectSchema<FormData> = yup.object({
-  title: yup.string().required('Please enter title'),
-  designation: yup.string().required('Please enter designation'),
-  description: yup.string().required('Please enter description'),
-  status: yup.string().required('Please select a status'),
+const messageSchema: yup.ObjectSchema<TestimonialFormData> = yup.object({
+  authorName: yup.string().required('Please enter name'),
+  authorProfession: yup.string().required('Please enter designation'),
+  quote: yup.string().required('Please enter description'),
+  order: yup.number().min(0, 'Order must be 0 or greater').default(0),
+  status: yup.string().oneOf(['active', 'inactive'], 'Status must be active or inactive').required('Please select a status'),
 })
 
 /** GENERAL INFORMATION CARD **/
@@ -41,18 +49,24 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
         <Row>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} name="title" label="Name" placeholder="" />
+              <TextFormInput control={control} name="authorName" label="Author Name" placeholder="Enter author name" />
             </div>
           </Col>
           <Col lg={6}>
             <div className="mb-3">
-              <TextFormInput control={control} type="text" name="designation" label="Designation" />
+              <TextFormInput control={control} type="text" name="authorProfession" label="Author Profession" placeholder="Enter author profession" />
             </div>
           </Col>
 
           <Col lg={12}>
             <div className="mb-3">
-              <TextAreaFormInput control={control} name="description" label="Description" placeholder="Type description" />
+              <TextAreaFormInput control={control} name="quote" label="Quote" placeholder="Enter quote" />
+            </div>
+          </Col>
+
+          <Col lg={6}>
+            <div className="mb-3">
+              <TextFormInput control={control} type="number" name="order" label="Order" placeholder="Enter order (optional)" />
             </div>
           </Col>
 
@@ -62,7 +76,6 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
             <Controller
               control={control}
               name="status"
-              rules={{ required: 'Please select a status' }}
               render={({ field, fieldState }) => (
                 <>
                   <div className="d-flex gap-2 align-items-center">
@@ -105,15 +118,60 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 }
 
 /** MAIN COMPONENT **/
-const TestimonialEdit: React.FC = () => {
-  const { reset, handleSubmit, control } = useForm<FormData>({
-    resolver: yupResolver(messageSchema),
-    defaultValues: { status: 'active' },
+const TestimonialEdit: React.FC<TestimonialEditProps> = ({ id }) => {
+  const router = useRouter()
+  const { data: testimonialResponse, isLoading, refetch } = useGetTestimonialByIdQuery(id)
+  const [updateTestimonial, { isLoading: isSubmitting }] = useUpdateTestimonialMutation()
+
+  const { reset, handleSubmit, control } = useForm<TestimonialFormData>({
+    resolver: yupResolver(messageSchema) as any,
+    defaultValues: {
+      authorName: '',
+      authorProfession: '',
+      quote: '',
+      order: 0,
+      status: 'active',
+    },
   })
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  // Populate form when data is fetched
+  useEffect(() => {
+    if (testimonialResponse?.data) {
+      const testimonial = testimonialResponse.data
+      reset({
+        authorName: testimonial.authorName || '',
+        authorProfession: testimonial.authorProfession || '',
+        quote: testimonial.quote || '',
+        order: testimonial.order || 0,
+        status: testimonial.status || 'active',
+      })
+    }
+  }, [testimonialResponse, reset])
+
+  const onSubmit = async (data: TestimonialFormData) => {
+    try {
+      const payload = {
+        authorName: data.authorName.trim(),
+        authorProfession: data.authorProfession.trim(),
+        quote: data.quote.trim(),
+        order: Number(data.order) || 0,
+        status: data.status,
+      }
+
+      const result = await updateTestimonial({ id, data: payload }).unwrap()
+      toast.success(result.message || 'Testimonial updated successfully')
+      router.push('/pages/testimonial')
+    } catch (error: any) {
+      toast.error(error?.data?.message || error?.message || 'Failed to update testimonial')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+        <Spinner animation="border" variant="primary" />
+      </div>
+    )
   }
 
   return (
@@ -122,12 +180,12 @@ const TestimonialEdit: React.FC = () => {
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
-              Save Change
+            <Button variant="outline-secondary" type="submit" className="w-100" disabled={isSubmitting}>
+              {isSubmitting ? <Spinner size="sm" /> : 'Save Change'}
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="" className="btn btn-primary w-100">
+            <Link href="/pages/testimonial" className="btn btn-primary w-100">
               Cancel
             </Link>
           </Col>
