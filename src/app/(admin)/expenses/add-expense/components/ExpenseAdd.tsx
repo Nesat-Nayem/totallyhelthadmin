@@ -2,9 +2,9 @@
 
 import TextFormInput from '@/components/form/TextFormInput'
 import { yupResolver } from '@hookform/resolvers/yup'
-import React from 'react'
+import React, { useMemo } from 'react'
 import * as yup from 'yup'
-import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row, Form } from 'react-bootstrap'
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
 import ChoicesFormInput from '@/components/form/ChoicesFormInput'
@@ -19,7 +19,12 @@ type FormData = {
   invoiceNumber: string
   paymentMethod: string
   paymentReference: string
-  totalAmount: number
+  baseAmount: number
+  taxPercent: number
+  taxAmount?: number
+  vatPercent: number
+  vatAmount?: number
+  grandTotal?: number
   paidBy: string
   approvedBy: string
   status: string
@@ -29,6 +34,7 @@ type FormData = {
 /** PROP TYPE FOR CHILD COMPONENTS **/
 type ControlType = {
   control: Control<FormData>
+  watch: any
 }
 
 /** VALIDATION SCHEMA **/
@@ -41,7 +47,12 @@ const messageSchema: yup.ObjectSchema<FormData> = yup.object({
   invoiceNumber: yup.string().required('Please enter invoice number'),
   paymentMethod: yup.string().required('Please select payment method'),
   paymentReference: yup.string().required('Please enter payment reference'),
-  totalAmount: yup.number().typeError('Please enter total amount').required('Please enter total amount'),
+  baseAmount: yup.number().typeError('Please enter base amount').required('Please enter base amount').min(0, 'Base amount must be greater than or equal to 0'),
+  taxPercent: yup.number().typeError('Please enter tax percentage').required('Please enter tax percentage').min(0, 'Tax percentage must be greater than or equal to 0').max(100, 'Tax percentage cannot exceed 100'),
+  taxAmount: yup.number().default(0),
+  vatPercent: yup.number().typeError('Please enter VAT percentage').required('Please enter VAT percentage').min(0, 'VAT percentage must be greater than or equal to 0').max(100, 'VAT percentage cannot exceed 100'),
+  vatAmount: yup.number().default(0),
+  grandTotal: yup.number().default(0),
   paidBy: yup.string().required('Please select staff'),
   approvedBy: yup.string().required('Please enter approved by'),
   status: yup.string().required('Please select status'),
@@ -49,7 +60,31 @@ const messageSchema: yup.ObjectSchema<FormData> = yup.object({
 })
 
 /** GENERAL INFORMATION CARD **/
-const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
+const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
+  // Watch baseAmount, taxPercent, and vatPercent for automatic calculations
+  const baseAmount = watch('baseAmount') || 0
+  const taxPercent = watch('taxPercent') || 0
+  const vatPercent = watch('vatPercent') || 0
+  
+  // Calculate Tax Amount
+  const taxAmount = useMemo(() => {
+    const base = parseFloat(String(baseAmount)) || 0
+    const tax = parseFloat(String(taxPercent)) || 0
+    return (base * tax) / 100
+  }, [baseAmount, taxPercent])
+  
+  // Calculate VAT Amount
+  const vatAmount = useMemo(() => {
+    const base = parseFloat(String(baseAmount)) || 0
+    const vat = parseFloat(String(vatPercent)) || 0
+    return (base * vat) / 100
+  }, [baseAmount, vatPercent])
+  
+  // Calculate Grand Total = Base Amount + Tax Amount + VAT Amount
+  const grandTotal = useMemo(() => {
+    const base = parseFloat(String(baseAmount)) || 0
+    return base + taxAmount + vatAmount
+  }, [baseAmount, taxAmount, vatAmount])
   return (
     <Card>
       <CardHeader>
@@ -124,7 +159,51 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
           </Col>
 
           <Col lg={6}>
-            <TextFormInput control={control} type="number" name="totalAmount" label="Total Amount" className="mb-3" />
+            <TextFormInput control={control} type="number" name="baseAmount" label="Base Amount" className="mb-3" step="0.01" min="0" />
+          </Col>
+
+          <Col lg={6}>
+            <TextFormInput control={control} type="number" name="taxPercent" label="Tax %" className="mb-3" step="0.01" min="0" max="100" defaultValue={0} />
+          </Col>
+
+          <Col lg={6}>
+            <div className="mb-3">
+              <label className="form-label">Tax Amount</label>
+              <Form.Control 
+                type="text" 
+                value={`AED ${taxAmount.toFixed(2)}`} 
+                disabled 
+                className="bg-light"
+              />
+            </div>
+          </Col>
+
+          <Col lg={6}>
+            <TextFormInput control={control} type="number" name="vatPercent" label="VAT %" className="mb-3" step="0.01" min="0" max="100" defaultValue={5} />
+          </Col>
+
+          <Col lg={6}>
+            <div className="mb-3">
+              <label className="form-label">VAT Amount</label>
+              <Form.Control 
+                type="text" 
+                value={`AED ${vatAmount.toFixed(2)}`} 
+                disabled 
+                className="bg-light"
+              />
+            </div>
+          </Col>
+
+          <Col lg={6}>
+            <div className="mb-3">
+              <label className="form-label">Grand Total</label>
+              <Form.Control 
+                type="text" 
+                value={`AED ${grandTotal.toFixed(2)}`} 
+                disabled 
+                className="bg-light fw-bold"
+              />
+            </div>
           </Col>
 
           <Col lg={6}>
@@ -153,7 +232,7 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control }) => {
 
 /** MAIN COMPONENT **/
 const ExpenseAdd: React.FC = () => {
-  const { reset, handleSubmit, control } = useForm<FormData>({
+  const { reset, handleSubmit, control, watch, setValue } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
     defaultValues: {
       status: 'active',
@@ -165,12 +244,37 @@ const ExpenseAdd: React.FC = () => {
       invoiceNumber: '',
       paymentMethod: '',
       paymentReference: '',
-      totalAmount: 0,
+      baseAmount: 0,
+      taxPercent: 0,
+      taxAmount: 0,
+      vatPercent: 5,
+      vatAmount: 0,
+      grandTotal: 0,
       paidBy: '',
       approvedBy: '',
       notes: '',
     },
   })
+
+  // Watch baseAmount, taxPercent, and vatPercent for automatic calculations
+  const baseAmount = watch('baseAmount') || 0
+  const taxPercent = watch('taxPercent') || 0
+  const vatPercent = watch('vatPercent') || 5
+  
+  // Calculate and update Tax Amount, VAT Amount, and Grand Total
+  React.useEffect(() => {
+    const base = parseFloat(String(baseAmount)) || 0
+    const tax = parseFloat(String(taxPercent)) || 0
+    const vat = parseFloat(String(vatPercent)) || 0
+    
+    const calculatedTaxAmount = (base * tax) / 100
+    const calculatedVatAmount = (base * vat) / 100
+    const calculatedGrandTotal = base + calculatedTaxAmount + calculatedVatAmount
+    
+    setValue('taxAmount', calculatedTaxAmount)
+    setValue('vatAmount', calculatedVatAmount)
+    setValue('grandTotal', calculatedGrandTotal)
+  }, [baseAmount, taxPercent, vatPercent, setValue])
 
   const onSubmit = (data: FormData) => {
     console.log('Form Submitted:', data)
@@ -179,7 +283,7 @@ const ExpenseAdd: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <GeneralInformationCard control={control} />
+      <GeneralInformationCard control={control} watch={watch} />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>

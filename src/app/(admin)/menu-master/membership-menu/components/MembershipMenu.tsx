@@ -110,8 +110,6 @@ const MembershipMenu = () => {
                     <th style={{ textWrap: 'nowrap' }}>Title</th>
                     <th style={{ textWrap: 'nowrap' }}> Category</th>
                     <th style={{ textWrap: 'nowrap' }}>Price </th>
-                    <th style={{ textWrap: 'nowrap' }}>VAT %</th>
-                    <th style={{ textWrap: 'nowrap' }}>Total After VAT</th>
                     <th style={{ textWrap: 'nowrap' }}>Price Category</th>
                     <th style={{ textWrap: 'nowrap' }}>Brands</th>
                     <th style={{ textWrap: 'nowrap' }}>Branch</th>
@@ -123,7 +121,7 @@ const MembershipMenu = () => {
                 <tbody>
                   {(isLoading || isFetching) && (
                     <tr>
-                      <td colSpan={13} className="text-center py-4">
+                      <td colSpan={11} className="text-center py-4">
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
                         Loading menus...
                       </td>
@@ -131,7 +129,7 @@ const MembershipMenu = () => {
                   )}
                   {!isLoading && !isFetching && menus.length === 0 && (
                     <tr>
-                      <td colSpan={13} className="text-center py-4">No menus found</td>
+                      <td colSpan={11} className="text-center py-4">No menus found</td>
                     </tr>
                   )}
                   {!isLoading && !isFetching && menus.map((item: any) => (
@@ -156,8 +154,6 @@ const MembershipMenu = () => {
                       <td>{item.title}</td>
                       <td>{getCategoryName(item.category)}</td>
                       <td>{item.membershipPrice ? `AED ${item.membershipPrice}` : '-'}</td>
-                      <td>{item.membershipVat ? `${item.membershipVat}%` : '-'}</td>
-                      <td>{item.membershipTotalPrice ? `AED ${item.membershipTotalPrice}` : '-'}</td>
                       <td>
                         <span className="badge bg-warning">Membership</span>
                       </td>

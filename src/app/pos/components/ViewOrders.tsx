@@ -1,9 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Modal, Button, Badge, Row, Col, Form, Spinner, Alert } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import { useGetPaidOrdersTodayQuery, useGetUnpaidOrdersTodayQuery } from '@/services/orderApi'
+import { printThermalReceipt } from '@/utils/thermalPrint'
+import ThermalReceipt from './ThermalReceipt'
 
 
 // Simple Status Display Component
@@ -421,6 +423,102 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
   const [search, setSearch] = useState('')
   const [showProducts, setShowProducts] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [showPrintOptions, setShowPrintOptions] = useState(false)
+  const [orderToPrint, setOrderToPrint] = useState<any>(null)
+
+  // Transform order data to format expected by ThermalReceipt (same as PrintOrder)
+  const transformedOrderData = useMemo(() => {
+    if (!orderToPrint) return null
+
+    // Convert items array to selectedProducts object format
+    const selectedProducts: { [key: string]: any } = {}
+    const itemOptions: { [key: string]: string[] } = {}
+    
+    if (orderToPrint.items && Array.isArray(orderToPrint.items) && orderToPrint.items.length > 0) {
+      orderToPrint.items.forEach((item: any, index: number) => {
+        const uniqueId = `${item.productId || item._id || 'item'}_${index}_${orderToPrint._id || orderToPrint.invoiceNo || 'order'}`
+        const price = (item.price !== undefined && item.price !== null && item.price !== '') ? Number(item.price) : 0
+        const qty = (item.qty !== undefined && item.qty !== null && item.qty !== '') ? Number(item.qty) : 1
+        
+        selectedProducts[uniqueId] = {
+          _id: item.productId || item._id,
+          id: item.productId || item._id,
+          title: item.title || item.name || '',
+          name: item.title || item.name || '',
+          price: price,
+          qty: qty,
+          moreOptions: item.moreOptions || []
+        }
+
+        if (item.moreOptions && Array.isArray(item.moreOptions) && item.moreOptions.length > 0) {
+          itemOptions[uniqueId] = item.moreOptions.map((opt: any) => 
+            typeof opt === 'string' ? opt : (opt.name || opt)
+          )
+        }
+      })
+    }
+
+    // Extract and convert all numeric values
+    const vatPercent = (orderToPrint.vatPercent !== undefined && orderToPrint.vatPercent !== null && orderToPrint.vatPercent !== '') ? Number(orderToPrint.vatPercent) : 5
+    const subTotal = (orderToPrint.subTotal !== undefined && orderToPrint.subTotal !== null && orderToPrint.subTotal !== '') ? Number(orderToPrint.subTotal) : 0
+    
+    let vatAmount = 0
+    if (orderToPrint.vatAmount !== undefined && orderToPrint.vatAmount !== null && orderToPrint.vatAmount !== '') {
+      vatAmount = Number(orderToPrint.vatAmount)
+    } else if (subTotal > 0) {
+      vatAmount = subTotal - (subTotal / (1 + vatPercent / 100))
+    }
+    
+    let basePriceWithoutVAT = 0
+    if (orderToPrint.basePriceWithoutVAT !== undefined && orderToPrint.basePriceWithoutVAT !== null && orderToPrint.basePriceWithoutVAT !== '') {
+      basePriceWithoutVAT = Number(orderToPrint.basePriceWithoutVAT)
+    } else if (subTotal > 0) {
+      if (vatAmount > 0) {
+        basePriceWithoutVAT = subTotal - vatAmount
+      } else {
+        basePriceWithoutVAT = subTotal / (1 + vatPercent / 100)
+      }
+    }
+    
+    const totalWithVAT = (orderToPrint.totalWithVAT !== undefined && orderToPrint.totalWithVAT !== null && orderToPrint.totalWithVAT !== '') ? Number(orderToPrint.totalWithVAT) : subTotal
+    const totalAmount = (orderToPrint.total !== undefined && orderToPrint.total !== null && orderToPrint.total !== '') ? Number(orderToPrint.total) : ((orderToPrint.totalAmount !== undefined && orderToPrint.totalAmount !== null && orderToPrint.totalAmount !== '') ? Number(orderToPrint.totalAmount) : 0)
+    const discountAmountApplied = (orderToPrint.discountAmount !== undefined && orderToPrint.discountAmount !== null && orderToPrint.discountAmount !== '') ? Number(orderToPrint.discountAmount) : 0
+    const deliveryCharge = (orderToPrint.shippingCharge !== undefined && orderToPrint.shippingCharge !== null && orderToPrint.shippingCharge !== '') ? Number(orderToPrint.shippingCharge) : ((orderToPrint.deliveryCharge !== undefined && orderToPrint.deliveryCharge !== null && orderToPrint.deliveryCharge !== '') ? Number(orderToPrint.deliveryCharge) : 0)
+    const rounding = (orderToPrint.rounding !== undefined && orderToPrint.rounding !== null && orderToPrint.rounding !== '') ? Number(orderToPrint.rounding) : 0
+
+    return {
+      ...orderToPrint,
+      selectedProducts,
+      itemOptions,
+      subTotal: subTotal,
+      totalAmount: totalAmount,
+      discountAmountApplied: discountAmountApplied,
+      deliveryCharge: deliveryCharge,
+      rounding: rounding,
+      vatPercent: vatPercent,
+      vatAmount: vatAmount,
+      basePriceWithoutVAT: basePriceWithoutVAT,
+      totalWithVAT: totalWithVAT,
+      selectedOrderType: orderToPrint.orderType || null,
+      selectedPriceType: orderToPrint.salesType || null,
+      notes: orderToPrint.note || orderToPrint.notes || '',
+      invoiceNo: orderToPrint.invoiceNo || '',
+      orderNo: orderToPrint.orderNo || '',
+      customer: orderToPrint.customer || null,
+      payments: orderToPrint.payments || [],
+      receiveAmount: (orderToPrint.receiveAmount !== undefined && orderToPrint.receiveAmount !== null && orderToPrint.receiveAmount !== '') ? Number(orderToPrint.receiveAmount) : 0,
+      cumulativePaid: (orderToPrint.cumulativePaid !== undefined && orderToPrint.cumulativePaid !== null && orderToPrint.cumulativePaid !== '') ? Number(orderToPrint.cumulativePaid) : 0,
+      changeAmount: (orderToPrint.changeAmount !== undefined && orderToPrint.changeAmount !== null && orderToPrint.changeAmount !== '') ? Number(orderToPrint.changeAmount) : 0,
+      payableAmount: (orderToPrint.payableAmount !== undefined && orderToPrint.payableAmount !== null && orderToPrint.payableAmount !== '') ? Number(orderToPrint.payableAmount) : 0,
+      startDate: orderToPrint.startDate || '',
+      endDate: orderToPrint.endDate || '',
+      discount: (orderToPrint.discountAmount !== undefined && orderToPrint.discountAmount !== null && orderToPrint.discountAmount !== '' && Number(orderToPrint.discountAmount) > 0) ? {
+        type: orderToPrint.discountType || 'flat',
+        amount: Number(orderToPrint.discountAmount),
+        reason: ''
+      } : null
+    }
+  }, [orderToPrint])
 
   // Fetch orders from new APIs - only when modal is open
   const { data: paidOrdersData, isLoading: isLoadingPaid, error: errorPaid, refetch: refetchPaid } = useGetPaidOrdersTodayQuery(
@@ -599,10 +697,22 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
                           </Button>
                         )}
 
-                        <Button size="sm" variant="dark">
+                        {activeTab === 'paid' && (
+                          <Button 
+                            size="sm" 
+                            variant="dark"
+                            onClick={() => {
+                              setOrderToPrint(order)
+                              // Wait a bit for component to render before showing modal
+                              setTimeout(() => {
+                                setShowPrintOptions(true)
+                              }, 100)
+                            }}
+                          >
                           <IconifyIcon icon="mdi:printer-outline" className="me-1" />
                           Print
                         </Button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -623,6 +733,236 @@ const ViewOrder = ({ onEditOrder }: { onEditOrder?: (orderData: any) => void }) 
         }}
         orderData={selectedOrder}
       />
+
+      {/* Print Order Components - Render ThermalReceipt directly like PrintOrder does */}
+      {transformedOrderData && (
+        <>
+          <ThermalReceipt orderData={transformedOrderData} receiptType="customer" />
+          <ThermalReceipt orderData={transformedOrderData} receiptType="kitchen" />
+        </>
+      )}
+
+      {/* Print Options Modal */}
+      <Modal 
+        show={showPrintOptions} 
+        onHide={() => setShowPrintOptions(false)} 
+        centered 
+        backdrop="static"
+        keyboard={false}
+        style={{
+          zIndex: 1055
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: '20px',
+          border: '3px solid #ffffff',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)',
+          overflow: 'hidden',
+          position: 'relative',
+          maxWidth: '450px',
+          width: '100%',
+          margin: '0 auto'
+        }}>
+          {/* Header with Gradient */}
+          <div style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            padding: '1rem 1.5rem',
+            borderBottom: '2px solid #e9ecef',
+            position: 'relative'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h4 style={{
+                  margin: 0,
+                  fontWeight: 'bold',
+                  color: '#2c3e50',
+                  fontSize: '1.2rem',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                }}>
+                  🖨️ Print Receipt
+                </h4>
+                <p style={{
+                  margin: '0.3rem 0 0 0',
+                  color: '#6c757d',
+                  fontSize: '0.8rem'
+                }}>
+                  Choose receipt type to print
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPrintOptions(false)}
+                style={{
+                  background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '35px',
+                  height: '35px',
+                  color: 'white',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(255, 107, 107, 0.3)',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.1)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 107, 107, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)'
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(255, 107, 107, 0.3)'
+                }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          {/* Body with Enhanced Design */}
+          <div style={{
+            padding: '1.2rem 1.5rem',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            position: 'relative'
+          }}>
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '1rem'
+            }}>
+              <p style={{
+                color: '#495057',
+                fontSize: '1rem',
+                fontWeight: '500',
+                margin: 0,
+                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}>
+                Select the receipt type you want to print:
+              </p>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.8rem'
+            }}>
+              {/* Customer Receipt Button */}
+              <button
+                onClick={() => {
+                  printThermalReceipt('customer', transformedOrderData)
+                  setShowPrintOptions(false)
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #28a745, #20c997)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 24px',
+                  color: 'white',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(40, 167, 69, 0.3)',
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)'
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(40, 167, 69, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(40, 167, 69, 0.3)'
+                }}
+              >
+                <span style={{ fontSize: '1.3rem' }}>🧾</span>
+                <span>Print Customer Receipt</span>
+              </button>
+
+              {/* Kitchen Receipt Button */}
+              <button
+                onClick={() => {
+                  printThermalReceipt('kitchen', transformedOrderData)
+                  setShowPrintOptions(false)
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #fd7e14, #ffc107)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 24px',
+                  color: 'white',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(253, 126, 20, 0.3)',
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)'
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(253, 126, 20, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(253, 126, 20, 0.3)'
+                }}
+              >
+                <span style={{ fontSize: '1.3rem' }}>🍳</span>
+                <span>Print Kitchen Receipt</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+            padding: '1rem 1.5rem',
+            borderTop: '2px solid #dee2e6',
+            textAlign: 'center'
+          }}>
+            <button
+              onClick={() => setShowPrintOptions(false)}
+              style={{
+                background: 'linear-gradient(135deg, #6c757d, #495057)',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '12px 30px',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(108, 117, 125, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(108, 117, 125, 0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(108, 117, 125, 0.3)'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
 
     </>
   )

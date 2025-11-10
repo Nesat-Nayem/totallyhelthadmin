@@ -19,6 +19,10 @@ interface PosState {
     discount: { type: string; amount: number; reason: string } | null
     deliveryCharge: number
     rounding: number
+    vatPercent: number
+    basePriceWithoutVAT: number
+    vatAmount: number
+    totalWithVAT: number
     notes: string
     receiveAmount: number
     cumulativePaid: number

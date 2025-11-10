@@ -12,7 +12,6 @@ export default function OrderCancellationModal() {
   const handleShow = () => setShow(true)
 
   const handleSearch = () => {
-    console.log('Searching for:', searchValue)
     // 👉 API call / filter logic goes here
   }
 

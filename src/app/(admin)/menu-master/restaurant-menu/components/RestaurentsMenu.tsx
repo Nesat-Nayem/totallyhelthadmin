@@ -109,8 +109,6 @@ const RestaurentsMenu = () => {
                     <th style={{ textWrap: 'nowrap' }}>Title</th>
                     <th style={{ textWrap: 'nowrap' }}> Category</th>
                     <th style={{ textWrap: 'nowrap' }}>Price </th>
-                    <th style={{ textWrap: 'nowrap' }}>VAT %</th>
-                    <th style={{ textWrap: 'nowrap' }}>Total After VAT</th>
                     <th style={{ textWrap: 'nowrap' }}>Price Category</th>
                     <th style={{ textWrap: 'nowrap' }}>Brands</th>
                     <th style={{ textWrap: 'nowrap' }}>Branch</th>
@@ -122,7 +120,7 @@ const RestaurentsMenu = () => {
                 <tbody>
                   {(isLoading || isFetching) && (
                     <tr>
-                      <td colSpan={13} className="text-center py-4">
+                      <td colSpan={11} className="text-center py-4">
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
                         Loading menus...
                       </td>
@@ -130,7 +128,7 @@ const RestaurentsMenu = () => {
                   )}
                   {!isLoading && !isFetching && menus.length === 0 && (
                     <tr>
-                      <td colSpan={13} className="text-center py-4">No menus found</td>
+                      <td colSpan={11} className="text-center py-4">No menus found</td>
                     </tr>
                   )}
                   {!isLoading && !isFetching && menus.map((item: any) => (
@@ -155,8 +153,6 @@ const RestaurentsMenu = () => {
                       <td>{item.title}</td>
                       <td>{getCategoryName(item.category)}</td>
                       <td>{item.restaurantPrice ? `AED ${item.restaurantPrice}` : '-'}</td>
-                      <td>{item.restaurantVat ? `${item.restaurantVat}%` : '-'}</td>
-                      <td>{item.restaurantTotalPrice ? `AED ${item.restaurantTotalPrice}` : '-'}</td>
                       <td>
                         <span className="badge bg-success">Restaurant</span>
                       </td>

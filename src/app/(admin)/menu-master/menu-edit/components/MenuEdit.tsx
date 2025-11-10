@@ -17,12 +17,6 @@ import Select from 'react-select'
 import { uploadSingle } from '@/services/upload'
 import { toast } from 'react-toastify'
 
-/** HELPER FUNCTION TO CALCULATE VAT **/
-const calculateVatTotal = (price: string, vatPercent: string = '5'): number => {
-  const basePrice = parseFloat(price) || 0
-  const vat = parseFloat(vatPercent) || 5
-  return basePrice + (basePrice * vat / 100)
-}
 
 /** FORM DATA TYPE **/
 type FormData = {
@@ -36,14 +30,6 @@ type FormData = {
   dineinPrice?: string
   takeawayPrice?: string
   aggregatorPrice?: string
-  // VAT fields for each price type (3 main categories)
-  restaurantVat?: string
-  onlineVat?: string
-  membershipVat?: string
-  // Total price after VAT (separate fields for backend)
-  restaurantTotalPrice?: string
-  onlineTotalPrice?: string
-  membershipTotalPrice?: string
   // optional nutrition fields
   calories?: string
   protein?: string
@@ -231,24 +217,14 @@ const GeneralInformationCard: React.FC<ControlType & {
                       </div>
                     </div>
 
-                    {/* Conditional price inputs with VAT */}
+                    {/* Conditional price inputs */}
                     {field.value?.includes('dinein') && (
                       <div className="mb-3">
                         <label className="form-label">Restaurant Price</label>
                         <div className="row">
-                          <div className="col-md-4">
-                            <label className="form-label small">Base Price</label>
-                            <input type="number" className="form-control" placeholder="Enter base price" {...register('dineinPrice')} />
-                          </div>
-                          <div className="col-md-3">
-                            <label className="form-label small">VAT %</label>
-                            <input type="number" className="form-control" placeholder="5" defaultValue="5" {...register('restaurantVat')} />
-                          </div>
-                          <div className="col-md-5">
-                            <label className="form-label small">Total After VAT</label>
-                            <input type="number" className="form-control bg-light" placeholder="Total" readOnly 
-                              value={calculateVatTotal(watch('dineinPrice') || '0', watch('restaurantVat') || '5')} 
-                              {...register('restaurantTotalPrice')} />
+                          <div className="col-md-12">
+                            <label className="form-label small">Price</label>
+                            <input type="number" className="form-control" placeholder="Enter price" {...register('dineinPrice')} />
                           </div>
                         </div>
                       </div>
@@ -257,19 +233,9 @@ const GeneralInformationCard: React.FC<ControlType & {
                       <div className="mb-3">
                         <label className="form-label">Online Price</label>
                         <div className="row">
-                          <div className="col-md-4">
-                            <label className="form-label small">Base Price</label>
-                            <input type="number" className="form-control" placeholder="Enter base price" {...register('takeawayPrice')} />
-                          </div>
-                          <div className="col-md-3">
-                            <label className="form-label small">VAT %</label>
-                            <input type="number" className="form-control" placeholder="5" defaultValue="5" {...register('onlineVat')} />
-                          </div>
-                          <div className="col-md-5">
-                            <label className="form-label small">Total After VAT</label>
-                            <input type="number" className="form-control bg-light" placeholder="Total" readOnly 
-                              value={calculateVatTotal(watch('takeawayPrice') || '0', watch('onlineVat') || '5')} 
-                              {...register('onlineTotalPrice')} />
+                          <div className="col-md-12">
+                            <label className="form-label small">Price</label>
+                            <input type="number" className="form-control" placeholder="Enter price" {...register('takeawayPrice')} />
                           </div>
                         </div>
                       </div>
@@ -278,19 +244,9 @@ const GeneralInformationCard: React.FC<ControlType & {
                       <div className="mb-3">
                         <label className="form-label">Membership Price</label>
                         <div className="row">
-                          <div className="col-md-4">
-                            <label className="form-label small">Base Price</label>
-                            <input type="number" className="form-control" placeholder="Enter base price" {...register('aggregatorPrice')} />
-                          </div>
-                          <div className="col-md-3">
-                            <label className="form-label small">VAT %</label>
-                            <input type="number" className="form-control" placeholder="5" defaultValue="5" {...register('membershipVat')} />
-                          </div>
-                          <div className="col-md-5">
-                            <label className="form-label small">Total After VAT</label>
-                            <input type="number" className="form-control bg-light" placeholder="Total" readOnly 
-                              value={calculateVatTotal(watch('aggregatorPrice') || '0', watch('membershipVat') || '5')} 
-                              {...register('membershipTotalPrice')} />
+                          <div className="col-md-12">
+                            <label className="form-label small">Price</label>
+                            <input type="number" className="form-control" placeholder="Enter price" {...register('aggregatorPrice')} />
                           </div>
                         </div>
                       </div>
@@ -445,14 +401,6 @@ const MenuEdit: React.FC = () => {
         dineinPrice: menu.restaurantPrice ? String(menu.restaurantPrice) : undefined,
         takeawayPrice: menu.onlinePrice ? String(menu.onlinePrice) : undefined,
         aggregatorPrice: menu.membershipPrice ? String(menu.membershipPrice) : undefined,
-        // Initialize VAT fields from database or default 5%
-        restaurantVat: menu.restaurantVat ? String(menu.restaurantVat) : '5',
-        onlineVat: menu.onlineVat ? String(menu.onlineVat) : '5',
-        membershipVat: menu.membershipVat ? String(menu.membershipVat) : '5',
-        // Initialize total price fields from database
-        restaurantTotalPrice: menu.restaurantTotalPrice ? String(menu.restaurantTotalPrice) : undefined,
-        onlineTotalPrice: menu.onlineTotalPrice ? String(menu.onlineTotalPrice) : undefined,
-        membershipTotalPrice: menu.membershipTotalPrice ? String(menu.membershipTotalPrice) : undefined,
         // Auto-fill nutrition fields
         calories: menu.calories ? String(menu.calories) : undefined,
         protein: menu.protein ? String(menu.protein) : undefined,
@@ -486,14 +434,12 @@ const MenuEdit: React.FC = () => {
         brands: selectedBrands.map((x) => x.value),
         branches: selectedBranches.map((x) => x.value),
       }
-      // Send original prices, total prices, and VAT percentages to backend
+      // Send prices to backend (price is final, includes VAT)
       if (data.orderTypes?.includes('dinein')) {
-        const basePrice = parseFloat(String(data.dineinPrice)) || 0
-        const vatPercent = parseFloat(String(data.restaurantVat)) || 5
-        const totalPrice = basePrice + (basePrice * vatPercent / 100)
-        payload.restaurantPrice = basePrice
-        payload.restaurantTotalPrice = totalPrice
-        payload.restaurantVat = vatPercent
+        const price = parseFloat(String(data.dineinPrice)) || 0
+        payload.restaurantPrice = price
+        payload.restaurantTotalPrice = price
+        payload.restaurantVat = 0
       } else {
         payload.restaurantPrice = undefined
         payload.restaurantTotalPrice = undefined
@@ -501,12 +447,10 @@ const MenuEdit: React.FC = () => {
       }
       
       if (data.orderTypes?.includes('takeaway')) {
-        const basePrice = parseFloat(String(data.takeawayPrice)) || 0
-        const vatPercent = parseFloat(String(data.onlineVat)) || 5
-        const totalPrice = basePrice + (basePrice * vatPercent / 100)
-        payload.onlinePrice = basePrice
-        payload.onlineTotalPrice = totalPrice
-        payload.onlineVat = vatPercent
+        const price = parseFloat(String(data.takeawayPrice)) || 0
+        payload.onlinePrice = price
+        payload.onlineTotalPrice = price
+        payload.onlineVat = 0
       } else {
         payload.onlinePrice = undefined
         payload.onlineTotalPrice = undefined
@@ -514,12 +458,10 @@ const MenuEdit: React.FC = () => {
       }
       
       if (data.orderTypes?.includes('aggregator')) {
-        const basePrice = parseFloat(String(data.aggregatorPrice)) || 0
-        const vatPercent = parseFloat(String(data.membershipVat)) || 5
-        const totalPrice = basePrice + (basePrice * vatPercent / 100)
-        payload.membershipPrice = basePrice
-        payload.membershipTotalPrice = totalPrice
-        payload.membershipVat = vatPercent
+        const price = parseFloat(String(data.aggregatorPrice)) || 0
+        payload.membershipPrice = price
+        payload.membershipTotalPrice = price
+        payload.membershipVat = 0
       } else {
         payload.membershipPrice = undefined
         payload.membershipTotalPrice = undefined

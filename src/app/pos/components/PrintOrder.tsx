@@ -64,9 +64,25 @@ const PrintOrder = () => {
     return `${day}/${month}/${year} ${hours}:${minutes}`
   }
 
-  // Calculate VAT (5%)
-  const calculateVAT = (amount: number) => {
-    return (amount * 5) / 100
+  // Get VAT amount from orderData (already calculated correctly in POS component)
+  // If not available, calculate it by extracting VAT from subtotal
+  const getVATAmount = () => {
+    if (orderData?.vatAmount !== undefined) {
+      return orderData.vatAmount
+    }
+    // Fallback: extract VAT from subtotal if vatAmount not available
+    const vatPercent = orderData?.vatPercent || 5
+    const subTotal = orderData?.subTotal || 0
+    if (subTotal > 0) {
+      const basePrice = subTotal / (1 + vatPercent / 100)
+      return subTotal - basePrice
+    }
+    return 0
+  }
+
+  // Get VAT percentage from orderData
+  const getVATPercent = () => {
+    return orderData?.vatPercent || 5
   }
 
   // Helper to get the display text for order type
@@ -184,8 +200,12 @@ const PrintOrder = () => {
           {/* Bill Summary */}
           <div className="small">
             <div className="d-flex justify-content-between">
-              <strong>BILL AMOUNT</strong>
-              <span>{orderData?.subTotal?.toFixed(2) || '0.00'}</span>
+              <strong>BASE PRICE (Without VAT)</strong>
+              <span>{orderData?.basePriceWithoutVAT ? orderData.basePriceWithoutVAT.toFixed(2) : (orderData?.subTotal ? (orderData.subTotal / (1 + getVATPercent() / 100)).toFixed(2) : '0.00')}</span>
+            </div>
+            <div className="d-flex justify-content-between">
+              <strong>{getVATPercent()} % VAT AMOUNT</strong>
+              <span>{getVATAmount().toFixed(2)}</span>
             </div>
             {orderData?.discountAmountApplied > 0 && (
               <div className="d-flex justify-content-between">
@@ -205,10 +225,6 @@ const PrintOrder = () => {
                 <span>{orderData.rounding > 0 ? '+' : ''}{orderData.rounding.toFixed(2)}</span>
               </div>
             )}
-            <div className="d-flex justify-content-between">
-              <strong>5 % VAT AMOUNT</strong>
-              <span>{orderData?.subTotal ? calculateVAT(orderData.subTotal).toFixed(2) : '0.00'}</span>
-            </div>
             <div className="d-flex justify-content-between">
               <strong>GRAND TOTAL</strong>
               <span>{orderData?.totalAmount?.toFixed(2) || '0.00'}</span>

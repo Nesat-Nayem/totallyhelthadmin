@@ -51,10 +51,36 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
     return paymentTypes.join(', ');
   };
 
-  // Calculate VAT (5%)
-  const calculateVAT = (amount: number) => {
-    return (amount * 5) / 100
-  }
+  // Get VAT amount from orderData (already calculated correctly in POS component)
+  // Pre-calculate all values to ensure they're in the rendered HTML
+  const vatAmount = orderData?.vatAmount !== undefined && orderData?.vatAmount !== null
+    ? Number(orderData.vatAmount)
+    : (() => {
+        const vatPercent = orderData?.vatPercent || 5
+        const subTotal = orderData?.subTotal || 0
+        if (subTotal > 0) {
+          const basePrice = subTotal / (1 + vatPercent / 100)
+          return subTotal - basePrice
+        }
+        return 0
+      })()
+
+  // Get VAT percentage from orderData - pre-calculate
+  const vatPercent = orderData?.vatPercent !== undefined && orderData?.vatPercent !== null
+    ? Number(orderData.vatPercent)
+    : 5
+
+  // Pre-calculate base price
+  const basePriceWithoutVAT = orderData?.basePriceWithoutVAT !== undefined && orderData?.basePriceWithoutVAT !== null
+    ? Number(orderData.basePriceWithoutVAT)
+    : (orderData?.subTotal ? (Number(orderData.subTotal) / (1 + vatPercent / 100)) : 0)
+
+  // Pre-calculate all other values
+  const subTotal = orderData?.subTotal !== undefined && orderData?.subTotal !== null ? Number(orderData.subTotal) : 0
+  const totalAmount = orderData?.totalAmount !== undefined && orderData?.totalAmount !== null ? Number(orderData.totalAmount) : 0
+  const discountAmountApplied = orderData?.discountAmountApplied !== undefined && orderData?.discountAmountApplied !== null ? Number(orderData.discountAmountApplied) : 0
+  const deliveryCharge = orderData?.deliveryCharge !== undefined && orderData?.deliveryCharge !== null ? Number(orderData.deliveryCharge) : 0
+  const rounding = orderData?.rounding !== undefined && orderData?.rounding !== null ? Number(orderData.rounding) : 0
 
   const getCurrentDateTime = () => {
     const now = new Date()
@@ -146,7 +172,7 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
 
       {/* Items Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontWeight: 'bold' }}>
-        <div style={{ width: '50%' }}>Description</div>
+        <div style={{ width: '50%' }}>Items</div>
         <div style={{ width: '15%', textAlign: 'center' }}>Qty</div>
         <div style={{ width: '35%', textAlign: 'right' }}>Amount</div>
       </div>
@@ -162,12 +188,17 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
           ? itemOptions 
           : moreOptions.map((opt: any) => typeof opt === 'string' ? opt : opt.name)
         
+        // Pre-calculate item values to ensure they're in the rendered HTML
+        const itemPrice = product.price !== undefined && product.price !== null ? Number(product.price) : 0
+        const itemQty = product.qty !== undefined && product.qty !== null ? Number(product.qty) : 1
+        const itemTotal = itemPrice * itemQty
+        
         return (
           <div key={index} style={{ marginBottom: '2px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ width: '50%' }}>{product.title || product.name}</div>
-              <div style={{ width: '15%', textAlign: 'center' }}>{product.qty}</div>
-              <div style={{ width: '35%', textAlign: 'right' }}>{(product.price * product.qty).toFixed(2)}</div>
+              <div style={{ width: '50%' }}>{product.title || product.name || ''}</div>
+              <div style={{ width: '15%', textAlign: 'center' }}>{itemQty}</div>
+              <div style={{ width: '35%', textAlign: 'right' }}>{itemTotal.toFixed(2)}</div>
             </div>
             {/* Item-specific options */}
             {optionNames.length > 0 && (
@@ -189,16 +220,34 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
       {/* Bill Summary */}
       <div style={{ marginBottom: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-          <div>BILL AMOUNT</div>
-          <div>{orderData?.subTotal?.toFixed(2) || '0.00'}</div>
+          <div>BASE PRICE (Without VAT)</div>
+          <div>{basePriceWithoutVAT.toFixed(2)}</div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-          <div>5 % VAT AMOUNT</div>
-          <div>{orderData?.subTotal ? calculateVAT(orderData.subTotal).toFixed(2) : '0.00'}</div>
+          <div>{vatPercent} % VAT AMOUNT</div>
+          <div>{vatAmount.toFixed(2)}</div>
         </div>
+        {discountAmountApplied > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <div>DISCOUNT</div>
+            <div>-{discountAmountApplied.toFixed(2)}</div>
+          </div>
+        )}
+        {deliveryCharge > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <div>DELIVERY CHARGE</div>
+            <div>{deliveryCharge.toFixed(2)}</div>
+          </div>
+        )}
+        {rounding !== 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <div>ROUNDING</div>
+            <div>{rounding > 0 ? '+' : ''}{rounding.toFixed(2)}</div>
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
           <div>GRAND TOTAL</div>
-          <div>{orderData?.totalAmount?.toFixed(2) || '0.00'}</div>
+          <div>{totalAmount.toFixed(2)}</div>
         </div>
       </div>
 
@@ -285,7 +334,7 @@ const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ orderData, receiptType 
 
       {/* Items Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontWeight: 'bold' }}>
-        <div style={{ width: '20%' }}>Qty</div>
+        <div style={{ width: '20%' }}>Item Quantity</div>
         <div style={{ width: '80%' }}>Item</div>
       </div>
 
