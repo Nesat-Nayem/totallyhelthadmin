@@ -167,12 +167,12 @@ const RoleForm: React.FC<RoleFormProps> = ({
       if (mode === 'edit') {
         // For edit mode, call the onSubmit callback directly
         if (onSubmit) {
-          // Map role to backend format (superadmin -> super admin)
+          // Use internal format (superadmin) for RoleFormData
           const formData: RoleFormData = {
             staffName: data.staffName,
             email: data.email,
             phone: data.phone,
-            role: mapRoleToBackend(data.role) as 'super admin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
+            role: data.role as 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
             menuAccess: menuAccess
           }
           onSubmit(formData)
@@ -204,12 +204,13 @@ const RoleForm: React.FC<RoleFormProps> = ({
         
         // Call the onSubmit callback if provided
         if (onSubmit) {
+          // Convert backend format to internal format for RoleFormData
           const formData: RoleFormData = {
             staffName: result.data.name,
             email: result.data.email,
             password: '', // Don't pass password back
             phone: result.data.phone,
-            role: result.data.role as 'admin' | 'manager' | 'cashier' | 'waiter' | 'staff',
+            role: mapRoleFromBackend(result.data.role) as 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
             menuAccess: result.data.menuAccess
           }
           onSubmit(formData)
