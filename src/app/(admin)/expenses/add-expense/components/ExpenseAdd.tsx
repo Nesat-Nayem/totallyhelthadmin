@@ -8,6 +8,13 @@ import { Button, Card, CardBody, CardHeader, CardTitle, Col, Row, Form } from 'r
 import { Control, Controller, useForm } from 'react-hook-form'
 import Link from 'next/link'
 import ChoicesFormInput from '@/components/form/ChoicesFormInput'
+import { useGetExpenseTypesQuery } from '@/services/expenseTypeApi'
+import { useGetSuppliersQuery } from '@/services/supplierApi'
+import { useGetApprovedBysQuery } from '@/services/approvedByApi'
+import { useGetPaymentMethodsQuery } from '@/services/paymentMethodApi'
+import { useCreateExpenseMutation } from '@/services/expenseApi'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'react-toastify'
 
 /** FORM DATA TYPE **/
 type FormData = {
@@ -16,19 +23,19 @@ type FormData = {
   category: string
   description: string
   vendor: string
-  invoiceNumber: string
+  invoiceNumber?: string
   paymentMethod: string
-  paymentReference: string
+  paymentReference?: string
   baseAmount: number
   taxPercent: number
   taxAmount?: number
   vatPercent: number
   vatAmount?: number
   grandTotal?: number
-  paidBy: string
+  paidBy?: string
   approvedBy: string
-  status: string
-  notes: string
+  status?: string
+  notes?: string
 }
 
 /** PROP TYPE FOR CHILD COMPONENTS **/
@@ -43,20 +50,20 @@ const messageSchema: yup.ObjectSchema<FormData> = yup.object({
   expenseDate: yup.string().required('Please select expense date'),
   category: yup.string().required('Please select category'),
   description: yup.string().required('Please enter description'),
-  vendor: yup.string().required('Please enter vendor name'),
-  invoiceNumber: yup.string().required('Please enter invoice number'),
+  vendor: yup.string().required('Please select supplier'),
+  invoiceNumber: yup.string().optional(),
   paymentMethod: yup.string().required('Please select payment method'),
-  paymentReference: yup.string().required('Please enter payment reference'),
+  paymentReference: yup.string().optional(),
   baseAmount: yup.number().typeError('Please enter base amount').required('Please enter base amount').min(0, 'Base amount must be greater than or equal to 0'),
   taxPercent: yup.number().typeError('Please enter tax percentage').required('Please enter tax percentage').min(0, 'Tax percentage must be greater than or equal to 0').max(100, 'Tax percentage cannot exceed 100'),
-  taxAmount: yup.number().default(0),
+  taxAmount: yup.number().optional().default(0),
   vatPercent: yup.number().typeError('Please enter VAT percentage').required('Please enter VAT percentage').min(0, 'VAT percentage must be greater than or equal to 0').max(100, 'VAT percentage cannot exceed 100'),
-  vatAmount: yup.number().default(0),
-  grandTotal: yup.number().default(0),
-  paidBy: yup.string().required('Please select staff'),
-  approvedBy: yup.string().required('Please enter approved by'),
-  status: yup.string().required('Please select status'),
-  notes: yup.string().required('Please enter notes'),
+  vatAmount: yup.number().optional().default(0),
+  grandTotal: yup.number().optional().default(0),
+  paidBy: yup.string().optional(),
+  approvedBy: yup.string().required('Please select approved by'),
+  status: yup.string().optional().default('active'),
+  notes: yup.string().optional(),
 })
 
 /** GENERAL INFORMATION CARD **/
@@ -65,6 +72,33 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
   const baseAmount = watch('baseAmount') || 0
   const taxPercent = watch('taxPercent') || 0
   const vatPercent = watch('vatPercent') || 0
+  
+  // Fetch data dynamically
+  const { data: expenseTypesData, isLoading: expenseTypesLoading } = useGetExpenseTypesQuery()
+  const { data: suppliersData, isLoading: suppliersLoading } = useGetSuppliersQuery()
+  const { data: approvedBysData, isLoading: approvedBysLoading } = useGetApprovedBysQuery()
+  const { data: paymentMethodsData, isLoading: paymentMethodsLoading } = useGetPaymentMethodsQuery()
+  
+  const expenseTypes = expenseTypesData?.data || []
+  const suppliers = suppliersData?.data || []
+  const approvedBys = approvedBysData?.data || []
+  const paymentMethods = paymentMethodsData || []
+  
+  // Filter only active items
+  const activeExpenseTypes = expenseTypes
+    .filter((et: any) => et.status === 'active')
+    .sort((a: any, b: any) => {
+      // Put "Travel" first, then sort others alphabetically
+      if (a.name.toLowerCase() === 'travel') return -1
+      if (b.name.toLowerCase() === 'travel') return 1
+      return a.name.localeCompare(b.name)
+    })
+  const activeSuppliers = suppliers.filter((s: any) => s.status === 'active')
+  const activeApprovedBys = approvedBys.filter((ab: any) => ab.status === 'active')
+  // Filter payment methods to only show Cash and Credit
+  const activePaymentMethods = paymentMethods.filter((pm: any) => 
+    pm.status === 'active' && (pm.name.toLowerCase() === 'cash' || pm.name.toLowerCase() === 'credit')
+  )
   
   // Calculate Tax Amount
   const taxAmount = useMemo(() => {
@@ -105,13 +139,13 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
                 control={control}
                 name="category"
                 render={({ field }) => (
-                  <select {...field} className="form-control form-select">
+                  <select {...field} className="form-control form-select" disabled={expenseTypesLoading}>
                     <option value="">Select Category</option>
-                    <option value="Travel">Travel</option>
-                    <option value="Office Supplies">Office Supplies</option>
-                    <option value="Utilities">Utilities</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Other">Other</option>
+                    {activeExpenseTypes.map((et: any) => (
+                      <option key={et._id} value={et._id}>
+                        {et.name}
+                      </option>
+                    ))}
                   </select>
                 )}
               />
@@ -126,12 +160,15 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
             <label className="form-label">Supplier Name</label>
             <Controller
               control={control}
-              name="paidBy"
+              name="vendor"
               render={({ field }) => (
-                <select {...field} className="form-control form-select mb-3" data-choices data-placeholder="Select Staff">
+                <select {...field} className="form-control form-select mb-3" disabled={suppliersLoading}>
                   <option value="">Select Supplier</option>
-                  <option value="John Doe">John Doe</option>
-                  <option value="Suraj Jamdade">Suraj Jamdade</option>
+                  {activeSuppliers.map((s: any) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name}
+                    </option>
+                  ))}
                 </select>
               )}
             />
@@ -144,10 +181,13 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
                 control={control}
                 name="paymentMethod"
                 render={({ field }) => (
-                  <select {...field} className="form-control form-select">
+                  <select {...field} className="form-control form-select" disabled={paymentMethodsLoading}>
                     <option value="">Select Payment Method</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Credit">Credit</option>
+                    {activePaymentMethods.map((pm: any) => (
+                      <option key={pm._id} value={pm.name}>
+                        {pm.name}
+                      </option>
+                    ))}
                   </select>
                 )}
               />
@@ -212,10 +252,13 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
               control={control}
               name="approvedBy"
               render={({ field }) => (
-                <select {...field} className="form-control form-select">
+                <select {...field} className="form-control form-select" disabled={approvedBysLoading}>
                   <option value="">Select Approved By</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Supervisor">Supervisor</option>
+                  {activeApprovedBys.map((ab: any) => (
+                    <option key={ab._id} value={ab._id}>
+                      {ab.name}
+                    </option>
+                  ))}
                 </select>
               )}
             />
@@ -232,6 +275,11 @@ const GeneralInformationCard: React.FC<ControlType> = ({ control, watch }) => {
 
 /** MAIN COMPONENT **/
 const ExpenseAdd: React.FC = () => {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const paymentMethodParam = searchParams.get('paymentMethod') || ''
+  const [createExpense, { isLoading: isSubmitting }] = useCreateExpenseMutation()
+  
   const { reset, handleSubmit, control, watch, setValue } = useForm<FormData>({
     resolver: yupResolver(messageSchema),
     defaultValues: {
@@ -242,7 +290,7 @@ const ExpenseAdd: React.FC = () => {
       description: '',
       vendor: '',
       invoiceNumber: '',
-      paymentMethod: '',
+      paymentMethod: paymentMethodParam,
       paymentReference: '',
       baseAmount: 0,
       taxPercent: 0,
@@ -255,6 +303,13 @@ const ExpenseAdd: React.FC = () => {
       notes: '',
     },
   })
+
+  // Set payment method if passed as query param
+  React.useEffect(() => {
+    if (paymentMethodParam) {
+      setValue('paymentMethod', paymentMethodParam)
+    }
+  }, [paymentMethodParam, setValue])
 
   // Watch baseAmount, taxPercent, and vatPercent for automatic calculations
   const baseAmount = watch('baseAmount') || 0
@@ -276,25 +331,83 @@ const ExpenseAdd: React.FC = () => {
     setValue('grandTotal', calculatedGrandTotal)
   }, [baseAmount, taxPercent, vatPercent, setValue])
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form Submitted:', data)
-    reset()
+  const onSubmit = async (data: FormData) => {
+    try {
+      console.log('Form data:', data)
+      // Normalize payment method to match backend expectation (Cash or Credit)
+      const paymentMethodNormalized = data.paymentMethod 
+        ? data.paymentMethod.charAt(0).toUpperCase() + data.paymentMethod.slice(1).toLowerCase()
+        : 'Cash'
+      
+      const payload = {
+        invoiceId: data.expenseId,
+        invoiceDate: data.expenseDate,
+        expenseType: data.category,
+        description: data.description || '',
+        supplier: data.vendor,
+        paymentMethod: paymentMethodNormalized,
+        paymentReferenceNo: data.paymentReference || '',
+        baseAmount: data.baseAmount,
+        taxPercent: data.taxPercent || 0,
+        taxAmount: data.taxAmount || 0,
+        vatPercent: data.vatPercent || 5,
+        vatAmount: data.vatAmount || 0,
+        grandTotal: data.grandTotal || 0,
+        approvedBy: data.approvedBy,
+        status: (data.status === 'active' || data.status === 'inactive' ? data.status : 'active') as 'active' | 'inactive',
+        notes: data.notes || '',
+      }
+      
+      console.log('Payload:', payload)
+      const result = await createExpense(payload).unwrap()
+      console.log('Success:', result)
+      toast.success('Expense created successfully')
+      reset()
+      // Redirect based on payment method (Cash or Credit only)
+      const paymentMethodLower = payload.paymentMethod.toLowerCase()
+      if (paymentMethodLower === 'cash') {
+        router.push('/expenses/cash-expense')
+        router.refresh()
+      } else if (paymentMethodLower === 'credit') {
+        router.push('/expenses/credit-expense')
+        router.refresh()
+      } else {
+        // Default to cash expense if payment method is not recognized
+        router.push('/expenses/cash-expense')
+        router.refresh()
+      }
+    } catch (error: any) {
+      console.error('Error creating expense:', error)
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create expense'
+      toast.error(errorMessage)
+    }
+  }
+
+  const onError = (errors: any) => {
+    console.log('Form validation errors:', errors)
+    // Show first error message
+    const firstError = Object.values(errors)[0] as any
+    if (firstError?.message) {
+      toast.error(firstError.message)
+    } else {
+      toast.error('Please fill in all required fields')
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <form onSubmit={handleSubmit(onSubmit, onError)}>
       <GeneralInformationCard control={control} watch={watch} />
       <div className="p-3 bg-light mb-3 rounded">
         <Row className="justify-content-end g-2">
           <Col lg={2}>
-            <Button variant="outline-secondary" type="submit" className="w-100">
-              Save
+            <Button variant="outline-secondary" type="button" className="w-100" onClick={() => router.back()}>
+              Cancel
             </Button>
           </Col>
           <Col lg={2}>
-            <Link href="#" className="btn btn-primary w-100">
-              Cancel
-            </Link>
+            <Button variant="primary" type="submit" className="w-100" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save'}
+            </Button>
           </Col>
         </Row>
       </div>

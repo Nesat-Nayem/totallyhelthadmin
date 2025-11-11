@@ -1,172 +1,246 @@
+'use client'
+
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
-import { getAllOrders } from '@/helpers/data'
-import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Button,
   Card,
-  CardFooter,
   CardHeader,
   CardTitle,
   Col,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownToggle,
   FormControl,
   InputGroup,
   Row,
 } from 'react-bootstrap'
-import waiter from '@/assets/images/users/avatar-1.jpg'
+import { useGetCreditExpensesQuery, useDeleteExpenseMutation } from '@/services/expenseApi'
+import Swal from 'sweetalert2'
+import { showSuccess, showError } from '@/utils/sweetAlert'
+import { useRouter } from 'next/navigation'
 
-const CreditExpenseList = async () => {
-  const customerData = await getAllOrders()
+const CreditExpenseList = () => {
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState<number | undefined>(undefined)
+  const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined)
+  // Build query params - only include defined values
+  // If no month is selected, don't filter by year either to get all data
+  const queryParams: { month?: number; year?: number } = {}
+  if (selectedMonth !== undefined) {
+    queryParams.month = selectedMonth
+    if (selectedYear !== undefined) {
+      queryParams.year = selectedYear
+    }
+  }
+  const { data: expensesRes, isLoading, error, refetch } = useGetCreditExpensesQuery(
+    Object.keys(queryParams).length > 0 ? queryParams : undefined,
+    {
+      refetchOnMountOrArgChange: true,
+    }
+  )
+
+  const [deleteExpense] = useDeleteExpenseMutation()
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Credit Expenses Query Params:', queryParams)
+    console.log('Credit Expenses Data:', expensesRes)
+    console.log('Credit Expenses Error:', error)
+    console.log('Credit Expenses Loading:', isLoading)
+  }, [expensesRes, error, isLoading, queryParams])
+
+  const expenses = useMemo(() => {
+    const data = expensesRes?.data || []
+    console.log('Credit expenses array:', data)
+    console.log('Credit expenses count:', data.length)
+    return data
+  }, [expensesRes])
+
+  const filteredExpenses = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return expenses
+    return expenses.filter((e: any) =>
+      e.invoiceId?.toLowerCase().includes(q) ||
+      e.description?.toLowerCase().includes(q) ||
+      (typeof e.expenseType === 'object' ? e.expenseType?.name?.toLowerCase().includes(q) : false) ||
+      (typeof e.supplier === 'object' ? e.supplier?.name?.toLowerCase().includes(q) : false)
+    )
+  }, [expenses, query])
+
+  const handleDelete = async (id: string, invoiceId: string) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `You want to delete expense "${invoiceId || id}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    })
+    
+    if (result.isConfirmed) {
+      try {
+        await deleteExpense(id).unwrap()
+        showSuccess('Expense has been deleted.')
+        refetch()
+      } catch (error: any) {
+        showError(error?.data?.message || 'Failed to delete expense.')
+      }
+    }
+  }
+
+  const formatDate = (date: string) => {
+    if (!date) return '-'
+    try {
+      return new Date(date).toLocaleDateString()
+    } catch {
+      return '-'
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return `AED ${(amount || 0).toFixed(2)}`
+  }
+
+  const months = [
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' },
+  ]
+
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 
   return (
-    <>
-      <Row>
-        <Col xl={12}>
-          <Card>
-            <CardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <CardTitle as="h4" className="mb-0 flex-grow-1">
-                All Expense List
-              </CardTitle>
+    <Row>
+      <Col xl={12}>
+        <Card>
+          <CardHeader className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <CardTitle as="h4" className="mb-0 flex-grow-1">
+              Credit Expense List
+            </CardTitle>
 
-              {/* Search Input */}
-              <InputGroup style={{ maxWidth: '250px' }}>
-                <FormControl placeholder="Search..." />
-                <Button variant="outline-secondary">
-                  <IconifyIcon icon="mdi:magnify" />
-                </Button>
-              </InputGroup>
+            <InputGroup style={{ maxWidth: '250px' }}>
+              <FormControl placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} />
+              <Button variant="outline-secondary">
+                <IconifyIcon icon="mdi:magnify" />
+              </Button>
+            </InputGroup>
 
-              {/* Month Filter Dropdown */}
-              <Link href="/expenses/add-expense" className="btn btn-lg btn-primary">
-                + Add Expense
-              </Link>
-            </CardHeader>
+            <Link href="/expenses/add-expense?paymentMethod=Credit" className="btn btn-lg btn-primary">
+              + Add Credit Expense
+            </Link>
+          </CardHeader>
 
-            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3">
-              {/* Month Filter Dropdown */}
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
-                <option value="all">Select Month</option>
-                <option value="january">January</option>
-                <option value="february">February</option>
-                <option value="march">March</option>
-                <option value="april">April</option>
-                <option value="may">May</option>
-                <option value="june">June</option>
-                <option value="july">July</option>
-                <option value="august">August</option>
-                <option value="september">September</option>
-                <option value="october">October</option>
-                <option value="november">November</option>
-                <option value="december">December</option>
-              </select>
-              {/* Month Filter Dropdown */}
-              <select style={{ maxWidth: '200px' }} className="form-select form-select-sm p-1">
-                <option value="all">Select Download</option>
-                <option value="pdf">PDF</option>
-                <option value="excel">Excel</option>
-                <option value="csv">CSV</option>
-              </select>
-            </div>
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3">
+            <select 
+              style={{ maxWidth: '200px' }} 
+              className="form-select form-select-sm p-1"
+              value={selectedMonth || ''}
+              onChange={(e) => setSelectedMonth(e.target.value ? parseInt(e.target.value) : undefined)}
+            >
+              <option value="">All Months</option>
+              {months.map((month) => (
+                <option key={month.value} value={month.value}>
+                  {month.label}
+                </option>
+              ))}
+            </select>
+            <select 
+              style={{ maxWidth: '200px' }} 
+              className="form-select form-select-sm p-1"
+              value={selectedYear || ''}
+              onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : undefined)}
+            >
+              <option value="">All Years</option>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <div className="table-responsive">
-                <table className="table align-middle mb-0 table-hover table-centered table-bordered">
-                  <thead className="bg-light-subtle">
+          <div>
+            <div className="table-responsive">
+              <table className="table align-middle mb-0 table-hover table-centered table-bordered">
+                <thead className="bg-light-subtle">
+                  <tr>
+                    <th>Invoice ID</th>
+                    <th>Invoice Date</th>
+                    <th>Expense Type</th>
+                    <th>Description</th>
+                    <th>Supplier</th>
+                    <th>Payment Reference</th>
+                    <th>Base Amount</th>
+                    <th>Grand Total</th>
+                    <th>Approved By</th>
+                    <th>Notes</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading && (
                     <tr>
-                      <th style={{ width: 20 }}>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck1" />
-                          <label className="form-check-label" htmlFor="customCheck1" />
-                        </div>
-                      </th>
-                      <th style={{ textWrap: 'nowrap' }}>Invoice ID</th>
-                      <th style={{ textWrap: 'nowrap' }}>Invoice Date</th>
-                      <th style={{ textWrap: 'nowrap' }}>Expense Type</th>
-                      <th style={{ textWrap: 'nowrap' }}>Description / Purpose</th>
-                      <th style={{ textWrap: 'nowrap' }}>Supplier Name</th>
-                      <th style={{ textWrap: 'nowrap' }}>Payment Method</th>
-                      <th style={{ textWrap: 'nowrap' }}>Total Amount</th>
-                      <th style={{ textWrap: 'nowrap' }}>Approved By</th>
-                      <th style={{ textWrap: 'nowrap' }}>Notes / Remarks</th>
-                      <th style={{ textWrap: 'nowrap' }}>Action</th>
+                      <td colSpan={11} className="text-center py-4">Loading...</td>
                     </tr>
-                  </thead>
-                  <tbody>
+                  )}
+                  {!isLoading && !error && filteredExpenses.length === 0 && (
                     <tr>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
-                        </div>
+                      <td colSpan={11} className="text-center py-4">No credit expenses found</td>
+                    </tr>
+                  )}
+                  {error && (
+                    <tr>
+                      <td colSpan={11} className="text-center py-4 text-danger">
+                        Error loading expenses: {(error as any)?.data?.message || (error as any)?.message || 'Unknown error'}
                       </td>
-                      <td style={{ textWrap: 'nowrap' }}>#001</td>
-                      <td style={{ textWrap: 'nowrap' }}>01 Aug 1995</td>
-                      <td style={{ textWrap: 'nowrap' }}>Maintance</td>
-                      <td style={{ textWrap: 'nowrap' }}>Maintance</td>
-                      <td style={{ textWrap: 'nowrap' }}>Raj Jamdade</td>
-                      <td style={{ textWrap: 'nowrap' }}>
-                        <span className="badge bg-success">Credit</span>
-                      </td>
-                      <td style={{ textWrap: 'nowrap' }}>AED 2000</td>
-                      <td style={{ textWrap: 'nowrap' }}>Admin</td>
-                      <td style={{ textWrap: 'nowrap' }}>Done</td>
-                      {/* Status */}
-                      <td style={{ textWrap: 'nowrap' }}>
+                    </tr>
+                  )}
+                  {!isLoading && filteredExpenses.map((expense: any) => (
+                    <tr key={expense._id}>
+                      <td>{expense.invoiceId || '-'}</td>
+                      <td>{formatDate(expense.invoiceDate)}</td>
+                      <td>{typeof expense.expenseType === 'object' ? expense.expenseType?.name : '-'}</td>
+                      <td>{expense.description || '-'}</td>
+                      <td>{typeof expense.supplier === 'object' ? expense.supplier?.name : '-'}</td>
+                      <td>{expense.paymentReferenceNo || expense.paymentReference || '-'}</td>
+                      <td>{formatCurrency(expense.baseAmount)}</td>
+                      <td>{formatCurrency(expense.grandTotal)}</td>
+                      <td>{typeof expense.approvedBy === 'object' ? expense.approvedBy?.name : '-'}</td>
+                      <td>{expense.notes || '-'}</td>
+                      <td>
                         <div className="d-flex gap-2">
-                          <Link href="/expenses/expenses-edit" className="btn btn-soft-primary btn-sm">
+                          <Link href={`/expenses/expenses-edit/${expense._id}`} className="btn btn-soft-primary btn-sm">
                             <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
                           </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
+                          <Button
+                            variant="soft-danger"
+                            size="sm"
+                            onClick={() => handleDelete(expense._id, expense.invoiceId)}
+                          >
                             <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
+                          </Button>
                         </div>
-                      </td>{' '}
-                      {/* Actions */}
+                      </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <CardFooter className="border-top">
-              <nav aria-label="Page navigation example">
-                <ul className="pagination justify-content-end mb-0">
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      Previous
-                    </Link>
-                  </li>
-                  <li className="page-item active">
-                    <Link className="page-link" href="">
-                      1
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      2
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      3
-                    </Link>
-                  </li>
-                  <li className="page-item">
-                    <Link className="page-link" href="">
-                      Next
-                    </Link>
-                  </li>
-                </ul>
-              </nav>
-            </CardFooter>
-          </Card>
-        </Col>
-      </Row>
-    </>
+          </div>
+        </Card>
+      </Col>
+    </Row>
   )
 }
 

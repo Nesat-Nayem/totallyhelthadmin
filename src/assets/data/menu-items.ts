@@ -325,6 +325,24 @@ export const MENU_ITEMS: MenuItemType[] = [
         parentKey: 'expenses',
       },
       {
+        key: 'expense-types',
+        label: 'Expense Types',
+        url: '/expenses/expense-types',
+        parentKey: 'expenses',
+      },
+      {
+        key: 'suppliers',
+        label: 'Suppliers',
+        url: '/expenses/suppliers',
+        parentKey: 'expenses',
+      },
+      {
+        key: 'approved-bys',
+        label: 'Approved By',
+        url: '/expenses/approved-bys',
+        parentKey: 'expenses',
+      },
+      {
         key: 'cash-expense',
         label: 'Cash Expense',
         url: '/expenses/cash-expense',

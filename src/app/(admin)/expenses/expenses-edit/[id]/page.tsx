@@ -1,11 +1,11 @@
 import React from 'react'
 import PageTItle from '@/components/PageTItle'
 import { Metadata } from 'next'
-import ExpenseEdit from './components/ExpenseEdit'
+import ExpenseEdit from '../components/ExpenseEdit'
 
 export const metadata: Metadata = { title: 'Expense Edit' }
 
-const ExpenseEditPage = () => {
+const ExpenseEditPage = ({ params }: { params: { id: string } }) => {
   return (
     <>
       <PageTItle title="Expense Edit" />
@@ -15,3 +15,4 @@ const ExpenseEditPage = () => {
 }
 
 export default ExpenseEditPage
+

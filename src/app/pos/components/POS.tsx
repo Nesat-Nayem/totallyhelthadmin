@@ -103,10 +103,10 @@ const POS = () => {
   const basePriceWithoutVAT = subTotal / (1 + vatPercent / 100) // Extract base price from total that includes VAT
   const vatAmount = totalWithVAT - basePriceWithoutVAT // VAT amount = Total with VAT - Base Price
   
-  // Discount is applied on the base price (without VAT)
+  // Discount is applied on the total amount (with VAT)
   const discountAmountApplied = discount
     ? (discount.type?.toLowerCase?.() === 'percent'
-        ? (basePriceWithoutVAT * (discount.amount || 0)) / 100
+        ? (totalWithVAT * (discount.amount || 0)) / 100
         : (discount.amount || 0))
     : 0
   
