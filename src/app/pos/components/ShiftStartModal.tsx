@@ -60,12 +60,6 @@ const ShiftStartModal: React.FC<ShiftStartModalProps> = ({ show, onHide, onSucce
         note: initialData.note || 'Starting new shift'
       }
       setFormData(newFormData)
-      
-      // Debug: Log the received data
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Modal received initialData:', initialData)
-        console.log('Modal setting formData:', newFormData)
-      }
     } else {
       // If no initialData, set default values for new shift
       const defaultFormData = {
@@ -87,10 +81,6 @@ const ShiftStartModal: React.FC<ShiftStartModalProps> = ({ show, onHide, onSucce
       }
       setFormData(defaultFormData)
       
-      // Debug: Log default data
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Modal using default values:', defaultFormData)
-      }
     }
   }, [initialData])
 

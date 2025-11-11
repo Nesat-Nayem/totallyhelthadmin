@@ -28,12 +28,6 @@ const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ show, onHide, onSucce
   useEffect(() => {
     if (initialData?.denominations) {
       setCounts(initialData.denominations)
-      
-      // Debug: Log the received data
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Close Modal received initialData:', initialData)
-        console.log('Close Modal setting counts:', initialData.denominations)
-      }
     }
   }, [initialData])
 

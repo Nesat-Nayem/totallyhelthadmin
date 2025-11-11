@@ -11,6 +11,8 @@ import Calculator from './Calculator'
 import PrintOrder from './PrintOrder'
 import ReportModal from '@/app/(admin)/reports/day-close-report/components/ReportModal'
 import ViewOrder from './ViewOrders'
+import ThermalReceipt from './ThermalReceipt'
+import { printThermalReceipt } from '@/utils/thermalPrint'
 
 // Product images
 import product1 from '@/assets/images/order-view/1.webp'
@@ -75,11 +77,13 @@ const POS = () => {
   const [newPaymentAmount, setNewPaymentAmount] = useState<string>('')
   const [deliveryCharge, setDeliveryCharge] = useState(0)
   const [rounding, setRounding] = useState(0)
+  const [vatPercent, setVatPercent] = useState(5) // Default VAT% is 5%
   const [notes, setNotes] = useState('')
   const [invoiceNo, setInvoiceNo] = useState('S-001')
   const [orderNo, setOrderNo] = useState('#001')
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [orderToPrint, setOrderToPrint] = useState<any>(null) // For automatic printing after save
 
   // Helper to generate a unique bill number
   const generateUniqueBillNumber = () => {
@@ -92,13 +96,22 @@ const POS = () => {
   // Calculate totals first
   const subTotal = Object.values(selectedProducts).reduce((sum, p: any) => sum + (p.price || 0) * p.qty, 0)
   
+  // VAT calculations - Sub Total already includes VAT, so we extract it
+  // Formula: Base Price = Sub Total / (1 + VAT%/100)
+  // Example: If Sub Total = 315 and VAT = 5%, then Base Price = 315 / 1.05 = 300
+  const totalWithVAT = subTotal // Sub Total already includes VAT
+  const basePriceWithoutVAT = subTotal / (1 + vatPercent / 100) // Extract base price from total that includes VAT
+  const vatAmount = totalWithVAT - basePriceWithoutVAT // VAT amount = Total with VAT - Base Price
+  
+  // Discount is applied on the total amount (with VAT)
   const discountAmountApplied = discount
     ? (discount.type?.toLowerCase?.() === 'percent'
-        ? (subTotal * (discount.amount || 0)) / 100
+        ? (totalWithVAT * (discount.amount || 0)) / 100
         : (discount.amount || 0))
     : 0
   
-  const totalBeforeRounding = subTotal + deliveryCharge - discountAmountApplied
+  // Total calculation: total with VAT - discount + delivery charge + rounding
+  const totalBeforeRounding = totalWithVAT - discountAmountApplied + deliveryCharge
   const totalAmount = totalBeforeRounding + rounding
   
   const payableAmount = Math.max(0, totalAmount - cumulativePaid)
@@ -113,6 +126,10 @@ const POS = () => {
       discount,
       deliveryCharge,
       rounding,
+      vatPercent,
+      basePriceWithoutVAT,
+      vatAmount,
+      totalWithVAT,
       notes,
       receiveAmount,
       cumulativePaid,
@@ -155,6 +172,7 @@ const POS = () => {
     discount,
     deliveryCharge,
     rounding,
+    vatPercent,
     notes,
     receiveAmount,
     cumulativePaid,
@@ -188,6 +206,10 @@ const POS = () => {
           } else {
             // Generate new invoice number if none exists
             setInvoiceNo(generateUniqueBillNumber())
+          }
+          // Restore VAT% if it exists
+          if (parsedData.vatPercent !== undefined) {
+            setVatPercent(parsedData.vatPercent)
           }
         }
       } catch (error) {
@@ -250,6 +272,7 @@ const POS = () => {
       setOriginalCumulativePaid(editingOrder.cumulativePaid || 0) // Store original cumulative paid amount
       setDeliveryCharge(editingOrder.shippingCharge || 0)
       setRounding(editingOrder.rounding || 0)
+      setVatPercent(editingOrder.vatPercent || 5) // Load VAT% from order or default to 5%
       setNotes(editingOrder.note || '')
       setInvoiceNo(editingOrder.invoiceNo || 'S-001')
       setOrderNo(editingOrder.orderNo || '#001')
@@ -494,13 +517,11 @@ const POS = () => {
 
   const handleStartDay = async () => {
     try {
-      console.log('Starting day...')
       const result = await startDayClose({
         startTime: new Date().toISOString(),
         note: 'Day started from POS system'
       }).unwrap()
       
-      console.log('Start day result:', result)
       await refetchOpenDay()
       showSuccess('Day started successfully')
     } catch (e: any) {
@@ -588,9 +609,10 @@ const POS = () => {
         date: startDate,  // Required field
         subTotal,
         total: totalAmount,  // Required field
-        // VAT fields commented out - VAT calculation disabled
-        // vatPercent,
-        // vatAmount,
+        vatPercent,
+        vatAmount,
+        basePriceWithoutVAT,
+        totalWithVAT,
         discountType: discount ? (discount.type?.toLowerCase?.() === 'percent' ? 'percent' : 'flat') as 'flat' | 'percent' : undefined,
         discountAmount: discountAmountApplied,
         shippingCharge: deliveryCharge,
@@ -614,6 +636,8 @@ const POS = () => {
       }
       
       let result
+      const isPaid = cumulativePaid >= totalAmount || payableAmount === 0
+      
       if (isEditMode && editingOrder) {
         // Update existing order (called from Settle Bill button)
         result = await updateOrder({ id: editingOrder._id, data: orderData }).unwrap()
@@ -625,6 +649,52 @@ const POS = () => {
         // Invalidate order cache to refresh paid/unpaid lists
         rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
         
+        // Auto-print receipts if order is paid (Settle Bill)
+        if (isPaid) {
+          // Prepare order data for printing (merge result with current order data)
+          const printData = {
+            ...orderData,
+            ...result,
+            invoiceNo: result.invoiceNo || invoiceNo,
+            orderNo: result.orderNo || orderNo,
+            selectedProducts,
+            itemOptions,
+            customer,
+            discount,
+            deliveryCharge,
+            rounding,
+            vatPercent,
+            basePriceWithoutVAT,
+            vatAmount,
+            totalWithVAT,
+            notes,
+            receiveAmount,
+            cumulativePaid,
+            payments,
+            selectedAggregator,
+            startDate,
+            endDate,
+            subTotal,
+            totalAmount,
+            payableAmount,
+            changeAmount,
+            discountAmountApplied,
+            selectedOrderType,
+            selectedPriceType,
+          }
+          setOrderToPrint(printData)
+          
+          // Wait for ThermalReceipt components to render, then print
+          setTimeout(() => {
+            printThermalReceipt('customer')
+            setTimeout(() => {
+              printThermalReceipt('kitchen')
+              // Clear print data after printing
+              setTimeout(() => setOrderToPrint(null), 1000)
+            }, 500)
+          }, 300)
+        }
+        
         // Optionally navigate back to reports after successful update
         // Uncomment the line below if you want automatic navigation back to reports
         // setTimeout(() => router.push('/reports/all-income'), 2000)
@@ -635,6 +705,52 @@ const POS = () => {
         
         // Invalidate order cache to refresh paid/unpaid lists
         rtkDispatch(orderApi.util.invalidateTags([{ type: 'Order', id: 'PAID_TODAY' }, { type: 'Order', id: 'UNPAID_TODAY' }]))
+        
+        // Auto-print receipts if order is paid (Save button)
+        if (isPaid) {
+          // Prepare order data for printing (merge result with current order data)
+          const printData = {
+            ...orderData,
+            ...result,
+            invoiceNo: result.invoiceNo || invoiceNo,
+            orderNo: result.orderNo || orderNo,
+            selectedProducts,
+            itemOptions,
+            customer,
+            discount,
+            deliveryCharge,
+            rounding,
+            vatPercent,
+            basePriceWithoutVAT,
+            vatAmount,
+            totalWithVAT,
+            notes,
+            receiveAmount,
+            cumulativePaid,
+            payments,
+            selectedAggregator,
+            startDate,
+            endDate,
+            subTotal,
+            totalAmount,
+            payableAmount,
+            changeAmount,
+            discountAmountApplied,
+            selectedOrderType,
+            selectedPriceType,
+          }
+          setOrderToPrint(printData)
+          
+          // Wait for ThermalReceipt components to render, then print
+          setTimeout(() => {
+            printThermalReceipt('customer')
+            setTimeout(() => {
+              printThermalReceipt('kitchen')
+              // Clear print data after printing
+              setTimeout(() => setOrderToPrint(null), 1000)
+            }, 500)
+          }, 300)
+        }
       }
       
       // Reset form
@@ -644,6 +760,7 @@ const POS = () => {
       setDiscount(null)
       setDeliveryCharge(0)
       setRounding(0)
+      setVatPercent(5) // Reset VAT% to default 5%
       setNotes('')
       setReceiveAmount(0)
       setCumulativePaid(0)
@@ -682,6 +799,7 @@ const POS = () => {
     setDiscount(null)
     setDeliveryCharge(0)
     setRounding(0)
+    setVatPercent(5) // Reset VAT% to default 5%
     setNotes('')
     setReceiveAmount(0)
     setCumulativePaid(0)
@@ -710,6 +828,14 @@ const POS = () => {
     <>
       <DefaultModaal show={showOrderTypeModal} onClose={() => dispatch(hideOrderTypeModal())} />
       <ReportModal show={showDayReportModal} onClose={() => setShowDayReportModal(false)} data={dayReportData || undefined} />
+      
+      {/* Hidden Thermal Receipt Components for Auto-Printing */}
+      {orderToPrint && (
+        <>
+          <ThermalReceipt orderData={orderToPrint} receiptType="customer" />
+          <ThermalReceipt orderData={orderToPrint} receiptType="kitchen" />
+        </>
+      )}
       
       {/* Shift Modals */}
       <ShiftStartModal
@@ -1019,6 +1145,59 @@ const POS = () => {
                   <Form.Label>Sub Total</Form.Label>
                   <Form.Control type="text" value={`AED ${subTotal.toFixed(2)}`} disabled />
                 </Form.Group>
+
+                {/* VAT Fields */}
+                <Row className="g-3 mb-3">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>VAT %</Form.Label>
+                      <Form.Control 
+                        type="number" 
+                        placeholder="Enter VAT %" 
+                        value={vatPercent} 
+                        onChange={(e) => setVatPercent(parseFloat(e.target.value) || 0)}
+                        min={0}
+                        step={0.01}
+                      />
+                      <Form.Text className="text-muted">Default: 5%</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Base Price (Without VAT)</Form.Label>
+                      <Form.Control 
+                        type="text" 
+                        value={`AED ${basePriceWithoutVAT.toFixed(2)}`} 
+                        disabled 
+                      />
+                      <Form.Text className="text-muted">Total price without VAT</Form.Text>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row className="g-3 mb-3">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>VAT Amount</Form.Label>
+                      <Form.Control 
+                        type="text" 
+                        value={`AED ${vatAmount.toFixed(2)}`} 
+                        disabled 
+                      />
+                      <Form.Text className="text-muted">VAT amount ({vatPercent}%)</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Total Price (With VAT)</Form.Label>
+                      <Form.Control 
+                        type="text" 
+                        value={`AED ${totalWithVAT.toFixed(2)}`} 
+                        disabled 
+                      />
+                      <Form.Text className="text-muted">Base price + VAT</Form.Text>
+                    </Form.Group>
+                  </Col>
+                </Row>
 
                 {/* Left Side */}
                 <Col md={6}>

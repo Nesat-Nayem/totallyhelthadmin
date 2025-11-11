@@ -8,7 +8,7 @@ export interface CreateRoleRequest {
   email: string
   password: string
   phone: string
-  role: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff'
+  role: 'super admin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff'
   menuAccess?: MenuAccess
 }
 

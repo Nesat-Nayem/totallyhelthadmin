@@ -54,7 +54,24 @@ const RoleForm: React.FC<RoleFormProps> = ({
   const [menuAccess, setMenuAccess] = useState<MenuAccess>(initialData?.menuAccess || {})
   
   // Fixed roles as per backend enum - no dynamic creation
+  // Backend expects "super admin" (two words), but we use "superadmin" internally for consistency
   const availableRoles = ['superadmin', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff']
+  
+  // Map internal role values to backend expected values
+  const mapRoleToBackend = (role: string): string => {
+    if (role === 'superadmin') {
+      return 'super admin'
+    }
+    return role
+  }
+  
+  // Map backend role values to internal values
+  const mapRoleFromBackend = (role: string): string => {
+    if (role === 'super admin') {
+      return 'superadmin'
+    }
+    return role
+  }
   
   // API mutation
   const [createRole, { isLoading: isCreating }] = useCreateRoleMutation()
@@ -99,7 +116,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
         if (mode === 'edit') {
           reset({
             staffName: initialData.staffName || '',
-            role: initialData.role || '',
+            role: mapRoleFromBackend(initialData.role || ''),
             email: initialData.email || '',
             phone: initialData.phone || ''
           }, {
@@ -119,7 +136,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
         
         // Also set individual values to ensure they're updated
         setValue('staffName', initialData.staffName || '')
-        setValue('role', initialData.role || '')
+        setValue('role', mapRoleFromBackend(initialData.role || ''))
         setValue('email', initialData.email || '')
         setValue('phone', initialData.phone || '')
         
@@ -150,6 +167,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
       if (mode === 'edit') {
         // For edit mode, call the onSubmit callback directly
         if (onSubmit) {
+          // Use internal format (superadmin) for RoleFormData
           const formData: RoleFormData = {
             staffName: data.staffName,
             email: data.email,
@@ -161,12 +179,13 @@ const RoleForm: React.FC<RoleFormProps> = ({
         }
       } else {
         // For create mode, use the API
+        // Map role to backend format (superadmin -> super admin)
         const apiPayload = {
           name: data.staffName,
           email: data.email,
           password: data.password,
           phone: data.phone,
-          role: data.role as 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
+          role: mapRoleToBackend(data.role) as 'super admin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
           menuAccess: menuAccess
         }
         
@@ -185,12 +204,13 @@ const RoleForm: React.FC<RoleFormProps> = ({
         
         // Call the onSubmit callback if provided
         if (onSubmit) {
+          // Convert backend format to internal format for RoleFormData
           const formData: RoleFormData = {
             staffName: result.data.name,
             email: result.data.email,
             password: '', // Don't pass password back
             phone: result.data.phone,
-            role: result.data.role as 'admin' | 'manager' | 'cashier' | 'waiter' | 'staff',
+            role: mapRoleFromBackend(result.data.role) as 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'cashier' | 'waiter' | 'staff',
             menuAccess: result.data.menuAccess
           }
           onSubmit(formData)
@@ -276,7 +296,7 @@ const RoleForm: React.FC<RoleFormProps> = ({
                       <option value="">Select Role</option>
                       {availableRoles.map(role => (
                         <option key={role} value={role}>
-                          {role}
+                          {role === 'superadmin' ? 'Super Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
                         </option>
                       ))}
                     </select>

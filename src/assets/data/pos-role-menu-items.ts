@@ -226,6 +226,24 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
         parentKey: 'expenses',
       },
       {
+        key: 'expense-types',
+        label: 'Expense Types',
+        url: '/expenses/expense-types',
+        parentKey: 'expenses',
+      },
+      {
+        key: 'suppliers',
+        label: 'Suppliers',
+        url: '/expenses/suppliers',
+        parentKey: 'expenses',
+      },
+      {
+        key: 'approved-bys',
+        label: 'Approved By',
+        url: '/expenses/approved-bys',
+        parentKey: 'expenses',
+      },
+      {
         key: 'cash-expense',
         label: 'Cash Expense',
         url: '/expenses/cash-expense',
@@ -395,6 +413,12 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
         key: 'home-banner',
         label: 'Home Banner',
         url: '/pages/home-banner',
+        parentKey: 'pages',
+      },
+      {
+        key: 'included-meals',
+        label: 'Included Meals',
+        url: '/pages/included-meals',
         parentKey: 'pages',
       },
       {

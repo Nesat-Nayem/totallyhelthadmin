@@ -100,12 +100,21 @@ const EditRolePage: React.FC = () => {
 
   const role = data.data
 
+  // Map backend role format to internal format
+  // Backend returns "super admin" but form uses "superadmin"
+  const mapRoleFromBackend = (roleValue: string): string => {
+    if (roleValue === 'super admin') {
+      return 'superadmin'
+    }
+    return roleValue
+  }
+
   // Transform API data to form format
   const initialData = {
     staffName: role.name,
     email: role.email,
     phone: role.phone,
-    role: role.role,
+    role: mapRoleFromBackend(role.role),
     password: '', // Don't pre-fill password for security
     menuAccess: role.menuAccess || {}
   }

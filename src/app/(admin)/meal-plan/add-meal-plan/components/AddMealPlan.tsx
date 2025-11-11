@@ -41,6 +41,7 @@ const AddMealPlan = () => {
   const [category, setCategory] = useState('')
   const [brand, setBrand] = useState('')
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
+  const [showOnClient, setShowOnClient] = useState<boolean>(true)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [isProcessingFiles, setIsProcessingFiles] = useState(false)
   const [weeks, setWeeks] = useState<WeekMealPlan[]>([])
@@ -303,6 +304,7 @@ const AddMealPlan = () => {
       formData.append('category', category)
       formData.append('brand', brand)
       formData.append('status', status)
+      formData.append('showOnClient', showOnClient.toString())
       
       // Add dynamic arrays
       const filteredKcalList = kcalList.filter(item => item.value.trim() !== '').map(item => item.value)
@@ -381,6 +383,7 @@ const AddMealPlan = () => {
               formDataWithoutImages.append('category', category)
               formDataWithoutImages.append('brand', brand)
               formDataWithoutImages.append('status', status)
+              formDataWithoutImages.append('showOnClient', showOnClient.toString())
               
               // Add dynamic arrays without images
               const filteredKcalList = kcalList.filter(item => item.value.trim() !== '').map(item => item.value)
@@ -907,6 +910,27 @@ const AddMealPlan = () => {
               />
               <label className="form-check-label" htmlFor="flexSwitchCheckDefault">
                 Active
+              </label>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Show on Client */}
+        <Card>
+          <CardHeader>
+            <CardTitle as="h4">Show on Client</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <div className="form-check form-switch">
+              <input 
+                className="form-check-input" 
+                type="checkbox" 
+                id="showOnClientSwitch" 
+                checked={showOnClient}
+                onChange={(e) => setShowOnClient(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="showOnClientSwitch">
+                Show on Client
               </label>
             </div>
           </CardBody>

@@ -35,6 +35,7 @@ export type MealPlan = {
   }>
   status: 'active' | 'inactive'
   isDeleted?: boolean
+  showOnClient?: boolean
   createdAt: string
   updatedAt: string
 }

@@ -42,7 +42,24 @@ const EditRole: React.FC<EditRoleProps> = ({
   const [menuAccess, setMenuAccess] = useState<MenuAccess>(initialData?.menuAccess || {})
   
   // Fixed roles as per backend enum
+  // Backend expects "super admin" (two words), but we use "superadmin" internally for consistency
   const availableRoles = ['superadmin', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff']
+  
+  // Map internal role values to backend expected values
+  const mapRoleToBackend = (role: string): string => {
+    if (role === 'superadmin') {
+      return 'super admin'
+    }
+    return role
+  }
+  
+  // Map backend role values to internal values
+  const mapRoleFromBackend = (role: string): string => {
+    if (role === 'super admin') {
+      return 'superadmin'
+    }
+    return role
+  }
   
   // API hooks
   const { updateRole, isUpdating } = useRoleApi()
@@ -77,7 +94,7 @@ const EditRole: React.FC<EditRoleProps> = ({
         // Force reset with new data
         reset({
           staffName: initialData.staffName || '',
-          role: initialData.role || '',
+          role: mapRoleFromBackend(initialData.role || ''),
           email: initialData.email || '',
           phone: initialData.phone || ''
         }, {
@@ -86,7 +103,7 @@ const EditRole: React.FC<EditRoleProps> = ({
         
         // Also set individual values to ensure they're updated
         setValue('staffName', initialData.staffName || '')
-        setValue('role', initialData.role || '')
+        setValue('role', mapRoleFromBackend(initialData.role || ''))
         setValue('email', initialData.email || '')
         setValue('phone', initialData.phone || '')
         
@@ -106,11 +123,12 @@ const EditRole: React.FC<EditRoleProps> = ({
   const handleFormSubmit = async (data: any) => {
     try {
       
+      // Map role to backend format (superadmin -> super admin)
       const updateData: any = {
         name: data.staffName,
         email: data.email,
         phone: data.phone,
-        role: data.role,
+        role: mapRoleToBackend(data.role),
         menuAccess: menuAccess
       }
       
@@ -203,7 +221,7 @@ const EditRole: React.FC<EditRoleProps> = ({
                             <option value="">Select Role</option>
                             {availableRoles.map((role) => (
                               <option key={role} value={role}>
-                                {role}
+                                {role === 'superadmin' ? 'Super Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
                               </option>
                             ))}
                           </select>
