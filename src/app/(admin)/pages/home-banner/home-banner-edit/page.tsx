@@ -1,16 +1,37 @@
-import React from 'react'
+'use client'
+import React, { Suspense, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import PageTItle from '@/components/PageTItle'
-import { Metadata } from 'next'
 import HomeBannerEdit from './components/HomeBannerEdit'
 
-export const metadata: Metadata = { title: 'Home Banner Edit' }
+const HomeBannerEditContent = () => {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id')
 
-const HomeBannerEditPage = () => {
+  useEffect(() => {
+    if (!id) {
+      router.push('/pages/home-banner')
+    }
+  }, [id, router])
+
+  if (!id) {
+    return null
+  }
+
   return (
     <>
       <PageTItle title="Home Banner Edit" />
-      <HomeBannerEdit />
+      <HomeBannerEdit id={id} />
     </>
+  )
+}
+
+const HomeBannerEditPage = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeBannerEditContent />
+    </Suspense>
   )
 }
 
