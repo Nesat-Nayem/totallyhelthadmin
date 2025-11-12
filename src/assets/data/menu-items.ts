@@ -601,6 +601,18 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/pages/restaurants-location',
         parentKey: 'pages',
       },
+      {
+        key: 'logo',
+        label: 'Logo',
+        url: '/pages/logo',
+        parentKey: 'pages',
+      },
+      {
+        key: 'subscription',
+        label: 'Subscription',
+        url: '/pages/subscription',
+        parentKey: 'pages',
+      },
     ],
   },
   {

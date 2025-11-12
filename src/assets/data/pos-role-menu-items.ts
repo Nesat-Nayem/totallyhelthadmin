@@ -493,6 +493,18 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
         url: '/pages/restaurants-location',
         parentKey: 'pages',
       },
+      {
+        key: 'logo',
+        label: 'Logo',
+        url: '/pages/logo',
+        parentKey: 'pages',
+      },
+      {
+        key: 'subscription',
+        label: 'Subscription',
+        url: '/pages/subscription',
+        parentKey: 'pages',
+      },
     ],
   },
   {
