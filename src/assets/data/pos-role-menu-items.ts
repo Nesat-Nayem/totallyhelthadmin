@@ -428,12 +428,6 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
         parentKey: 'pages',
       },
       {
-        key: 'about-us',
-        label: 'About Us',
-        url: '/pages/about-us',
-        parentKey: 'pages',
-      },
-      {
         key: 'pages-brands',
         label: 'Brands',
         url: '/pages/brands',
@@ -529,6 +523,31 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
         label: 'Blog List',
         url: '/blog/blog-list',
         parentKey: 'blog',
+      },
+    ],
+  },
+  {
+    key: 'about-us',
+    label: 'About Details',
+    icon: 'solar:info-circle-bold-duotone',
+    children: [
+      {
+        key: 'about-us-details',
+        label: 'About Details',
+        url: '/about-us/about-us-details',
+        parentKey: 'about-us',
+      },
+      {
+        key: 'about-us-food',
+        label: 'About Food',
+        url: '/about-us/about-us-food',
+        parentKey: 'about-us',
+      },
+      {
+        key: 'about-us-author',
+        label: 'About Author',
+        url: '/about-us/about-us-author',
+        parentKey: 'about-us',
       },
     ],
   },
