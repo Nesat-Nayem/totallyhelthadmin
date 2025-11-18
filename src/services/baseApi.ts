@@ -76,6 +76,6 @@ const baseQuery = fetchBaseQuery({
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Branch', 'MealPlan', 'Category', 'Brand', 'Aggregator', 'PaymentMethod', 'MoreOption', 'Customer', 'Order', 'Menu', 'MenuCategory', 'DayClose', 'Shift', 'Role', 'UserMembership', 'Banner', 'IncludedMeal', 'Testimonial', 'WhyChoose', 'MealPlanWork', 'Compare', 'ExpenseType', 'Supplier', 'ApprovedBy', 'Expense', 'Video', 'Logo', 'Subscription', 'AboutUsDetails', 'AboutUsFood', 'AboutUsAuthor'],
+  tagTypes: ['Branch', 'MealPlan', 'Category', 'Brand', 'Aggregator', 'PaymentMethod', 'MoreOption', 'Customer', 'Order', 'Menu', 'MenuCategory', 'DayClose', 'Shift', 'Role', 'UserMembership', 'Banner', 'IncludedMeal', 'Testimonial', 'WhyChoose', 'MealPlanWork', 'Compare', 'ExpenseType', 'Supplier', 'ApprovedBy', 'Expense', 'Video', 'Logo', 'Subscription', 'AboutUsDetails', 'AboutUsFood', 'AboutUsAuthor', 'FAQ', 'TermsCondition', 'PrivacyPolicy', 'Contact'],
   endpoints: () => ({}),
 })
