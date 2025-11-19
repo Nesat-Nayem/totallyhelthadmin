@@ -399,6 +399,12 @@ export const POS_ROLE_MENU_ITEMS: MenuItemType[] = [
     url: '/contact-us',
   },
   {
+    key: 'get-in-touch',
+    label: 'Get In Touch',
+    icon: 'solar:phone-calling-bold-duotone',
+    url: '/get-in-touch',
+  },
+  {
     key: 'meal-plan-order-history',
     label: 'Meal Plan Order History',
     icon: 'solar:cart-5-bold-duotone',
