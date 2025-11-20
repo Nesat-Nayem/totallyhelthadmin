@@ -1,37 +1,26 @@
+'use client'
 import IconifyIcon from '@/components/wrappers/IconifyIcon'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import { Card, CardFooter, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
-import banner1 from '../../../../../assets/images/banner/1.jpg'
-import banner2 from '../../../../../assets/images/banner/2.jpg'
-import banner3 from '../../../../../assets/images/banner/3.jpg'
+import { Button, Card, CardFooter, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
+import { useDeleteRestaurantLocationMutation, useGetRestaurantLocationsQuery } from '@/services/restaurantLocationApi'
+import type { RestaurantLocation } from '@/services/restaurantLocationApi'
 
-const data = [
-  {
-    id: 1,
-    banner: banner1,
-    name: 'Totally Health',
-    title: 'Dubai',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    banner: banner2,
-    name: 'Totally Health',
-    title: 'Dubai',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    banner: banner3,
-    name: 'Totally Health',
-    title: 'Dubai',
-    status: 'Active',
-  },
-]
+const RestaurantsLocation = () => {
+  const { data = [], isLoading } = useGetRestaurantLocationsQuery()
+  const [deleteRestaurantLocation, { isLoading: deleting }] = useDeleteRestaurantLocationMutation()
 
-const RestaurantsLocation = async () => {
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this restaurant location?')) {
+      try {
+        await deleteRestaurantLocation(id).unwrap()
+      } catch (e: any) {
+        alert(e?.data?.message || 'Failed to delete restaurant location')
+      }
+    }
+  }
+
   return (
     <Row>
       <Col xl={12}>
@@ -41,7 +30,7 @@ const RestaurantsLocation = async () => {
               Restaurants Locations
             </CardTitle>
             <Link href="/pages/restaurants-location/restaurants-location-add" className="btn btn-lg btn-primary">
-              + Add Restaurants
+              + Add Restaurant Location
             </Link>
           </CardHeader>
           <div>
@@ -49,52 +38,65 @@ const RestaurantsLocation = async () => {
               <table className="table align-middle mb-0 table-hover table-centered">
                 <thead className="bg-light-subtle">
                   <tr>
-                    <th style={{ width: 20 }}>
-                      <div className="form-check">
-                        <input type="checkbox" className="form-check-input" id="customCheck1" />
-                        <label className="form-check-label" htmlFor="customCheck1" />
-                      </div>
-                    </th>
-                    <th>Restaurants Img</th>
-                    <th>Restaurants Name</th>
-                    <th>Location</th>
-                    <th>Status</th>
+                    <th>Restaurant Image</th>
+                    <th>Restaurant Name</th>
+                    <th>Address</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="form-check">
-                          <input type="checkbox" className="form-check-input" id="customCheck2" />
-                          <label className="form-check-label" htmlFor="customCheck2" />
-                        </div>
-                      </td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
-                            <Image src={item.banner} alt="product" className="avatar-md" />
-                          </div>
-                        </div>
-                      </td>
-                      <td>{item.name}</td>
-                      <td>{item.title}</td>
-                      <td>
-                        <span className="badge bg-success">{item.status}</span>
-                      </td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Link href="/pages/restaurants-location/restaurants-location-edit" className="btn btn-soft-primary btn-sm">
-                            <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
-                          </Link>
-                          <Link href="" className="btn btn-soft-danger btn-sm">
-                            <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
-                          </Link>
-                        </div>
-                      </td>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={4}>Loading...</td>
                     </tr>
-                  ))}
+                  ) : data.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>No restaurant locations found</td>
+                    </tr>
+                  ) : (
+                    data.map((item: RestaurantLocation) => (
+                      <tr key={item._id}>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <div className="rounded bg-light avatar-md d-flex align-items-center justify-content-center">
+                              {item.image ? (
+                                <Image
+                                  src={item.image}
+                                  alt={item.name}
+                                  width={50}
+                                  height={50}
+                                  className="avatar-md rounded"
+                                  style={{ objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <IconifyIcon icon="solar:restaurant-bold-duotone" className="fs-24 text-muted" />
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{item.name}</td>
+                        <td>{item.address}</td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <Link
+                              href={`/pages/restaurants-location/restaurants-location-edit?id=${item._id}`}
+                              className="btn btn-soft-primary btn-sm"
+                            >
+                              <IconifyIcon icon="solar:pen-2-broken" className="align-middle fs-18" />
+                            </Link>
+                            <Button
+                              variant="soft-danger"
+                              size="sm"
+                              onClick={() => handleDelete(item._id)}
+                              disabled={deleting}
+                            >
+                              <IconifyIcon icon="solar:trash-bin-minimalistic-2-broken" className="align-middle fs-18" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -102,29 +104,9 @@ const RestaurantsLocation = async () => {
           <CardFooter className="border-top">
             <nav aria-label="Page navigation example">
               <ul className="pagination justify-content-end mb-0">
-                <li className="page-item">
-                  <Link className="page-link" href="">
-                    Previous
-                  </Link>
-                </li>
                 <li className="page-item active">
                   <Link className="page-link" href="">
                     1
-                  </Link>
-                </li>
-                <li className="page-item">
-                  <Link className="page-link" href="">
-                    2
-                  </Link>
-                </li>
-                <li className="page-item">
-                  <Link className="page-link" href="">
-                    3
-                  </Link>
-                </li>
-                <li className="page-item">
-                  <Link className="page-link" href="">
-                    Next
                   </Link>
                 </li>
               </ul>

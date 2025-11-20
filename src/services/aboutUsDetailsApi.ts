@@ -3,7 +3,6 @@ import { baseApi } from '@/services/baseApi'
 export type AboutUsDetailsService = {
   title: string
   description: string
-  icon: string
 }
 
 export type AboutUsDetails = {
@@ -38,7 +37,6 @@ export type AboutUsDetailsCreateRequest = {
   services?: Array<{
     title: string
     description: string
-    icon?: string
   }>
 }
 

@@ -24,8 +24,6 @@ type AboutUsDetailsFormData = {
     _id?: string
     title: string
     description: string
-    icon?: FileList | null
-    iconUrl?: string
   }>
 }
 
@@ -42,8 +40,6 @@ const aboutUsDetailsSchema: yup.ObjectSchema<AboutUsDetailsFormData> = yup.objec
     yup.object({
       title: yup.string().required('Service title is required'),
       description: yup.string().required('Service description is required'),
-      icon: yup.mixed().nullable().optional(),
-      iconUrl: yup.string().nullable().optional(),
     })
   ),
 }) as yup.ObjectSchema<AboutUsDetailsFormData>
@@ -73,7 +69,6 @@ const AboutUsDetails: React.FC = () => {
     },
   })
 
-  const watchedServices = watch('services')
   const watchedImageUrl = watch('imageUrl')
 
   const { fields, append, remove } = useFieldArray({
@@ -107,8 +102,6 @@ const AboutUsDetails: React.FC = () => {
           _id: service._id || '', // Include _id for existing services
           title: service.title || '',
           description: service.description || '',
-          icon: null, // Explicitly set to null for updates
-          iconUrl: isValidImageUrl(service.icon) ? service.icon : '',
         })) || [],
       })
     }
@@ -130,24 +123,18 @@ const AboutUsDetails: React.FC = () => {
       // Build services data - CRITICAL: Send ONLY services you want to keep
       // Backend behavior:
       // - Services IN request: Updated (if has _id) or Created (if no _id)
-      // - Services NOT in request: DELETED (removed from database and Cloudinary)
+      // - Services NOT in request: DELETED (removed from database)
       // 
       // So when user clicks "Remove" on a service:
       // - Service is removed from form array (via remove(index))
       // - Service won't be in data.services when submitted
       // - Backend will delete it automatically
-      //
-      // Backend priority for icons: iconFiles[iconFileIndex]?.path > serv.icon (if valid) > existing icon
       const servicesData = data.services
-        .map((service, index) => {
-          const hasNewFile = service.icon && service.icon.length > 0 && service.icon[0] instanceof File
-          const hasExistingIcon = service.iconUrl && service.iconUrl.trim() !== '' && isValidImageUrl(service.iconUrl)
+        .map((service) => {
           const hasId = service._id && service._id.trim() !== ''
 
-          // CRITICAL: Always include existing services (with _id) even if icon is missing
-          // Backend will use existing icon from database for services with _id
-          // Only skip NEW services (no _id) that don't have an icon
-          if (!hasId && !hasNewFile && !hasExistingIcon) {
+          // Skip services without title or description
+          if (!service.title || !service.description) {
             return null
           }
 
@@ -162,50 +149,14 @@ const AboutUsDetails: React.FC = () => {
             serviceData._id = service._id
           }
 
-          // Icon handling (backend priority: iconFiles[iconFileIndex] > serv.icon > existing icon):
-          // - If new file selected: send empty string (backend will use iconFiles[iconFileIndex])
-          // - If no new file but existing icon: send existing icon URL (preserves existing icon)
-          // - If existing service (has _id) but no icon in form: send empty string (backend will use existing from DB)
-          if (hasNewFile) {
-            // New file selected - send empty string, backend will use uploaded file from iconFiles array
-            serviceData.icon = ''
-          } else if (hasExistingIcon) {
-            // No new file but existing icon in form - send existing icon URL to preserve it
-            serviceData.icon = service.iconUrl
-          } else if (hasId) {
-            // Existing service (has _id) but no icon in form - send empty string
-            // Backend will use existing icon from database for services with _id
-            serviceData.icon = ''
-          } else {
-            // New service without icon - should have been filtered above, but just in case
-            return null
-          }
-
           return serviceData
         })
-        .filter((service) => service !== null) // Filter out services without icons
-
-      console.log('Final services to send:', servicesData.length)
-      console.log('Services data:', servicesData)
-      console.log('=== END DEBUG ===')
-      console.log('⚠️ IMPORTANT: Services NOT in this array will be DELETED by backend')
+        .filter((service) => service !== null) // Filter out invalid services
 
       // Send services array - backend will:
       // 1. Keep/update services in this array
       // 2. Delete services NOT in this array (removed from form)
-      // 3. Delete icons from Cloudinary for removed services
       formDataObj.append('services', JSON.stringify(servicesData))
-
-      // Append icon files in the SAME order as services array
-      // Backend uses iconFileIndex counter that increments only when a file is found
-      // So files must be sent in the same order as services appear
-      // Example: If Service[0] has file and Service[1] has file, send icons[0] and icons[1]
-      data.services.forEach((service) => {
-        if (service.icon && service.icon.length > 0 && service.icon[0] instanceof File) {
-          formDataObj.append('icons', service.icon[0])
-        }
-        // If no new file, don't append - backend counter will skip this index
-      })
 
       const token = getAuthToken()
       if (!token) {
@@ -325,7 +276,7 @@ const AboutUsDetails: React.FC = () => {
               <Button
                 type="button"
                 variant="primary"
-                onClick={() => append({ title: '', description: '', icon: null, iconUrl: '', _id: '' })}
+                onClick={() => append({ title: '', description: '', _id: '' })}
               >
                 Add Service
               </Button>
@@ -369,44 +320,6 @@ const AboutUsDetails: React.FC = () => {
                             label="Service Description"
                             placeholder="Enter service description"
                             rows={3}
-                          />
-                        </Col>
-                        <Col lg={12}>
-                          <Controller
-                            control={control}
-                            name={`services.${index}.icon`}
-                            render={({ field: { onChange, value, ...field }, fieldState }) => (
-                              <div>
-                                <label className="form-label">Service Icon</label>
-                                <input
-                                  {...field}
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    const files = e.target.files
-                                    onChange(files)
-                                  }}
-                                  className={`form-control ${fieldState.error ? 'is-invalid' : ''}`}
-                                />
-                                {watchedServices?.[index]?.iconUrl && 
-                                 isValidImageUrl(watchedServices[index].iconUrl) && 
-                                 !value && (
-                                  <div className="mt-2">
-                                    <small className="text-muted d-block mb-1">Current icon:</small>
-                                    <Image
-                                      src={watchedServices[index].iconUrl}
-                                      alt="Service Icon"
-                                      width={80}
-                                      height={80}
-                                      style={{ objectFit: 'cover', borderRadius: '4px' }}
-                                    />
-                                  </div>
-                                )}
-                                {fieldState.error && (
-                                  <div className="invalid-feedback">{fieldState.error.message}</div>
-                                )}
-                              </div>
-                            )}
                           />
                         </Col>
                       </Row>

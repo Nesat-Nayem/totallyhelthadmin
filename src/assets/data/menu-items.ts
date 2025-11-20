@@ -514,6 +514,12 @@ export const MENU_ITEMS: MenuItemType[] = [
     url: '/get-in-touch',
   },
   {
+    key: 'restaurant-location',
+    label: 'Restaurant Location',
+    icon: 'solar:map-point-bold-duotone',
+    url: '/pages/restaurants-location',
+  },
+  {
     key: 'meal-plan-order-history',
     label: 'Meal Plan Order History',
     icon: 'solar:cart-5-bold-duotone',
